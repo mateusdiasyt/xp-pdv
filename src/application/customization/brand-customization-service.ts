@@ -2,6 +2,7 @@ import { updateBrandCustomizationSchema } from "@/domain/customization/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
+  ensureBrandCustomizationTable,
   getLatestBrandCustomization,
   isMissingBrandCustomizationTableError,
   upsertBrandCustomization,
@@ -130,11 +131,38 @@ export async function getBrandCustomizationSnapshot() {
     };
   } catch (error) {
     if (isMissingBrandCustomizationTableError(error)) {
-      console.warn("[CUSTOMIZATION] Tabela BrandCustomization ainda nao existe neste banco.");
-      return {
-        customization: defaultBrandCustomization,
-        setupPending: true,
-      };
+      console.warn("[CUSTOMIZATION] Tabela BrandCustomization ausente. Tentando auto-bootstrap.");
+
+      try {
+        await ensureBrandCustomizationTable();
+        const retriedCustomization = await getLatestBrandCustomization();
+
+        if (!retriedCustomization) {
+          return {
+            customization: defaultBrandCustomization,
+            setupPending: false,
+          };
+        }
+
+        return {
+          customization: {
+            primaryColor: normalizeHex(retriedCustomization.primaryColor),
+            accentColor: normalizeHex(retriedCustomization.accentColor),
+            backgroundColor: normalizeHex(retriedCustomization.backgroundColor),
+            foregroundColor: normalizeHex(retriedCustomization.foregroundColor),
+            logoDataUrl: retriedCustomization.logoDataUrl ?? undefined,
+            faviconDataUrl: retriedCustomization.faviconDataUrl ?? undefined,
+            updatedAt: retriedCustomization.updatedAt,
+          } satisfies BrandCustomizationSnapshot,
+          setupPending: false,
+        };
+      } catch (bootstrapError) {
+        console.error("[CUSTOMIZATION] Falha no auto-bootstrap da tabela BrandCustomization:", bootstrapError);
+        return {
+          customization: defaultBrandCustomization,
+          setupPending: true,
+        };
+      }
     }
 
     throw error;

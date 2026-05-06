@@ -15,6 +15,46 @@ export function isMissingBrandCustomizationTableError(error: unknown) {
   return false;
 }
 
+export async function ensureBrandCustomizationTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BrandCustomization" (
+      "id" TEXT NOT NULL,
+      "primaryColor" TEXT NOT NULL DEFAULT '#d4a62a',
+      "accentColor" TEXT NOT NULL DEFAULT '#b9882a',
+      "backgroundColor" TEXT NOT NULL DEFAULT '#0a0a0a',
+      "foregroundColor" TEXT NOT NULL DEFAULT '#f4efe4',
+      "logoDataUrl" TEXT,
+      "faviconDataUrl" TEXT,
+      "updatedById" TEXT,
+      "updatedByName" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "BrandCustomization_pkey" PRIMARY KEY ("id")
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'BrandCustomization_updatedById_fkey'
+      ) THEN
+        ALTER TABLE "BrandCustomization"
+        ADD CONSTRAINT "BrandCustomization_updatedById_fkey"
+        FOREIGN KEY ("updatedById") REFERENCES "User"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BrandCustomization_updatedAt_idx"
+    ON "BrandCustomization"("updatedAt");
+  `);
+}
+
 export async function getLatestBrandCustomization() {
   return prisma.brandCustomization.findFirst({
     orderBy: {
