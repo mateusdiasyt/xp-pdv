@@ -126,6 +126,7 @@ export function CreateProductForm({
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialData?.imageUrl ?? "");
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const currentStockValue = initialData?.currentStock ?? 0;
 
   useEffect(() => {
     if (state.status === "success") {
@@ -263,14 +264,18 @@ export function CreateProductForm({
 
         <div className="space-y-2">
           <Label htmlFor="currentStock">Estoque atual</Label>
+          <input type="hidden" name="currentStock" value={String(currentStockValue)} />
           <Input
             id="currentStock"
-            name="currentStock"
             type="number"
             min={0}
-            defaultValue={initialData?.currentStock ?? 0}
-            required
+            value={currentStockValue}
+            readOnly
+            disabled
           />
+          <p className="text-xs text-muted-foreground">
+            O saldo atual e somente informativo. Ajustes de estoque devem ser feitos na aba Estoque.
+          </p>
         </div>
 
         <div className="space-y-2">
