@@ -11,6 +11,7 @@ import {
   Store,
   Target,
   LifeBuoy,
+  PaintbrushVertical,
   Warehouse,
 } from "lucide-react";
 
@@ -94,6 +95,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "Metas",
     href: "/admin/metas",
     icon: Target,
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+  },
+  {
+    label: "Personalizacao",
+    href: "/admin/customization",
+    icon: PaintbrushVertical,
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
 ];

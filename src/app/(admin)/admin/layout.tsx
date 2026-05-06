@@ -1,3 +1,9 @@
+import type { CSSProperties } from "react";
+
+import {
+  buildBrandThemeVariables,
+  getBrandCustomizationSnapshot,
+} from "@/application/customization/brand-customization-service";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { FooterCredit } from "@/components/admin/footer-credit";
@@ -9,13 +15,15 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerAuthSession();
+  const { customization } = await getBrandCustomizationSnapshot();
+  const themeVariables = buildBrandThemeVariables(customization);
 
   if (!session?.user) {
     return null;
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative min-h-screen overflow-hidden bg-background" style={themeVariables as CSSProperties}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_15%,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_30%),radial-gradient(circle_at_88%_4%,color-mix(in_oklab,var(--accent)_24%,transparent),transparent_36%),radial-gradient(circle_at_80%_88%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_30%)]" />
       <div className="relative flex min-h-screen">
         <div className="hidden md:block">

@@ -141,6 +141,7 @@ model User {
   closedComandas Comanda[] @relation("ComandaClosedBy")
   uploadedStockXmls StockInvoiceXml[] @relation("StockInvoiceXmlUploadedBy")
   createdSystemUpdates SystemUpdate[] @relation("SystemUpdateCreatedBy")
+  updatedBrandCustomizations BrandCustomization[] @relation("BrandCustomizationUpdatedBy")
 
   @@index([status])
   @@index([roleId])
@@ -537,4 +538,22 @@ model SystemUpdate {
   createdBy User? @relation("SystemUpdateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+model BrandCustomization {
+  id              String   @id @default(cuid())
+  primaryColor    String   @default("#d4a62a")
+  accentColor     String   @default("#b9882a")
+  backgroundColor String   @default("#0a0a0a")
+  foregroundColor String   @default("#f4efe4")
+  logoDataUrl     String?
+  faviconDataUrl  String?
+  updatedById     String?
+  updatedByName   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  updatedBy User? @relation("BrandCustomizationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedAt])
 }

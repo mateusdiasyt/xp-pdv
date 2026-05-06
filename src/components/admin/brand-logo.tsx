@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -8,15 +6,15 @@ type BrandLogoProps = {
 };
 
 export function BrandLogo({ className, priority = false }: BrandLogoProps) {
+  void priority;
+
   return (
     <div className={cn("relative w-full", className)}>
-      <Image
-        src="/logo-maia.png"
-        alt="Logo Maia"
-        width={960}
-        height={320}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/api/branding/logo"
+        alt="Logo do sistema"
         className="h-auto w-full object-contain"
-        priority={priority}
       />
     </div>
   );

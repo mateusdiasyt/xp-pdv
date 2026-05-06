@@ -1,5 +1,10 @@
+import type { CSSProperties } from "react";
 import { redirect } from "next/navigation";
 
+import {
+  buildBrandThemeVariables,
+  getBrandCustomizationSnapshot,
+} from "@/application/customization/brand-customization-service";
 import { BrandLogo } from "@/components/admin/brand-logo";
 import { LoginForm } from "@/components/admin/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,13 +12,15 @@ import { getServerAuthSession } from "@/lib/auth";
 
 export default async function LoginPage() {
   const session = await getServerAuthSession();
+  const { customization } = await getBrandCustomizationSnapshot();
+  const themeVariables = buildBrandThemeVariables(customization);
 
   if (session?.user) {
     redirect("/admin");
   }
 
   return (
-    <main className="grid min-h-screen place-items-center px-4 py-12">
+    <main className="grid min-h-screen place-items-center px-4 py-12" style={themeVariables as CSSProperties}>
       <section className="w-full max-w-md">
         <Card className="border-border/80 bg-card/88 shadow-xl shadow-zinc-900/10">
           <CardHeader className="space-y-3">
