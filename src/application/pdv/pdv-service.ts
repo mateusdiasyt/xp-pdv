@@ -145,6 +145,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     cashSessionId: input.get("cashSessionId"),
     customerName: input.get("customerName"),
     discountAmount: input.get("discountAmount") ?? "0",
+    cashReceived: input.get("cashReceived") ?? "",
   });
 
   const items = parseItems(input);
@@ -153,6 +154,20 @@ export async function createSaleRecord(input: FormData, actorId: string) {
 
   if (discountAmount.lessThan(0)) {
     throw new Error("Desconto invalido.");
+  }
+
+  const cashPaymentTotal = payments
+    .filter((payment) => payment.method === PaymentMethod.CASH)
+    .reduce((acc, payment) => acc.plus(payment.amount), new Prisma.Decimal(0));
+
+  const cashReceived = parsed.cashReceived ? parseDecimalInput(parsed.cashReceived) : undefined;
+
+  if (cashReceived && cashPaymentTotal.equals(0)) {
+    throw new Error("Valor recebido em dinheiro so pode ser informado quando houver pagamento em dinheiro.");
+  }
+
+  if (cashReceived && cashReceived.lessThan(cashPaymentTotal)) {
+    throw new Error("Valor recebido em dinheiro nao pode ser menor que a parte paga em dinheiro.");
   }
 
   const sale = await createSaleWithStockAdjustment({
@@ -176,6 +191,11 @@ export async function createSaleRecord(input: FormData, actorId: string) {
       totalAmount: sale.totalAmount.toString(),
     },
   });
+
+  return {
+    saleId: sale.id,
+    cashReceived: cashReceived?.toString(),
+  };
 }
 
 export async function createComandaRecord(input: FormData, actorId: string) {

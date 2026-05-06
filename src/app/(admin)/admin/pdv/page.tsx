@@ -29,6 +29,7 @@ type PdvPageProps = {
   searchParams: Promise<{
     receipt?: string;
     cashReceived?: string;
+    ticket?: string;
   }>;
 };
 
@@ -46,14 +47,18 @@ function parseCashReceived(value?: string) {
 
 export default async function PdvPage({ searchParams }: PdvPageProps) {
   const session = await requirePermission(PERMISSIONS.PDV_VIEW);
-  const { receipt, cashReceived } = await searchParams;
+  const { receipt, cashReceived, ticket } = await searchParams;
   const receiptData = receipt ? await getSaleReceiptData(receipt) : null;
 
   if (receipt && receiptData) {
     return (
       <div className="space-y-6">
         <ReceiptPrintMode />
-        <ReceiptPreviewCard sale={receiptData} cashReceived={parseCashReceived(cashReceived)} />
+        <ReceiptPreviewCard
+          sale={receiptData}
+          cashReceived={parseCashReceived(cashReceived)}
+          ticketMode={ticket === "quick"}
+        />
       </div>
     );
   }

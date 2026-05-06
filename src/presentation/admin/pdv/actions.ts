@@ -37,6 +37,40 @@ export async function createSaleAction(
   }
 }
 
+export async function closeQuickSaleAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  let result: Awaited<ReturnType<typeof createSaleRecord>> | null = null;
+  try {
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    result = await createSaleRecord(formData, session.user.id);
+    revalidatePath("/admin/pdv");
+    revalidatePath("/admin/stock");
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin");
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
+  }
+
+  if (!result) {
+    return { status: "error", message: toActionErrorMessage(new Error("Nao foi possivel concluir a venda rapida")) };
+  }
+
+  const params = new URLSearchParams({
+    receipt: result.saleId,
+    ticket: "quick",
+  });
+
+  if (result.cashReceived) {
+    params.set("cashReceived", result.cashReceived);
+  }
+
+  redirect(`/admin/pdv?${params.toString()}`);
+}
+
 export async function cancelSaleAction(
   prevState: ActionState = initialActionState,
   formData: FormData,

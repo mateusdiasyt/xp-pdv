@@ -7,6 +7,7 @@ export const createSaleSchema = z.object({
   cashSessionId: z.string().min(1, "Sessao de caixa obrigatoria"),
   customerName: z.string().max(120, "Nome do cliente muito longo").optional().or(z.literal("")),
   discountAmount: z.string().regex(decimalRegex, "Desconto invalido"),
+  cashReceived: z.string().regex(decimalRegex, "Valor recebido invalido").optional().or(z.literal("")),
 });
 
 export const createComandaSchema = z.object({
