@@ -1,6 +1,5 @@
 import { Bell } from "lucide-react";
 
-import { BrandLogo } from "@/components/admin/brand-logo";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ export function AdminHeader({ userName, userEmail, roleSlug, permissions }: Admi
         <div className="md:hidden">
           <AdminMobileNav roleSlug={roleSlug} permissions={permissions} />
         </div>
-        <BrandLogo className="hidden w-32 md:block" />
         <div className="space-y-0.5">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Painel Administrativo
