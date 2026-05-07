@@ -1,13 +1,17 @@
 import { requirePermission } from "@/application/auth/guards";
 import { getBrandCustomizationSnapshot } from "@/application/customization/brand-customization-service";
+import { getFiscalEnvironmentSnapshot } from "@/application/fiscal/fiscal-configuration-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PERMISSIONS } from "@/domain/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { UpdateBrandCustomizationForm } from "@/presentation/admin/customization/update-brand-customization-form";
+import { UpdateFiscalEnvironmentForm } from "@/presentation/admin/customization/update-fiscal-environment-form";
 
 export default async function CustomizationPage() {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
   const { customization, setupPending } = await getBrandCustomizationSnapshot();
+  const fiscal = await getFiscalEnvironmentSnapshot();
+  const canManageFiscalEnvironment = hasPermission(session.user.permissions, PERMISSIONS.USERS_MANAGE);
 
   return (
     <div className="space-y-6">
@@ -40,6 +44,31 @@ export default async function CustomizationPage() {
                 faviconDataUrl: customization.faviconDataUrl,
               }}
             />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ambiente fiscal NFC-e</CardTitle>
+          <CardDescription>
+            Troque entre homologacao e producao sem redeploy. A alteracao vale para novas emissoes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {fiscal.setupPending ? (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-100">
+              O modulo fiscal precisa da tabela `FiscalConfiguration` no banco atual. Rode `db:push` e tente novamente.
+            </div>
+          ) : canManageFiscalEnvironment ? (
+            <UpdateFiscalEnvironmentForm
+              initialEnvironment={fiscal.environment}
+              persisted={fiscal.persisted}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Somente usuarios administradores podem trocar o ambiente fiscal.
+            </p>
           )}
         </CardContent>
       </Card>

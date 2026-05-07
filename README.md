@@ -81,6 +81,11 @@ Para emissao automatica no fechamento da venda/comanda, configure no ambiente:
 - `FOCUS_NFCE_CNPJ_EMITENTE`
 - `FOCUS_NFCE_NCM_PADRAO` (fallback opcional quando algum produto estiver sem NCM)
 
+Observacao sobre ambiente fiscal:
+- O painel agora possui um seletor em `Admin > Personalizacao > Ambiente fiscal NFC-e`.
+- O valor salvo no painel tem prioridade sobre `FOCUS_NFE_ENV`.
+- Se nao existir configuracao salva, o sistema usa `FOCUS_NFE_ENV` como fallback.
+
 Campos opcionais (com padrao no codigo):
 
 - `FOCUS_NFCE_CFOP_PADRAO` (padrao `5102`)

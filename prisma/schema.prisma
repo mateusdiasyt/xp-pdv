@@ -561,6 +561,18 @@ model SystemUpdate {
   @@index([createdAt])
 }
 
+model FiscalConfiguration {
+  id           String   @id @default(cuid())
+  scope        String   @unique @default("GLOBAL")
+  environment  String   @default("homologacao")
+  updatedById  String?
+  updatedByName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 model BrandCustomization {
   id              String   @id @default(cuid())
   primaryColor    String   @default("#d4a62a")

@@ -1,5 +1,6 @@
 import { PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
 
+import { resolveFiscalEnvironment } from "@/application/fiscal/fiscal-configuration-service";
 import {
   getSaleFiscalSnapshot,
   getSaleFiscalStatus,
@@ -71,17 +72,17 @@ function normalizeCnpjDigits(value: string | undefined) {
   return value.replace(/\D/g, "");
 }
 
-function resolveEnvironment(): FocusEnvironment {
-  const configured = (process.env.FOCUS_NFE_ENV ?? "homologacao").trim().toLowerCase();
-  return configured.startsWith("prod") ? "producao" : "homologacao";
-}
-
-function getFocusNfceConfig(): FocusNfceConfig {
-  const environment = resolveEnvironment();
+function resolveTokenByEnvironment(environment: FocusEnvironment) {
   const token =
     environment === "producao"
       ? process.env.FOCUS_NFE_TOKEN_PROD?.trim()
       : process.env.FOCUS_NFE_TOKEN_HOMOLOG?.trim();
+  return token;
+}
+
+async function getFocusNfceConfig(): Promise<FocusNfceConfig> {
+  const environment = await resolveFiscalEnvironment();
+  const token = resolveTokenByEnvironment(environment);
   const cnpjEmitente = normalizeCnpjDigits(
     process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE,
   );
@@ -263,7 +264,7 @@ async function requestFocusNfceCancellation(
 }
 
 export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
-  const config = getFocusNfceConfig();
+  const config = await getFocusNfceConfig();
   const snapshot = await getSaleFiscalSnapshot(data.saleId);
 
   if (!snapshot) {
@@ -457,7 +458,7 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
 }
 
 export async function cancelSaleNfce(data: { saleId: string; reason: string; actorId: string }) {
-  const config = getFocusNfceConfig();
+  const config = await getFocusNfceConfig();
   const saleFiscal = await getSaleFiscalStatus(data.saleId);
 
   if (!saleFiscal) {
