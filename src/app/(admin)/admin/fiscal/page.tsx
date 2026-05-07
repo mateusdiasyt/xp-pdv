@@ -99,7 +99,11 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
           <CardDescription>Busque por venda, cliente, chave, periodo e status.</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          <form className="grid gap-3 lg:grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_auto_auto]" method="get">
+          <form
+            className="grid gap-3 lg:grid-cols-[minmax(220px,2fr)_1fr_1fr_1fr_auto_auto_auto]"
+            method="get"
+            action="/admin/fiscal"
+          >
             <div className="space-y-1">
               <label htmlFor="query" className="text-xs text-muted-foreground">
                 Busca
@@ -147,6 +151,14 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
             >
               Filtrar
             </button>
+            <button
+              type="submit"
+              formAction="/api/fiscal/sales/xml-batch"
+              formTarget="_blank"
+              className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-100 shadow-sm transition-colors hover:bg-emerald-500/20"
+            >
+              Baixar XMLs (ZIP)
+            </button>
             <a
               href="/admin/fiscal"
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted/70"
@@ -190,7 +202,7 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
                   <TableCell className="font-medium text-foreground">
                     {sale.saleNumber}
                     <p className="text-xs text-muted-foreground">
-                      {sale.operator.name} • {sale.cashSession.cashRegister.name}
+                      {sale.operator.name} - {sale.cashSession.cashRegister.name}
                     </p>
                   </TableCell>
                   <TableCell>{dateTimeFormatter.format(sale.createdAt)}</TableCell>
