@@ -100,6 +100,13 @@ Campos opcionais (com padrao no codigo):
 
 Observacao: o sistema usa o NCM cadastrado em cada produto no catalogo. O NCM padrao entra apenas como fallback.
 
+## Painel fiscal para contabilidade
+
+Nova aba `Admin > Fiscal`:
+- filtra vendas por periodo, status e busca textual;
+- mostra chave, numero/serie e status fiscal de cada venda;
+- permite baixar XML da NFC-e por venda via rota segura do sistema (`/api/fiscal/sales/[saleId]/xml`), sem expor token da Focus no navegador.
+
 ## Modulos implementados na fundacao
 
 - Dashboard administrativo base

@@ -4,6 +4,7 @@ import {
   Calculator,
   ChartColumnBig,
   ContactRound,
+  FileCode2,
   Receipt,
   LineChart,
   Package,
@@ -41,6 +42,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "Relatorios",
     href: "/admin/reports",
     icon: LineChart,
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+  },
+  {
+    label: "Fiscal",
+    href: "/admin/fiscal",
+    icon: FileCode2,
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
   {
