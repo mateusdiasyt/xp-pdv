@@ -280,14 +280,48 @@ async function runCreateSaleWithStockAdjustment(
   }
 
   const totalAmount = subtotalAmount.minus(data.discountAmount);
-  const paymentsTotal = data.payments.reduce(
+  const tolerance = new Prisma.Decimal("0.01");
+  const nonCashPayments = data.payments.filter((payment) => payment.method !== PaymentMethod.CASH);
+  const cashPayments = data.payments.filter((payment) => payment.method === PaymentMethod.CASH);
+
+  const nonCashTotal = nonCashPayments.reduce(
+    (acc, payment) => acc.plus(payment.amount),
+    new Prisma.Decimal(0),
+  );
+  const cashTotal = cashPayments.reduce(
     (acc, payment) => acc.plus(payment.amount),
     new Prisma.Decimal(0),
   );
 
-  const difference = paymentsTotal.minus(totalAmount).abs();
-  if (difference.greaterThan(new Prisma.Decimal("0.01"))) {
-    throw new Error("A soma dos pagamentos deve ser igual ao total liquido da venda.");
+  const normalizedPayments: SalePaymentInput[] = [...nonCashPayments];
+
+  if (cashPayments.length === 0) {
+    const paymentsTotal = nonCashTotal;
+    const difference = paymentsTotal.minus(totalAmount).abs();
+    if (difference.greaterThan(tolerance)) {
+      throw new Error("A soma dos pagamentos deve ser igual ao total liquido da venda.");
+    }
+  } else {
+    const nonCashOverflow = nonCashTotal.minus(totalAmount);
+    if (nonCashOverflow.greaterThan(tolerance)) {
+      throw new Error("Pagamentos sem dinheiro nao podem ultrapassar o total da venda.");
+    }
+
+    const remainingForCashRaw = totalAmount.minus(nonCashTotal);
+    const remainingForCash = remainingForCashRaw.lessThan(0)
+      ? new Prisma.Decimal(0)
+      : remainingForCashRaw;
+
+    if (cashTotal.plus(tolerance).lessThan(remainingForCash)) {
+      throw new Error("Valor em dinheiro insuficiente para completar o total da venda.");
+    }
+
+    if (remainingForCash.greaterThan(0)) {
+      normalizedPayments.push({
+        method: PaymentMethod.CASH,
+        amount: remainingForCash,
+      });
+    }
   }
 
   const sale = await tx.sale.create({
@@ -320,7 +354,7 @@ async function runCreateSaleWithStockAdjustment(
         }),
       },
       payments: {
-        create: data.payments.map((payment) => ({
+        create: normalizedPayments.map((payment) => ({
           method: payment.method,
           amount: payment.amount,
         })),

@@ -97,6 +97,27 @@ function parsePayments(formData: FormData) {
   });
 }
 
+function resolveCashReceivedForReceipt(data: {
+  explicitCashReceived?: Prisma.Decimal;
+  cashPaymentTotal: Prisma.Decimal;
+  paymentsTotal: Prisma.Decimal;
+  saleTotal: Prisma.Decimal;
+}) {
+  if (data.explicitCashReceived) {
+    return data.explicitCashReceived.toString();
+  }
+
+  if (data.cashPaymentTotal.lessThanOrEqualTo(0)) {
+    return undefined;
+  }
+
+  if (data.paymentsTotal.greaterThan(data.saleTotal)) {
+    return data.cashPaymentTotal.toString();
+  }
+
+  return undefined;
+}
+
 async function settlePdvSection<T>(label: string, loader: () => Promise<T>, fallback: T) {
   try {
     const data = await loader();
@@ -160,6 +181,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
   const cashPaymentTotal = payments
     .filter((payment) => payment.method === PaymentMethod.CASH)
     .reduce((acc, payment) => acc.plus(payment.amount), new Prisma.Decimal(0));
+  const paymentsTotal = payments.reduce((acc, payment) => acc.plus(payment.amount), new Prisma.Decimal(0));
 
   const cashReceived = parsed.cashReceived ? parseDecimalInput(parsed.cashReceived) : undefined;
 
@@ -198,9 +220,16 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     actorId,
   });
 
+  const receiptCashReceived = resolveCashReceivedForReceipt({
+    explicitCashReceived: cashReceived,
+    cashPaymentTotal,
+    paymentsTotal,
+    saleTotal: sale.totalAmount,
+  });
+
   return {
     saleId: sale.id,
-    cashReceived: cashReceived?.toString(),
+    cashReceived: receiptCashReceived,
     fiscalStatus: fiscalResult.status,
     fiscalMessage: fiscalResult.message,
   };
@@ -340,6 +369,7 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
   const cashPaymentTotal = payments
     .filter((payment) => payment.method === PaymentMethod.CASH)
     .reduce((acc, payment) => acc.plus(payment.amount), new Prisma.Decimal(0));
+  const paymentsTotal = payments.reduce((acc, payment) => acc.plus(payment.amount), new Prisma.Decimal(0));
 
   const cashReceived = parsed.cashReceived ? parseDecimalInput(parsed.cashReceived) : undefined;
 
@@ -378,9 +408,16 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
     actorId,
   });
 
+  const receiptCashReceived = resolveCashReceivedForReceipt({
+    explicitCashReceived: cashReceived,
+    cashPaymentTotal,
+    paymentsTotal,
+    saleTotal: sale.totalAmount,
+  });
+
   return {
     saleId: sale.id,
-    cashReceived: cashReceived?.toString(),
+    cashReceived: receiptCashReceived,
     fiscalStatus: fiscalResult.status,
     fiscalMessage: fiscalResult.message,
   };

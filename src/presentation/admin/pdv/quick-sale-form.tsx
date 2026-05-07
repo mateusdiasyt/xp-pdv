@@ -279,7 +279,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     return acc + Math.max(0, parseMoneyToCents(paymentLine.amount));
   }, 0);
   const cashReceivedInCents = Math.max(0, parseMoneyToCents(cashReceived));
-  const changeInCents = Math.max(cashReceivedInCents - cashPaymentTotalInCents, 0);
+  const changeFromReceivedInCents = Math.max(cashReceivedInCents - cashPaymentTotalInCents, 0);
+  const paymentExcessInCents = Math.max(paymentsTotalInCents - totalInCents, 0);
+  const changeInCents = hasCashPayment
+    ? Math.max(changeFromReceivedInCents, paymentExcessInCents)
+    : 0;
   const normalizedCustomerQuery = customerQuery.trim().toLowerCase();
   const normalizedCustomerQueryDigits = normalizeDigits(customerQuery);
   const filteredCustomers = customers
@@ -801,7 +805,9 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                     ? "Pagamentos conferem com o total da venda."
                     : paymentDifferenceInCents > 0
                       ? `Falta ${formatCurrency(paymentDifferenceInCents / 100)} para fechar a venda.`
-                      : `Pagamentos excedem em ${formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}.`}
+                      : hasCashPayment
+                        ? `Troco previsto de ${formatCurrency(changeInCents / 100)}.`
+                        : `Pagamentos excedem em ${formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}. Troco so pode ser calculado em pagamento com dinheiro.`}
                 </p>
               </div>
             </div>
