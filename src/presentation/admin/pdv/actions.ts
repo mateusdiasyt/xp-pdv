@@ -15,6 +15,7 @@ import {
   updateComandaCustomerRecord,
   updateComandaItemRecord,
 } from "@/application/pdv/pdv-service";
+import { issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
@@ -36,7 +37,6 @@ export async function createSaleAction(
     return { status: "error", message: toActionErrorMessage(error) };
   }
 }
-
 export async function closeQuickSaleAction(
   prevState: ActionState = initialActionState,
   formData: FormData,
@@ -70,7 +70,6 @@ export async function closeQuickSaleAction(
 
   redirect(`/admin/pdv?${params.toString()}`);
 }
-
 export async function cancelSaleAction(
   prevState: ActionState = initialActionState,
   formData: FormData,
@@ -78,14 +77,61 @@ export async function cancelSaleAction(
   void prevState;
   try {
     const session = await requirePermission(PERMISSIONS.PDV_CANCEL);
-    await cancelSaleRecord(formData, session.user.id);
+    const result = await cancelSaleRecord(formData, session.user.id);
     revalidatePath("/admin/pdv");
     revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
     revalidatePath("/admin");
-    return { status: "success", message: "Venda cancelada com sucesso." };
+    return { status: "success", message: result?.message ?? "Venda cancelada com sucesso." };
   } catch (error) {
-    return { status: "error", message: toActionErrorMessage(error) };
+    return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };
+  }
+}
+
+export async function retrySaleNfceAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  try {
+    const saleId = String(formData.get("saleId") ?? "");
+    if (!saleId) {
+      throw new Error("Venda nao informada para reprocessar NFC-e.");
+    }
+
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const result = await issueSaleNfce({
+      saleId,
+      actorId: session.user.id,
+    });
+
+    revalidatePath("/admin/pdv");
+    revalidatePath("/admin");
+    return {
+      status: result.status === "AUTHORIZED" ? "success" : "error",
+      message: result.message,
+    };
+  } catch (error) {
+    return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };
+  }
+}
+
+export async function retrySaleNfceRequest(formData: FormData): Promise<void> {
+  try {
+    const saleId = String(formData.get("saleId") ?? "");
+    if (!saleId) {
+      return;
+    }
+
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    await issueSaleNfce({
+      saleId,
+      actorId: session.user.id,
+    });
+    revalidatePath("/admin/pdv");
+    revalidatePath("/admin");
+  } catch {
+    // Mantem o fluxo da tela sem travar, a situacao fiscal fica registrada na venda.
   }
 }
 

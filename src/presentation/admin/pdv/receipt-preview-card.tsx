@@ -12,6 +12,13 @@ type ReceiptSale = {
   saleNumber: string;
   customerName: string | null;
   status: SaleStatus;
+  fiscalStatus?: string | null;
+  fiscalAccessKey?: string | null;
+  fiscalNumber?: string | null;
+  fiscalSeries?: string | null;
+  fiscalMessage?: string | null;
+  fiscalDanfeUrl?: string | null;
+  fiscalXmlUrl?: string | null;
   subtotalAmount: { toString(): string };
   discountAmount: { toString(): string };
   totalAmount: { toString(): string };
@@ -115,6 +122,15 @@ function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) 
         <p className="font-semibold text-black">
           {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
         </p>
+        {sale.fiscalStatus ? (
+          <p className="text-[9px] uppercase tracking-[0.08em] text-black/70">NFC-e: {sale.fiscalStatus}</p>
+        ) : null}
+        {sale.fiscalNumber ? (
+          <p className="text-[9px] text-black/70">
+            Numero: {sale.fiscalNumber} / Serie: {sale.fiscalSeries ?? "-"}
+          </p>
+        ) : null}
+        {sale.fiscalAccessKey ? <p className="break-all text-[8px] leading-3 text-black/55">{sale.fiscalAccessKey}</p> : null}
       </div>
 
       <div className="space-y-2 border-b border-dashed border-black/20 pb-3">
@@ -172,6 +188,14 @@ function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) 
           <span>{formatCurrency(toNumber(sale.totalAmount))}</span>
         </div>
       </div>
+
+      {sale.fiscalDanfeUrl || sale.fiscalXmlUrl || sale.fiscalMessage ? (
+        <div className="space-y-1 border-t border-dashed border-black/20 pt-2 text-[9px] leading-4 text-black/70">
+          {sale.fiscalMessage ? <p>{sale.fiscalMessage}</p> : null}
+          {sale.fiscalDanfeUrl ? <p>DANFE: {sale.fiscalDanfeUrl}</p> : null}
+          {sale.fiscalXmlUrl ? <p>XML: {sale.fiscalXmlUrl}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

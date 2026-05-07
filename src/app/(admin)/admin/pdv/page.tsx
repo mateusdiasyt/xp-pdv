@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
 import { CancelSaleForm } from "@/presentation/admin/pdv/cancel-sale-form";
+import { retrySaleNfceRequest } from "@/presentation/admin/pdv/actions";
 import { PdvWorkspace } from "@/presentation/admin/pdv/pdv-workspace";
 import { ReceiptPrintMode } from "@/presentation/admin/pdv/receipt-print-mode";
 import { ReceiptPreviewCard } from "@/presentation/admin/pdv/receipt-preview-card";
@@ -24,6 +25,57 @@ const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+function getFiscalStatusPresentation(status?: string | null) {
+  const normalized = (status ?? "").trim().toUpperCase();
+
+  if (normalized === "AUTHORIZED") {
+    return {
+      label: "Autorizada",
+      className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+    };
+  }
+
+  if (normalized === "CANCELLED") {
+    return {
+      label: "Cancelada",
+      className: "bg-zinc-200 text-zinc-700 hover:bg-zinc-200",
+    };
+  }
+
+  if (normalized === "REJECTED") {
+    return {
+      label: "Rejeitada",
+      className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
+    };
+  }
+
+  if (normalized === "PROCESSING") {
+    return {
+      label: "Processando",
+      className: "bg-sky-100 text-sky-700 hover:bg-sky-100",
+    };
+  }
+
+  if (normalized === "DISABLED") {
+    return {
+      label: "Nao configurada",
+      className: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+    };
+  }
+
+  if (normalized === "ERROR") {
+    return {
+      label: "Erro",
+      className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
+    };
+  }
+
+  return {
+    label: "Nao emitida",
+    className: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
+  };
+}
 
 type PdvPageProps = {
   searchParams: Promise<{
@@ -183,6 +235,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                   <TableHead>Caixa</TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Fiscal</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Total (R$)</TableHead>
                   <TableHead>Acoes</TableHead>
@@ -191,7 +244,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
               <TableBody>
                 {sales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
                       Nenhuma venda registrada.
                     </TableCell>
                   </TableRow>
@@ -199,7 +252,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                 {groupedSales.map((group) => (
                   <Fragment key={`group-fragment-${group.dateKey}`}>
                     <TableRow key={`group-${group.dateKey}`} className="bg-muted/20">
-                      <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <TableCell colSpan={9} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {group.dateLabel}
                       </TableCell>
                     </TableRow>
@@ -223,6 +276,18 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                             {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Badge className={getFiscalStatusPresentation(sale.fiscalStatus).className}>
+                              {getFiscalStatusPresentation(sale.fiscalStatus).label}
+                            </Badge>
+                            {sale.fiscalAccessKey ? (
+                              <p className="max-w-[19rem] truncate text-[11px] text-muted-foreground">
+                                {sale.fiscalAccessKey}
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">{sale.items.length}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(sale.totalAmount))}</TableCell>
                         <TableCell>
@@ -233,6 +298,29 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                             >
                               Comprovante
                             </Link>
+                            {sale.fiscalDanfeUrl ? (
+                              <a
+                                href={sale.fiscalDanfeUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
+                              >
+                                DANFE
+                              </a>
+                            ) : null}
+                            {canManage &&
+                            sale.status === SaleStatus.COMPLETED &&
+                            sale.fiscalStatus !== "AUTHORIZED" ? (
+                              <form action={retrySaleNfceRequest}>
+                                <input type="hidden" name="saleId" value={sale.id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
+                                >
+                                  Reemitir NFC-e
+                                </button>
+                              </form>
+                            ) : null}
                             {canCancel && sale.status === SaleStatus.COMPLETED ? (
                               <CancelSaleForm saleId={sale.id} />
                             ) : (

@@ -1,0 +1,528 @@
+import { PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
+
+import {
+  getSaleFiscalSnapshot,
+  getSaleFiscalStatus,
+  updateSaleFiscalData,
+} from "@/infrastructure/db/repositories/sale-fiscal-repository";
+import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
+
+type FocusEnvironment = "homologacao" | "producao";
+type FiscalSaleStatus =
+  | "AUTHORIZED"
+  | "REJECTED"
+  | "PROCESSING"
+  | "CANCELLED"
+  | "ERROR"
+  | "DISABLED";
+
+type FocusNfceConfig = {
+  enabled: boolean;
+  environment: FocusEnvironment;
+  token?: string;
+  cnpjEmitente?: string;
+  baseUrl: string;
+  defaultNcm?: string;
+  defaultCfop: string;
+  defaultIcmsOrigem: string;
+  defaultIcmsSituacaoTributaria: string;
+  defaultUnidade: string;
+  naturezaOperacao: string;
+  localDestino: string;
+  presencaComprador: string;
+  indicadorIeDestinatario: string;
+  infoAdicional?: string;
+};
+
+const paymentMethodToFocusCode: Record<PaymentMethod, string> = {
+  CASH: "01",
+  PIX: "17",
+  CREDIT_CARD: "03",
+  DEBIT_CARD: "04",
+};
+
+function toISOStringWithTimezone(date: Date) {
+  return date.toISOString();
+}
+
+function toDecimal(value: number, fractionDigits = 2) {
+  return value.toFixed(fractionDigits);
+}
+
+function parseMoney(value: { toString(): string } | string | number) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  const parsed = Number(value.toString());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeReference(value: string) {
+  const normalized = value.replace(/[^a-zA-Z0-9_-]/g, "");
+  return normalized || `VENDA${Date.now()}`;
+}
+
+function normalizeCnpjDigits(value: string | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return value.replace(/\D/g, "");
+}
+
+function resolveEnvironment(): FocusEnvironment {
+  const configured = (process.env.FOCUS_NFE_ENV ?? "homologacao").trim().toLowerCase();
+  return configured.startsWith("prod") ? "producao" : "homologacao";
+}
+
+function getFocusNfceConfig(): FocusNfceConfig {
+  const environment = resolveEnvironment();
+  const token =
+    environment === "producao"
+      ? process.env.FOCUS_NFE_TOKEN_PROD?.trim()
+      : process.env.FOCUS_NFE_TOKEN_HOMOLOG?.trim();
+  const cnpjEmitente = normalizeCnpjDigits(
+    process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE,
+  );
+  const defaultNcm = (process.env.FOCUS_NFCE_NCM_PADRAO ?? process.env.FOCUS_NFE_NCM_PADRAO ?? "").trim();
+  const baseUrl =
+    environment === "producao" ? "https://api.focusnfe.com.br" : "https://homologacao.focusnfe.com.br";
+
+  return {
+    enabled: Boolean(token && cnpjEmitente && defaultNcm),
+    environment,
+    token,
+    cnpjEmitente,
+    baseUrl,
+    defaultNcm,
+    defaultCfop: (process.env.FOCUS_NFCE_CFOP_PADRAO ?? "5102").trim(),
+    defaultIcmsOrigem: (process.env.FOCUS_NFCE_ICMS_ORIGEM_PADRAO ?? "0").trim(),
+    defaultIcmsSituacaoTributaria: (process.env.FOCUS_NFCE_ICMS_CST_PADRAO ?? "102").trim(),
+    defaultUnidade: (process.env.FOCUS_NFCE_UNIDADE_PADRAO ?? "UN").trim(),
+    naturezaOperacao: (process.env.FOCUS_NFCE_NATUREZA_OPERACAO ?? "VENDA AO CONSUMIDOR").trim(),
+    localDestino: (process.env.FOCUS_NFCE_LOCAL_DESTINO ?? "1").trim(),
+    presencaComprador: (process.env.FOCUS_NFCE_PRESENCA_COMPRADOR ?? "1").trim(),
+    indicadorIeDestinatario: (process.env.FOCUS_NFCE_INDICADOR_IE_DESTINATARIO ?? "9").trim(),
+    infoAdicional: (process.env.FOCUS_NFCE_INFO_ADICIONAL ?? "").trim() || undefined,
+  };
+}
+
+function buildAbsoluteFocusUrl(baseUrl: string, maybePath: unknown) {
+  if (typeof maybePath !== "string" || !maybePath.trim()) {
+    return undefined;
+  }
+
+  if (maybePath.startsWith("http://") || maybePath.startsWith("https://")) {
+    return maybePath;
+  }
+
+  const path = maybePath.startsWith("/") ? maybePath : `/${maybePath}`;
+  return `${baseUrl}${path}`;
+}
+
+function extractFocusMessage(payload: unknown, fallbackMessage: string) {
+  if (!payload || typeof payload !== "object") {
+    return fallbackMessage;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const messageCandidates = [
+    record.mensagem_sefaz,
+    record.mensagem,
+    record.message,
+    record.erro,
+    record.codigo,
+  ];
+
+  for (const candidate of messageCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return fallbackMessage;
+}
+
+function deriveFocusStatus(payload: unknown, httpStatus: number): FiscalSaleStatus {
+  if (payload && typeof payload === "object") {
+    const statusValue = String((payload as Record<string, unknown>).status ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (statusValue === "autorizado") {
+      return "AUTHORIZED";
+    }
+
+    if (statusValue === "cancelado") {
+      return "CANCELLED";
+    }
+
+    if (statusValue === "erro_autorizacao") {
+      return "REJECTED";
+    }
+
+    if (statusValue === "processando_autorizacao") {
+      return "PROCESSING";
+    }
+  }
+
+  if (httpStatus >= 200 && httpStatus < 300) {
+    return "PROCESSING";
+  }
+
+  return "ERROR";
+}
+
+function buildPaymentPayload(
+  payments: Array<{ method: PaymentMethod; amount: { toString(): string } }>,
+) {
+  return payments.map((payment) => {
+    const paymentCode = paymentMethodToFocusCode[payment.method];
+    const payload: Record<string, string> = {
+      forma_pagamento: paymentCode,
+      valor_pagamento: toDecimal(parseMoney(payment.amount), 2),
+    };
+
+    if (paymentCode === "03" || paymentCode === "04") {
+      payload.tipo_integracao = "2";
+    }
+
+    return payload;
+  });
+}
+
+async function requestFocusNfce(
+  config: FocusNfceConfig,
+  saleRef: string,
+  payload: unknown,
+) {
+  const response = await fetch(`${config.baseUrl}/v2/nfce?ref=${encodeURIComponent(saleRef)}&completa=1`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.token}:`).toString("base64")}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  let responseJson: unknown = null;
+  let responseText: string | null = null;
+  try {
+    responseJson = await response.json();
+  } catch {
+    try {
+      responseText = await response.text();
+    } catch {
+      responseText = null;
+    }
+  }
+
+  return {
+    httpStatus: response.status,
+    payload: responseJson ?? responseText,
+  };
+}
+
+async function requestFocusNfceCancellation(
+  config: FocusNfceConfig,
+  saleRef: string,
+  justificativa: string,
+) {
+  const response = await fetch(`${config.baseUrl}/v2/nfce/${encodeURIComponent(saleRef)}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.token}:`).toString("base64")}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      justificativa,
+    }),
+    cache: "no-store",
+  });
+
+  let responseJson: unknown = null;
+  let responseText: string | null = null;
+  try {
+    responseJson = await response.json();
+  } catch {
+    try {
+      responseText = await response.text();
+    } catch {
+      responseText = null;
+    }
+  }
+
+  return {
+    httpStatus: response.status,
+    payload: responseJson ?? responseText,
+  };
+}
+
+export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
+  const config = getFocusNfceConfig();
+  const snapshot = await getSaleFiscalSnapshot(data.saleId);
+
+  if (!snapshot) {
+    return {
+      status: "ERROR" as const,
+      message: "Venda nao encontrada para emissao fiscal.",
+    };
+  }
+
+  const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
+
+  if (!config.enabled) {
+    const message =
+      "NFC-e nao emitida: configure FOCUS_NFE_TOKEN_*, FOCUS_NFCE_CNPJ_EMITENTE e FOCUS_NFCE_NCM_PADRAO.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalEnvironment: config.environment,
+      fiscalStatus: "DISABLED",
+      fiscalMessage: message,
+      fiscalErrorAt: new Date(),
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "DISABLED" as const,
+      message,
+    };
+  }
+
+  if (snapshot.status !== SaleStatus.COMPLETED) {
+    const message = "NFC-e nao emitida: somente vendas concluidas podem ser emitidas.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalEnvironment: config.environment,
+      fiscalStatus: "ERROR",
+      fiscalMessage: message,
+      fiscalErrorAt: new Date(),
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "ERROR" as const,
+      message,
+    };
+  }
+
+  if (snapshot.items.length === 0 || snapshot.payments.length === 0) {
+    const message = "NFC-e nao emitida: venda sem itens ou sem pagamentos.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalEnvironment: config.environment,
+      fiscalStatus: "ERROR",
+      fiscalMessage: message,
+      fiscalErrorAt: new Date(),
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "ERROR" as const,
+      message,
+    };
+  }
+
+  const payload = {
+    cnpj_emitente: config.cnpjEmitente,
+    data_emissao: toISOStringWithTimezone(new Date()),
+    indicador_inscricao_estadual_destinatario: config.indicadorIeDestinatario,
+    modalidade_frete: "9",
+    local_destino: config.localDestino,
+    presenca_comprador: config.presencaComprador,
+    natureza_operacao: config.naturezaOperacao,
+    nome_destinatario: snapshot.customerName ?? undefined,
+    informacoes_adicionais_contribuinte: config.infoAdicional,
+    valor_produtos: toDecimal(parseMoney(snapshot.subtotalAmount), 2),
+    valor_desconto: toDecimal(parseMoney(snapshot.discountAmount), 2),
+    valor_total: toDecimal(parseMoney(snapshot.totalAmount), 2),
+    items: snapshot.items.map((item, index) => ({
+      numero_item: String(index + 1),
+      codigo_ncm: config.defaultNcm,
+      codigo_produto: item.skuSnapshot || `ITEM-${index + 1}`,
+      descricao: item.productNameSnapshot || `ITEM ${index + 1}`,
+      quantidade_comercial: toDecimal(item.quantity, 4),
+      quantidade_tributavel: toDecimal(item.quantity, 4),
+      cfop: config.defaultCfop,
+      valor_unitario_comercial: toDecimal(parseMoney(item.unitPrice), 4),
+      valor_unitario_tributavel: toDecimal(parseMoney(item.unitPrice), 4),
+      valor_bruto: toDecimal(parseMoney(item.lineTotal), 2),
+      valor_desconto: "0.00",
+      unidade_comercial: config.defaultUnidade,
+      unidade_tributavel: config.defaultUnidade,
+      icms_origem: config.defaultIcmsOrigem,
+      icms_situacao_tributaria: config.defaultIcmsSituacaoTributaria,
+    })),
+    formas_pagamento: buildPaymentPayload(snapshot.payments),
+  };
+
+  const { httpStatus, payload: focusPayload } = await requestFocusNfce(config, fiscalReference, payload);
+  const derivedStatus = deriveFocusStatus(focusPayload, httpStatus);
+  const baseMessage = extractFocusMessage(focusPayload, "Resposta recebida da Focus NFe.");
+
+  const focusRecord = (focusPayload && typeof focusPayload === "object"
+    ? (focusPayload as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+
+  const fiscalMessage =
+    derivedStatus === "AUTHORIZED"
+      ? "NFC-e autorizada com sucesso."
+      : derivedStatus === "REJECTED"
+        ? `NFC-e rejeitada: ${baseMessage}`
+        : derivedStatus === "PROCESSING"
+          ? `NFC-e em processamento: ${baseMessage}`
+          : derivedStatus === "CANCELLED"
+            ? "NFC-e cancelada."
+            : `Falha ao emitir NFC-e: ${baseMessage}`;
+
+  await updateSaleFiscalData(snapshot.id, {
+    fiscalReference,
+    fiscalDocumentType: "NFCE",
+    fiscalEnvironment: config.environment,
+    fiscalStatus: derivedStatus,
+    fiscalMessage,
+    fiscalAccessKey:
+      (focusRecord.chave_nfe as string | undefined) ?? (focusRecord.chave as string | undefined) ?? null,
+    fiscalProtocol:
+      (focusRecord.numero_protocolo as string | undefined) ?? (focusRecord.protocolo as string | undefined) ?? null,
+    fiscalNumber: focusRecord.numero !== undefined ? String(focusRecord.numero) : null,
+    fiscalSeries: focusRecord.serie !== undefined ? String(focusRecord.serie) : null,
+    fiscalXmlUrl: buildAbsoluteFocusUrl(config.baseUrl, focusRecord.caminho_xml_nota_fiscal),
+    fiscalDanfeUrl:
+      buildAbsoluteFocusUrl(config.baseUrl, focusRecord.caminho_danfe) ??
+      buildAbsoluteFocusUrl(config.baseUrl, focusRecord.url_danfe),
+    fiscalQrCodeUrl:
+      (focusRecord.qrcode_url as string | undefined) ??
+      (focusRecord.url_qrcode as string | undefined) ??
+      null,
+    fiscalConsultaUrl: (focusRecord.url_consulta_nf as string | undefined) ?? null,
+    fiscalIssuedAt: derivedStatus === "AUTHORIZED" ? new Date() : null,
+    fiscalUpdatedAt: new Date(),
+    fiscalErrorAt: derivedStatus === "AUTHORIZED" ? null : new Date(),
+    fiscalResponse:
+      focusPayload === null || focusPayload === undefined
+        ? Prisma.JsonNull
+        : (focusPayload as Prisma.InputJsonValue),
+  });
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "pdv.sale.nfce.issue",
+    entity: "Sale",
+    entityId: snapshot.id,
+    metadata: {
+      saleNumber: snapshot.saleNumber,
+      reference: fiscalReference,
+      environment: config.environment,
+      httpStatus,
+      status: derivedStatus,
+      message: fiscalMessage,
+    },
+  });
+
+  return {
+    status: derivedStatus,
+    message: fiscalMessage,
+  };
+}
+
+export async function cancelSaleNfce(data: { saleId: string; reason: string; actorId: string }) {
+  const config = getFocusNfceConfig();
+  const saleFiscal = await getSaleFiscalStatus(data.saleId);
+
+  if (!saleFiscal) {
+    return {
+      status: "ERROR" as const,
+      message: "Venda nao encontrada para cancelamento fiscal.",
+    };
+  }
+
+  const fiscalReference = normalizeReference(saleFiscal.fiscalReference ?? saleFiscal.saleNumber);
+
+  if (!config.enabled || !config.token) {
+    const message = "Cancelamento fiscal nao executado: configuracao da Focus NFe incompleta.";
+    await updateSaleFiscalData(saleFiscal.id, {
+      fiscalReference,
+      fiscalMessage: message,
+      fiscalUpdatedAt: new Date(),
+      fiscalErrorAt: new Date(),
+    });
+    return {
+      status: "DISABLED" as const,
+      message,
+    };
+  }
+
+  if (saleFiscal.fiscalStatus !== "AUTHORIZED") {
+    return {
+      status: "SKIPPED" as const,
+      message: "Venda sem NFC-e autorizada; nenhum cancelamento fiscal necessario.",
+    };
+  }
+
+  const reason = data.reason.trim();
+  const justification = reason.length >= 15 ? reason : `${reason} - Contate o Mateus para suporte.`;
+  const normalizedJustification = justification.slice(0, 255);
+
+  const { httpStatus, payload } = await requestFocusNfceCancellation(config, fiscalReference, normalizedJustification);
+  const derivedStatus = deriveFocusStatus(payload, httpStatus);
+  const responseRecord =
+    payload && typeof payload === "object" ? (payload as Record<string, unknown>) : ({} as Record<string, unknown>);
+  const baseMessage = extractFocusMessage(payload, "Resposta recebida da Focus NFe.");
+
+  const fiscalStatus: FiscalSaleStatus =
+    derivedStatus === "CANCELLED"
+      ? "CANCELLED"
+      : derivedStatus === "AUTHORIZED"
+        ? "CANCELLED"
+        : derivedStatus === "REJECTED"
+          ? "ERROR"
+          : derivedStatus;
+
+  const message =
+    fiscalStatus === "CANCELLED"
+      ? "NFC-e cancelada na Focus com sucesso."
+      : `Falha ao cancelar NFC-e na Focus: ${baseMessage}`;
+
+  await updateSaleFiscalData(saleFiscal.id, {
+    fiscalReference,
+    fiscalStatus,
+    fiscalMessage: message,
+    fiscalProtocol:
+      (responseRecord.numero_protocolo as string | undefined) ??
+      (responseRecord.protocolo as string | undefined) ??
+      null,
+    fiscalUpdatedAt: new Date(),
+    fiscalErrorAt: fiscalStatus === "CANCELLED" ? null : new Date(),
+    fiscalResponse:
+      payload === null || payload === undefined
+        ? Prisma.JsonNull
+        : (payload as Prisma.InputJsonValue),
+  });
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "pdv.sale.nfce.cancel",
+    entity: "Sale",
+    entityId: saleFiscal.id,
+    metadata: {
+      saleNumber: saleFiscal.saleNumber,
+      reference: fiscalReference,
+      httpStatus,
+      status: fiscalStatus,
+      message,
+    },
+  });
+
+  return {
+    status: fiscalStatus,
+    message,
+  };
+}

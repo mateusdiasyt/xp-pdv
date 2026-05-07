@@ -71,6 +71,28 @@ Pode sobrescrever com:
 - `DEFAULT_ADMIN_EMAIL`
 - `DEFAULT_ADMIN_PASSWORD`
 
+## NFC-e (Focus NFe)
+
+Para emissao automatica no fechamento da venda/comanda, configure no ambiente:
+
+- `FOCUS_NFE_ENV` = `homologacao` ou `producao`
+- `FOCUS_NFE_TOKEN_HOMOLOG`
+- `FOCUS_NFE_TOKEN_PROD`
+- `FOCUS_NFCE_CNPJ_EMITENTE`
+- `FOCUS_NFCE_NCM_PADRAO`
+
+Campos opcionais (com padrao no codigo):
+
+- `FOCUS_NFCE_CFOP_PADRAO` (padrao `5102`)
+- `FOCUS_NFCE_ICMS_ORIGEM_PADRAO` (padrao `0`)
+- `FOCUS_NFCE_ICMS_CST_PADRAO` (padrao `102`)
+- `FOCUS_NFCE_UNIDADE_PADRAO` (padrao `UN`)
+- `FOCUS_NFCE_NATUREZA_OPERACAO` (padrao `VENDA AO CONSUMIDOR`)
+- `FOCUS_NFCE_LOCAL_DESTINO` (padrao `1`)
+- `FOCUS_NFCE_PRESENCA_COMPRADOR` (padrao `1`)
+- `FOCUS_NFCE_INDICADOR_IE_DESTINATARIO` (padrao `9`)
+- `FOCUS_NFCE_INFO_ADICIONAL` (opcional)
+
 ## Modulos implementados na fundacao
 
 - Dashboard administrativo base

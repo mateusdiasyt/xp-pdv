@@ -15,6 +15,7 @@ import {
 } from "@/domain/pdv/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { parseDecimalInput } from "@/lib/decimal";
+import { cancelSaleNfce, issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   addItemToComanda,
@@ -192,9 +193,16 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     },
   });
 
+  const fiscalResult = await issueSaleNfce({
+    saleId: sale.id,
+    actorId,
+  });
+
   return {
     saleId: sale.id,
     cashReceived: cashReceived?.toString(),
+    fiscalStatus: fiscalResult.status,
+    fiscalMessage: fiscalResult.message,
   };
 }
 
@@ -365,9 +373,16 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
     },
   });
 
+  const fiscalResult = await issueSaleNfce({
+    saleId: sale.id,
+    actorId,
+  });
+
   return {
     saleId: sale.id,
     cashReceived: cashReceived?.toString(),
+    fiscalStatus: fiscalResult.status,
+    fiscalMessage: fiscalResult.message,
   };
 }
 
@@ -397,6 +412,24 @@ export async function cancelSaleRecord(input: FormData, actorId: string) {
       cancelReason: parsed.cancelReason,
     },
   });
+
+  const fiscalCancellation = await cancelSaleNfce({
+    saleId: cancelled.id,
+    reason: parsed.cancelReason,
+    actorId,
+  });
+
+  const baseMessage = "Venda cancelada com sucesso.";
+  const fiscalMessage =
+    fiscalCancellation.status === "CANCELLED" ||
+    fiscalCancellation.status === "SKIPPED" ||
+    fiscalCancellation.status === "DISABLED"
+      ? fiscalCancellation.message
+      : `${fiscalCancellation.message} Contate o Mateus.`;
+
+  return {
+    message: `${baseMessage} ${fiscalMessage}`.trim(),
+  };
 }
 
 export async function cancelComandaRecord(input: FormData, actorId: string) {

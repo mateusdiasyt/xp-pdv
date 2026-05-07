@@ -354,6 +354,23 @@ model Sale {
   discountAmount Decimal    @default(0) @db.Decimal(12, 2)
   totalAmount    Decimal    @db.Decimal(12, 2)
   status         SaleStatus @default(COMPLETED)
+  fiscalReference    String?
+  fiscalDocumentType String?
+  fiscalEnvironment  String?
+  fiscalStatus       String?
+  fiscalMessage      String?
+  fiscalAccessKey    String?
+  fiscalProtocol     String?
+  fiscalNumber       String?
+  fiscalSeries       String?
+  fiscalXmlUrl       String?
+  fiscalDanfeUrl     String?
+  fiscalQrCodeUrl    String?
+  fiscalConsultaUrl  String?
+  fiscalIssuedAt     DateTime?
+  fiscalUpdatedAt    DateTime?
+  fiscalErrorAt      DateTime?
+  fiscalResponse     Json?
   cancelReason   String?
   cancelledAt    DateTime?
   cancelledById  String?
@@ -370,6 +387,8 @@ model Sale {
   @@index([cashSessionId, createdAt])
   @@index([operatorId])
   @@index([status])
+  @@index([fiscalReference])
+  @@index([fiscalStatus])
 }
 
 model Customer {
