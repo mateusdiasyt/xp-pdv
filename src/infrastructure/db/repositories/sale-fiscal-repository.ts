@@ -18,6 +18,7 @@ type SaleFiscalSnapshot = {
   items: Array<{
     productNameSnapshot: string;
     skuSnapshot: string;
+    ncmSnapshot: string | null;
     quantity: number;
     unitPrice: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
@@ -51,6 +52,7 @@ export async function getSaleFiscalSnapshot(saleId: string): Promise<SaleFiscalS
         select: {
           productNameSnapshot: true,
           skuSnapshot: true,
+          ncmSnapshot: true,
           quantity: true,
           unitPrice: true,
           lineTotal: true,

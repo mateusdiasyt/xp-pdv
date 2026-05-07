@@ -200,6 +200,7 @@ model Product {
   id            String       @id @default(cuid())
   name          String
   sku           String       @unique
+  ncm           String?
   description   String?
   imageUrl      String?
   costPrice     Decimal      @db.Decimal(12, 2)
@@ -461,6 +462,7 @@ model SaleItem {
   productId           String
   productNameSnapshot String
   skuSnapshot         String
+  ncmSnapshot         String?
   quantity            Int
   unitPrice           Decimal  @db.Decimal(12, 2)
   unitCost            Decimal  @db.Decimal(12, 2)

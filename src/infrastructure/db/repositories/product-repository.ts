@@ -46,6 +46,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         id: true,
         name: true,
         sku: true,
+        ncm: true,
         description: true,
         imageUrl: true,
         costPrice: true,
@@ -77,6 +78,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         id: true,
         name: true,
         sku: true,
+        ncm: true,
         description: true,
         costPrice: true,
         salePrice: true,
@@ -107,6 +109,7 @@ export async function listProducts(filters?: ListProductsFilters) {
 export async function createProduct(data: {
   name: string;
   sku: string;
+  ncm: string;
   description?: string;
   imageUrl?: string;
   categoryId: string;
@@ -127,6 +130,7 @@ export async function updateProduct(data: {
   productId: string;
   name: string;
   sku: string;
+  ncm: string;
   description?: string;
   imageUrl?: string;
   categoryId: string;
@@ -143,6 +147,7 @@ export async function updateProduct(data: {
     data: {
       name: data.name,
       sku: data.sku,
+      ncm: data.ncm,
       description: data.description,
       imageUrl: data.imageUrl,
       categoryId: data.categoryId,

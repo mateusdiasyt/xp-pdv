@@ -4,6 +4,7 @@ import { z } from "zod";
 const decimalRegex = /^\d+(\.\d{1,2})?$/;
 const imagePathRegex = /^(https?:\/\/.+|\/.+)$/i;
 const imageDataUrlRegex = /^data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+$/;
+const ncmRegex = /^\d{8}$/;
 
 export const createCategorySchema = z.object({
   name: z.string().min(2, "Nome da categoria obrigatorio"),
@@ -27,6 +28,16 @@ export const createSupplierSchema = z.object({
 export const createProductSchema = z.object({
   name: z.string().min(2, "Nome obrigatorio"),
   sku: z.string().min(2, "SKU obrigatorio"),
+  ncm: z.preprocess(
+    (value) => {
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      return value.replace(/\D/g, "");
+    },
+    z.string().regex(ncmRegex, "NCM invalido. Use 8 digitos."),
+  ),
   description: z.string().max(800).optional().or(z.literal("")),
   imageUrl: z
     .string()

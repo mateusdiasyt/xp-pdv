@@ -209,6 +209,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         <div>
                           <p className="text-base font-semibold text-foreground">{product.name}</p>
                           <p className="text-xs text-muted-foreground">{product.sku}</p>
+                          <p className="text-xs text-muted-foreground">NCM {product.ncm ?? "Nao informado"}</p>
                         </div>
                         <Badge
                           className={
@@ -265,6 +266,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               id: product.id,
                               name: product.name,
                               sku: product.sku,
+                              ncm: product.ncm,
                               description: product.description,
                               imageUrl: product.imageUrl,
                               categoryId: product.categoryId,

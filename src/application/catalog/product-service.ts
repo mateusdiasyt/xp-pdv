@@ -42,6 +42,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
   const parsed = createProductSchema.parse({
     name: input.get("name"),
     sku: input.get("sku"),
+    ncm: input.get("ncm"),
     description: input.get("description"),
     imageUrl: input.get("imageUrl"),
     categoryId: input.get("categoryId"),
@@ -60,6 +61,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
   const created = await createProduct({
     name: parsed.name.trim(),
     sku: parsed.sku.trim(),
+    ncm: parsed.ncm,
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
@@ -79,6 +81,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     entityId: created.id,
     metadata: {
       sku: created.sku,
+      ncm: created.ncm,
       imageUrl: created.imageUrl,
       categoryId: created.categoryId,
       supplierId: created.supplierId,
@@ -91,6 +94,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     productId: input.get("productId"),
     name: input.get("name"),
     sku: input.get("sku"),
+    ncm: input.get("ncm"),
     description: input.get("description"),
     imageUrl: input.get("imageUrl"),
     categoryId: input.get("categoryId"),
@@ -110,6 +114,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     productId: parsed.productId,
     name: parsed.name.trim(),
     sku: parsed.sku.trim(),
+    ncm: parsed.ncm,
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
@@ -129,6 +134,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     entityId: updated.id,
     metadata: {
       sku: updated.sku,
+      ncm: updated.ncm,
       imageUrl: updated.imageUrl,
       categoryId: updated.categoryId,
       supplierId: updated.supplierId,

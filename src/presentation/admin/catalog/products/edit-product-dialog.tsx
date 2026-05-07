@@ -26,6 +26,7 @@ type EditProductDialogProps = {
     id: string;
     name: string;
     sku: string;
+    ncm?: string | null;
     description?: string | null;
     imageUrl?: string | null;
     categoryId: string;
@@ -62,6 +63,7 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
               productId: product.id,
               name: product.name,
               sku: product.sku,
+              ncm: product.ncm ?? "",
               description: product.description,
               imageUrl: product.imageUrl,
               categoryId: product.categoryId,

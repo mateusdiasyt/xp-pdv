@@ -90,7 +90,7 @@ function getFocusNfceConfig(): FocusNfceConfig {
     environment === "producao" ? "https://api.focusnfe.com.br" : "https://homologacao.focusnfe.com.br";
 
   return {
-    enabled: Boolean(token && cnpjEmitente && defaultNcm),
+    enabled: Boolean(token && cnpjEmitente),
     environment,
     token,
     cnpjEmitente,
@@ -330,6 +330,29 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     };
   }
 
+  const hasMissingNcm = snapshot.items.some(
+    (item) => !String(item.ncmSnapshot ?? "").trim() && !String(config.defaultNcm ?? "").trim(),
+  );
+
+  if (hasMissingNcm) {
+    const message =
+      "NFC-e nao emitida: cadastre o NCM no produto ou configure FOCUS_NFCE_NCM_PADRAO no ambiente.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalEnvironment: config.environment,
+      fiscalStatus: "ERROR",
+      fiscalMessage: message,
+      fiscalErrorAt: new Date(),
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "ERROR" as const,
+      message,
+    };
+  }
+
   const payload = {
     cnpj_emitente: config.cnpjEmitente,
     data_emissao: toISOStringWithTimezone(new Date()),
@@ -345,7 +368,7 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     valor_total: toDecimal(parseMoney(snapshot.totalAmount), 2),
     items: snapshot.items.map((item, index) => ({
       numero_item: String(index + 1),
-      codigo_ncm: config.defaultNcm,
+      codigo_ncm: String(item.ncmSnapshot ?? "").trim() || config.defaultNcm,
       codigo_produto: item.skuSnapshot || `ITEM-${index + 1}`,
       descricao: item.productNameSnapshot || `ITEM ${index + 1}`,
       quantidade_comercial: toDecimal(item.quantity, 4),

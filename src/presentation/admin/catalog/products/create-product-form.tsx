@@ -29,6 +29,7 @@ type ProductFormInitialData = {
   productId?: string;
   name?: string;
   sku?: string;
+  ncm?: string;
   description?: string | null;
   imageUrl?: string | null;
   categoryId?: string;
@@ -204,6 +205,20 @@ export function CreateProductForm({
         <div className="space-y-2">
           <Label htmlFor="sku">SKU</Label>
           <Input id="sku" name="sku" placeholder="SKU-0001" defaultValue={initialData?.sku ?? ""} required />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ncm">NCM</Label>
+          <Input
+            id="ncm"
+            name="ncm"
+            placeholder="22021000"
+            defaultValue={initialData?.ncm ?? ""}
+            inputMode="numeric"
+            maxLength={8}
+            required
+          />
+          <p className="text-xs text-muted-foreground">Informe o NCM fiscal com 8 digitos.</p>
         </div>
 
         <div className="space-y-2">

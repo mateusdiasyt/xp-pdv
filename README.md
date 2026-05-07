@@ -79,7 +79,7 @@ Para emissao automatica no fechamento da venda/comanda, configure no ambiente:
 - `FOCUS_NFE_TOKEN_HOMOLOG`
 - `FOCUS_NFE_TOKEN_PROD`
 - `FOCUS_NFCE_CNPJ_EMITENTE`
-- `FOCUS_NFCE_NCM_PADRAO`
+- `FOCUS_NFCE_NCM_PADRAO` (fallback opcional quando algum produto estiver sem NCM)
 
 Campos opcionais (com padrao no codigo):
 
@@ -92,6 +92,8 @@ Campos opcionais (com padrao no codigo):
 - `FOCUS_NFCE_PRESENCA_COMPRADOR` (padrao `1`)
 - `FOCUS_NFCE_INDICADOR_IE_DESTINATARIO` (padrao `9`)
 - `FOCUS_NFCE_INFO_ADICIONAL` (opcional)
+
+Observacao: o sistema usa o NCM cadastrado em cada produto no catalogo. O NCM padrao entra apenas como fallback.
 
 ## Modulos implementados na fundacao
 
