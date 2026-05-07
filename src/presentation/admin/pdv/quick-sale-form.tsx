@@ -207,7 +207,6 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
   const [discountAmount, setDiscountAmount] = useState("0.00");
-  const [cashReceived, setCashReceived] = useState("");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     { id: 1, method: PaymentMethod.PIX, amount: "0.00" },
@@ -271,19 +270,8 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
   );
   const paymentDifferenceInCents = totalInCents - paymentsTotalInCents;
   const hasCashPayment = paymentLines.some((paymentLine) => paymentLine.method === PaymentMethod.CASH);
-  const cashPaymentTotalInCents = paymentLines.reduce((acc, paymentLine) => {
-    if (paymentLine.method !== PaymentMethod.CASH) {
-      return acc;
-    }
-
-    return acc + Math.max(0, parseMoneyToCents(paymentLine.amount));
-  }, 0);
-  const cashReceivedInCents = Math.max(0, parseMoneyToCents(cashReceived));
-  const changeFromReceivedInCents = Math.max(cashReceivedInCents - cashPaymentTotalInCents, 0);
   const paymentExcessInCents = Math.max(paymentsTotalInCents - totalInCents, 0);
-  const changeInCents = hasCashPayment
-    ? Math.max(changeFromReceivedInCents, paymentExcessInCents)
-    : 0;
+  const changeInCents = hasCashPayment ? paymentExcessInCents : 0;
   const normalizedCustomerQuery = customerQuery.trim().toLowerCase();
   const normalizedCustomerQueryDigits = normalizeDigits(customerQuery);
   const filteredCustomers = customers
@@ -733,7 +721,9 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`quick-payment-amount-${paymentLine.id}`}>Valor (R$)</Label>
+                      <Label htmlFor={`quick-payment-amount-${paymentLine.id}`}>
+                        {paymentLine.method === PaymentMethod.CASH ? "Valor recebido (R$)" : "Valor (R$)"}
+                      </Label>
                       <Input
                         id={`quick-payment-amount-${paymentLine.id}`}
                         name="paymentAmount"
@@ -759,22 +749,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                 ))}
               </div>
             </div>
-
-            {hasCashPayment ? (
-              <div className="space-y-2">
-                <Label htmlFor="quick-cash-received">Valor recebido em dinheiro (R$)</Label>
-                <Input
-                  id="quick-cash-received"
-                  name="cashReceived"
-                  value={cashReceived}
-                  onChange={(event) => setCashReceived(event.target.value)}
-                  placeholder="0.00"
-                />
-                <p className="text-xs text-muted-foreground">Ajuda no calculo automatico do troco.</p>
-              </div>
-            ) : (
-              <input type="hidden" name="cashReceived" value="" />
-            )}
+            <input type="hidden" name="cashReceived" value="" />
 
             <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
