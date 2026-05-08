@@ -1,10 +1,16 @@
 import { Prisma } from "@prisma/client";
 
 import { createStockMovementSchema } from "@/domain/stock/schemas";
-import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
+import {
+  createAuditLog,
+  findAuditLogByActionEntity,
+  listStockXmlImportAuditEntries,
+} from "@/infrastructure/db/repositories/audit-log-repository";
 import { listProductOptions } from "@/infrastructure/db/repositories/product-repository";
 import {
   createStockInvoiceXmlRecord,
+  findStockInvoiceXmlById,
+  importStockInvoiceItems,
   isMissingStockInvoiceXmlTableError,
   listStockInvoiceXmls,
   listStockMovements,
@@ -12,6 +18,16 @@ import {
 } from "@/infrastructure/db/repositories/stock-repository";
 
 const MAX_XML_FILE_SIZE_BYTES = 2_000_000;
+
+type ParsedStockInvoiceItem = {
+  lineNumber: number;
+  supplierProductCode?: string;
+  supplierEan?: string;
+  description: string;
+  ncm?: string;
+  quantity: number;
+  unitCost: Prisma.Decimal;
+};
 
 type ParsedStockInvoiceXml = {
   accessKey: string;
@@ -22,6 +38,15 @@ type ParsedStockInvoiceXml = {
   issuedAt?: Date;
   totalAmount?: Prisma.Decimal;
   itemCount: number;
+  items: ParsedStockInvoiceItem[];
+};
+
+type StockXmlImportSummary = {
+  imported: boolean;
+  createdProducts: number;
+  updatedProducts: number;
+  stockMovements: number;
+  skippedItems: number;
 };
 
 function normalizeXmlText(rawValue?: string) {
@@ -38,7 +63,7 @@ function extractTagValue(xml: string, tagName: string) {
   return normalizeXmlText(xml.match(valueRegex)?.[1]);
 }
 
-function parseXmlDecimal(rawValue?: string) {
+function parseXmlDecimal(rawValue?: string, maxPrecision = 2) {
   if (!rawValue) {
     return undefined;
   }
@@ -49,7 +74,21 @@ function parseXmlDecimal(rawValue?: string) {
     return undefined;
   }
 
-  return new Prisma.Decimal(parsedValue.toFixed(2));
+  return new Prisma.Decimal(parsedValue.toFixed(maxPrecision));
+}
+
+function parseXmlNumber(rawValue?: string) {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const normalizedValue = rawValue.replace(",", ".").trim();
+  const parsedValue = Number(normalizedValue);
+  if (!Number.isFinite(parsedValue)) {
+    return undefined;
+  }
+
+  return parsedValue;
 }
 
 function parseXmlDate(rawValue?: string) {
@@ -63,6 +102,55 @@ function parseXmlDate(rawValue?: string) {
   }
 
   return parsedDate;
+}
+
+function parseStockInvoiceItems(rawXml: string) {
+  const detBlocks = Array.from(rawXml.matchAll(/<det\b[^>]*>([\s\S]*?)<\/det>/gi));
+  const items: ParsedStockInvoiceItem[] = [];
+
+  for (const [index, detMatch] of detBlocks.entries()) {
+    const detBlock = detMatch[1] ?? "";
+    const productBlock = extractTagBlock(detBlock, "prod") ?? detBlock;
+
+    const description = extractTagValue(productBlock, "xProd");
+    if (!description) {
+      continue;
+    }
+
+    const rawQuantity = parseXmlNumber(extractTagValue(productBlock, "qCom"));
+    if (!rawQuantity || rawQuantity <= 0) {
+      continue;
+    }
+
+    if (!Number.isInteger(rawQuantity)) {
+      throw new Error(
+        `O item "${description}" possui quantidade fracionada (${rawQuantity}). Ajuste manualmente antes de importar.`,
+      );
+    }
+
+    const lineTotal = parseXmlDecimal(extractTagValue(productBlock, "vProd"), 2);
+    const unitCost =
+      parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 2) ??
+      (lineTotal ? lineTotal.dividedBy(rawQuantity).toDecimalPlaces(2) : undefined);
+
+    if (!unitCost) {
+      continue;
+    }
+
+    const normalizedNcm = (extractTagValue(productBlock, "NCM") ?? "").replace(/\D/g, "");
+
+    items.push({
+      lineNumber: index + 1,
+      supplierProductCode: normalizeXmlText(extractTagValue(productBlock, "cProd")),
+      supplierEan: normalizeXmlText(extractTagValue(productBlock, "cEAN")),
+      description,
+      ncm: normalizedNcm.length === 8 ? normalizedNcm : undefined,
+      quantity: rawQuantity,
+      unitCost,
+    });
+  }
+
+  return items;
 }
 
 function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
@@ -84,7 +172,8 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
   const supplierDocument = extractTagValue(issuerBlock, "CNPJ") ?? extractTagValue(issuerBlock, "CPF");
   const issuedAt = parseXmlDate(extractTagValue(ideBlock, "dhEmi") ?? extractTagValue(ideBlock, "dEmi"));
   const totalAmount = parseXmlDecimal(extractTagValue(totalBlock, "vNF"));
-  const itemCount = (rawXml.match(/<det\b/gi) ?? []).length;
+  const items = parseStockInvoiceItems(rawXml);
+  const itemCount = items.length;
 
   return {
     accessKey,
@@ -95,7 +184,17 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
     issuedAt,
     totalAmount,
     itemCount,
+    items,
   };
+}
+
+function readBooleanFormFlag(input: FormData, key: string) {
+  const value = input.get(key);
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return value === "on" || value === "true" || value === "1";
 }
 
 function ensureXmlStorageAvailable(error: unknown): never {
@@ -104,6 +203,57 @@ function ensureXmlStorageAvailable(error: unknown): never {
   }
 
   throw error instanceof Error ? error : new Error("Nao foi possivel salvar o XML de estoque.");
+}
+
+async function runStockXmlImport(params: {
+  xmlRecordId: string;
+  parsedInvoice: ParsedStockInvoiceXml;
+  actorId?: string;
+  allowCreateProducts: boolean;
+}) {
+  if (params.parsedInvoice.items.length === 0) {
+    throw new Error("Nao foi encontrado nenhum item valido no XML para importar.");
+  }
+
+  const alreadyImported = await findAuditLogByActionEntity({
+    action: "stock.xml.import",
+    entity: "StockInvoiceXml",
+    entityId: params.xmlRecordId,
+  });
+
+  if (alreadyImported) {
+    throw new Error("Este XML ja foi importado anteriormente para o estoque.");
+  }
+
+  const summary = await importStockInvoiceItems({
+    accessKey: params.parsedInvoice.accessKey,
+    invoiceNumber: params.parsedInvoice.invoiceNumber,
+    invoiceSeries: params.parsedInvoice.invoiceSeries,
+    supplierName: params.parsedInvoice.supplierName,
+    supplierDocument: params.parsedInvoice.supplierDocument,
+    actorId: params.actorId,
+    allowCreateProducts: params.allowCreateProducts,
+    items: params.parsedInvoice.items,
+  });
+
+  await createAuditLog({
+    userId: params.actorId,
+    action: "stock.xml.import",
+    entity: "StockInvoiceXml",
+    entityId: params.xmlRecordId,
+    metadata: {
+      accessKey: params.parsedInvoice.accessKey,
+      invoiceNumber: params.parsedInvoice.invoiceNumber,
+      invoiceSeries: params.parsedInvoice.invoiceSeries,
+      createdProducts: summary.createdProducts,
+      updatedProducts: summary.updatedProducts,
+      stockMovements: summary.stockMovements,
+      skippedItems: summary.skippedItems,
+      allowCreateProducts: params.allowCreateProducts,
+    },
+  });
+
+  return summary;
 }
 
 export async function getStockMovements() {
@@ -117,8 +267,22 @@ export async function getStockFormOptions() {
 export async function getStockInvoiceXmlHistory() {
   try {
     const entries = await listStockInvoiceXmls();
+    const importAudits = await listStockXmlImportAuditEntries(entries.map((entry) => entry.id));
+    const importedAtByXmlId = new Map<string, Date>();
+
+    for (const entry of importAudits) {
+      if (!entry.entityId || importedAtByXmlId.has(entry.entityId)) {
+        continue;
+      }
+
+      importedAtByXmlId.set(entry.entityId, entry.createdAt);
+    }
+
     return {
-      entries,
+      entries: entries.map((entry) => ({
+        ...entry,
+        importedAt: importedAtByXmlId.get(entry.id),
+      })),
       setupPending: false,
     };
   } catch (error) {
@@ -166,7 +330,7 @@ export async function registerStockMovementRecord(input: FormData, actorId?: str
   });
 }
 
-export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: string) {
+export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: string): Promise<StockXmlImportSummary> {
   const maybeXmlFile = input.get("xmlFile");
   if (!(maybeXmlFile instanceof File) || maybeXmlFile.size <= 0) {
     throw new Error("Selecione um arquivo XML valido para continuar.");
@@ -186,6 +350,8 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
   }
 
   const parsedInvoice = parseStockInvoiceXml(rawXml);
+  const applyStockImport = readBooleanFormFlag(input, "applyStockImport");
+  const allowCreateProducts = readBooleanFormFlag(input, "allowCreateProducts");
 
   let created: Awaited<ReturnType<typeof createStockInvoiceXmlRecord>>;
   try {
@@ -211,6 +377,29 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
     ensureXmlStorageAvailable(error);
   }
 
+  const importSummary: StockXmlImportSummary = {
+    imported: false,
+    createdProducts: 0,
+    updatedProducts: 0,
+    stockMovements: 0,
+    skippedItems: 0,
+  };
+
+  if (applyStockImport) {
+    const summary = await runStockXmlImport({
+      xmlRecordId: created.id,
+      parsedInvoice,
+      actorId,
+      allowCreateProducts,
+    });
+
+    importSummary.imported = true;
+    importSummary.createdProducts = summary.createdProducts;
+    importSummary.updatedProducts = summary.updatedProducts;
+    importSummary.stockMovements = summary.stockMovements;
+    importSummary.skippedItems = summary.skippedItems;
+  }
+
   await createAuditLog({
     userId: actorId,
     action: "stock.xml.store",
@@ -224,7 +413,34 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
       itemCount: created.itemCount,
       sourceFileName: created.sourceFileName,
       sourceFileSize: created.sourceFileSize,
-      importedProducts: false,
+      importedProducts: importSummary.imported,
+      importSummary,
     },
   });
+
+  return importSummary;
+}
+
+export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actorId?: string): Promise<StockXmlImportSummary> {
+  const xmlRecord = await findStockInvoiceXmlById(stockInvoiceXmlId);
+  if (!xmlRecord) {
+    throw new Error("XML nao encontrado para importacao.");
+  }
+
+  const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
+
+  const summary = await runStockXmlImport({
+    xmlRecordId: xmlRecord.id,
+    parsedInvoice,
+    actorId,
+    allowCreateProducts: true,
+  });
+
+  return {
+    imported: true,
+    createdProducts: summary.createdProducts,
+    updatedProducts: summary.updatedProducts,
+    stockMovements: summary.stockMovements,
+    skippedItems: summary.skippedItems,
+  };
 }

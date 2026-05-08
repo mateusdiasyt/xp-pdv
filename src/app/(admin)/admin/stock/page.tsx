@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { CreateStockMovementForm } from "@/presentation/admin/stock/create-stock-movement-form";
+import { ImportStockInvoiceXmlButton } from "@/presentation/admin/stock/import-stock-invoice-xml-button";
 import { UploadStockInvoiceXmlForm } from "@/presentation/admin/stock/upload-stock-invoice-xml-form";
 
 function movementTypeLabel(type: StockMovementType) {
@@ -70,7 +71,8 @@ export default async function StockPage() {
           <CardHeader>
             <CardTitle>XML de notas de compra</CardTitle>
             <CardDescription>
-              Fluxo principal: carregue o XML recebido do fornecedor para guarda fiscal e rastreabilidade.
+              Fluxo ideal: carregue o XML recebido do fornecedor, guarde para auditoria e opcionalmente importe os itens
+              para atualizar cadastro e estoque.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -101,13 +103,15 @@ export default async function StockPage() {
                   <TableHead>Data emissao</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Arquivo</TableHead>
+                  {canManage ? <TableHead className="text-right">Acao</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {xmlHistory.entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-zinc-500">
+                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-sm text-zinc-500">
                       Nenhum XML de estoque foi carregado.
                     </TableCell>
                   </TableRow>
@@ -129,9 +133,27 @@ export default async function StockPage() {
                       {xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}
                     </TableCell>
                     <TableCell>
+                      {xmlEntry.importedAt ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                          Importado em {dateFormatter.format(xmlEntry.importedAt)}
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Somente guardado</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <p className="max-w-[14rem] truncate text-sm">{xmlEntry.sourceFileName}</p>
                       <p className="text-xs text-zinc-500">Upload em {dateFormatter.format(xmlEntry.createdAt)}</p>
                     </TableCell>
+                    {canManage ? (
+                      <TableCell className="text-right">
+                        {xmlEntry.importedAt ? (
+                          <span className="text-xs text-muted-foreground">Importacao concluida</span>
+                        ) : (
+                          <ImportStockInvoiceXmlButton stockInvoiceXmlId={xmlEntry.id} compact />
+                        )}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
