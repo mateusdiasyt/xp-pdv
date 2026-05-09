@@ -21,6 +21,7 @@ const defaultBrandColors = {
 
 type UpdateBrandCustomizationFormProps = {
   initialValues: {
+    browserTitle: string;
     primaryColor: string;
     accentColor: string;
     backgroundColor: string;
@@ -66,6 +67,7 @@ async function buildImagePreviewDataUrl(file: File, format: "image/png" | "image
 export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCustomizationFormProps) {
   const [state, formAction] = useActionState(updateBrandCustomizationAction, initialActionState);
 
+  const [browserTitle, setBrowserTitle] = useState(initialValues.browserTitle);
   const [primaryColor, setPrimaryColor] = useState(initialValues.primaryColor);
   const [accentColor, setAccentColor] = useState(initialValues.accentColor);
   const [backgroundColor, setBackgroundColor] = useState(initialValues.backgroundColor);
@@ -108,6 +110,7 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
   }
 
   function restoreDefaults() {
+    setBrowserTitle("Painel Maia | Sistema Administrativo");
     setPrimaryColor(defaultBrandColors.primaryColor);
     setAccentColor(defaultBrandColors.accentColor);
     setBackgroundColor(defaultBrandColors.backgroundColor);
@@ -121,6 +124,18 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
     <form action={formAction} className="grid gap-5">
       <input type="hidden" name="logoDataUrl" value={logoDataUrl} />
       <input type="hidden" name="faviconDataUrl" value={faviconDataUrl} />
+
+      <section className="grid gap-2">
+        <Label htmlFor="browserTitle">Nome da aba do navegador</Label>
+        <Input
+          id="browserTitle"
+          name="browserTitle"
+          value={browserTitle}
+          onChange={(event) => setBrowserTitle(event.target.value)}
+          placeholder="Ex.: XP Arcade & Bar | Sistema"
+          maxLength={80}
+        />
+      </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="space-y-2">

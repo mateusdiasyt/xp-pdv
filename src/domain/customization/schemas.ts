@@ -3,6 +3,11 @@ import { z } from "zod";
 const hexColorRegex = /^#([0-9a-fA-F]{6})$/;
 
 export const updateBrandCustomizationSchema = z.object({
+  browserTitle: z
+    .string()
+    .trim()
+    .min(3, "Nome da aba obrigatorio.")
+    .max(80, "Nome da aba muito longo."),
   primaryColor: z
     .string()
     .trim()

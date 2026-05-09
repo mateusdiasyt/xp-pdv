@@ -575,6 +575,7 @@ model FiscalConfiguration {
 
 model BrandCustomization {
   id              String   @id @default(cuid())
+  browserTitle    String   @default("Painel Maia | Sistema Administrativo")
   primaryColor    String   @default("#d4a62a")
   accentColor     String   @default("#b9882a")
   backgroundColor String   @default("#0a0a0a")

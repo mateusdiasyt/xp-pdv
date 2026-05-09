@@ -20,6 +20,7 @@ const MAX_LOGO_DATA_URL_LENGTH = 700_000;
 const MAX_FAVICON_DATA_URL_LENGTH = 220_000;
 
 export const defaultBrandCustomization = {
+  browserTitle: "Painel Maia | Sistema Administrativo",
   primaryColor: "#D4A62A",
   accentColor: "#B9882A",
   backgroundColor: "#0A0A0A",
@@ -108,6 +109,7 @@ function normalizeDataUrlImage(value: unknown, type: "logo" | "favicon") {
 
 export async function getBrandCustomizationSnapshot() {
   try {
+    await ensureBrandCustomizationTable();
     const customization = await getLatestBrandCustomization();
 
     if (!customization) {
@@ -120,6 +122,7 @@ export async function getBrandCustomizationSnapshot() {
     return {
       customization: {
         primaryColor: normalizeHex(customization.primaryColor),
+        browserTitle: customization.browserTitle,
         accentColor: normalizeHex(customization.accentColor),
         backgroundColor: normalizeHex(customization.backgroundColor),
         foregroundColor: normalizeHex(customization.foregroundColor),
@@ -146,6 +149,7 @@ export async function getBrandCustomizationSnapshot() {
 
         return {
           customization: {
+            browserTitle: retriedCustomization.browserTitle,
             primaryColor: normalizeHex(retriedCustomization.primaryColor),
             accentColor: normalizeHex(retriedCustomization.accentColor),
             backgroundColor: normalizeHex(retriedCustomization.backgroundColor),
@@ -171,6 +175,7 @@ export async function getBrandCustomizationSnapshot() {
 
 export async function updateBrandCustomizationRecord(input: FormData, actor: { id?: string; name: string }) {
   const parsed = updateBrandCustomizationSchema.parse({
+    browserTitle: input.get("browserTitle"),
     primaryColor: input.get("primaryColor"),
     accentColor: input.get("accentColor"),
     backgroundColor: input.get("backgroundColor"),
@@ -184,7 +189,9 @@ export async function updateBrandCustomizationRecord(input: FormData, actor: { i
 
   let updated: Awaited<ReturnType<typeof upsertBrandCustomization>>;
   try {
+    await ensureBrandCustomizationTable();
     updated = await upsertBrandCustomization({
+      browserTitle: parsed.browserTitle,
       primaryColor: normalizeHex(parsed.primaryColor),
       accentColor: normalizeHex(parsed.accentColor),
       backgroundColor: normalizeHex(parsed.backgroundColor),
@@ -205,6 +212,7 @@ export async function updateBrandCustomizationRecord(input: FormData, actor: { i
     entityId: updated.id,
     metadata: {
       primaryColor: updated.primaryColor,
+      browserTitle: updated.browserTitle,
       accentColor: updated.accentColor,
       backgroundColor: updated.backgroundColor,
       foregroundColor: updated.foregroundColor,

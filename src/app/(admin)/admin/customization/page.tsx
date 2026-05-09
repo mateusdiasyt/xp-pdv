@@ -18,14 +18,14 @@ export default async function CustomizationPage() {
       <PageHeader
         eyebrow="Modulo ERP"
         title="Personalizacao"
-        description="Altere cores da interface, logo e favicon para adaptar o sistema para cada empresa."
+        description="Altere nome da aba, cores da interface, logo e favicon para adaptar o sistema para cada empresa."
       />
 
       <Card>
         <CardHeader>
           <CardTitle>Marca e identidade visual</CardTitle>
           <CardDescription>
-            As alteracoes sao aplicadas no painel e na tela de login.
+            As alteracoes sao aplicadas no painel, na tela de login e na aba do navegador.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -37,6 +37,7 @@ export default async function CustomizationPage() {
             <UpdateBrandCustomizationForm
               initialValues={{
                 primaryColor: customization.primaryColor,
+                browserTitle: customization.browserTitle,
                 accentColor: customization.accentColor,
                 backgroundColor: customization.backgroundColor,
                 foregroundColor: customization.foregroundColor,
