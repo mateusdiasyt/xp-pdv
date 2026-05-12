@@ -62,6 +62,7 @@ export async function closeQuickSaleAction(
   const params = new URLSearchParams({
     receipt: result.saleId,
     ticket: "quick",
+    print: "ticket",
   });
 
   if (result.cashReceived) {

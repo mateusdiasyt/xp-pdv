@@ -12,6 +12,7 @@ import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
 import { CancelSaleForm } from "@/presentation/admin/pdv/cancel-sale-form";
 import { retrySaleNfceRequest } from "@/presentation/admin/pdv/actions";
+import { AutoPrintReceipt } from "@/presentation/admin/pdv/auto-print-receipt";
 import { PdvWorkspace } from "@/presentation/admin/pdv/pdv-workspace";
 import { ReceiptPrintMode } from "@/presentation/admin/pdv/receipt-print-mode";
 import { ReceiptPreviewCard } from "@/presentation/admin/pdv/receipt-preview-card";
@@ -82,6 +83,7 @@ type PdvPageProps = {
     receipt?: string;
     cashReceived?: string;
     ticket?: string;
+    print?: string;
   }>;
 };
 
@@ -99,13 +101,14 @@ function parseCashReceived(value?: string) {
 
 export default async function PdvPage({ searchParams }: PdvPageProps) {
   const session = await requirePermission(PERMISSIONS.PDV_VIEW);
-  const { receipt, cashReceived, ticket } = await searchParams;
+  const { receipt, cashReceived, ticket, print } = await searchParams;
   const receiptData = receipt ? await getSaleReceiptData(receipt) : null;
 
   if (receipt && receiptData) {
     return (
       <div className="space-y-6">
         <ReceiptPrintMode />
+        <AutoPrintReceipt enabled={print === "ticket"} />
         <ReceiptPreviewCard
           sale={receiptData}
           cashReceived={parseCashReceived(cashReceived)}
