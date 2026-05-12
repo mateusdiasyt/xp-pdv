@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { PaymentMethod, SaleStatus } from "@prisma/client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
@@ -88,9 +88,36 @@ type ReceiptBodyProps = {
   cashReceived?: number;
   title: string;
   subtitle: string;
+  showFiscalSummary?: boolean;
 };
 
-function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) {
+function getFiscalStatusLabel(status?: string | null) {
+  const normalized = (status ?? "").trim().toUpperCase();
+
+  if (normalized === "AUTHORIZED") {
+    return "NFC-e autorizada";
+  }
+
+  if (normalized === "PROCESSING") {
+    return "NFC-e processando";
+  }
+
+  if (normalized === "REJECTED") {
+    return "NFC-e rejeitada";
+  }
+
+  if (normalized === "DISABLED") {
+    return "NFC-e nao configurada";
+  }
+
+  if (normalized === "ERROR") {
+    return "NFC-e com erro";
+  }
+
+  return "NFC-e nao emitida";
+}
+
+function ReceiptBody({ sale, cashReceived, title, subtitle, showFiscalSummary = false }: ReceiptBodyProps) {
   const cashPaymentTotal = sale.payments
     .filter((payment) => payment.method === PaymentMethod.CASH)
     .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
@@ -98,20 +125,20 @@ function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) 
   const ticketCode = formatTicketCode(sale.saleNumber);
 
   return (
-    <div className="space-y-3 pb-4">
-      <div className="space-y-1 border-b border-dashed border-black/20 pb-3 text-center">
+    <div className="space-y-2.5 pb-4">
+      <div className="space-y-1 border-b border-black pb-2.5 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/api/branding/logo"
           alt="Logo do estabelecimento"
-          className="mx-auto h-9 w-auto max-w-[42mm] object-contain"
+          className="mx-auto h-8 w-auto max-w-[42mm] object-contain"
         />
-        <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-black/55">{title}</p>
-        <h3 className="text-[1rem] font-semibold leading-tight tracking-[-0.02em] text-black">{subtitle}</h3>
-        <p className="text-[10px] leading-4 text-black/70">Ticket #{ticketCode}</p>
+        <p className="text-[8px] font-semibold uppercase tracking-[0.22em] text-black/55">{title}</p>
+        <h3 className="text-[0.9rem] font-bold leading-tight text-black">{subtitle}</h3>
+        <p className="text-[1.55rem] font-black leading-none text-black">#{ticketCode}</p>
       </div>
 
-      <div className="space-y-1.5 border-b border-dashed border-black/20 pb-3 text-[10px] leading-4 text-black/78">
+      <div className="space-y-1 border-b border-black pb-2.5 text-[9px] leading-3.5 text-black/78">
         <p className="text-[11px] font-semibold text-black">{sale.saleNumber}</p>
         <p>{receiptDateFormatter.format(sale.createdAt)}</p>
         <p>{sale.customerName || "Comanda avulsa"}</p>
@@ -120,54 +147,56 @@ function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) 
         </p>
         <p>Operador: {sale.operator.name}</p>
         <p className="font-semibold text-black">
-          {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
+          {sale.status === SaleStatus.COMPLETED ? "Pago / Concluido" : "Cancelada"}
         </p>
-        {sale.fiscalStatus ? (
-          <p className="text-[9px] uppercase tracking-[0.08em] text-black/70">NFC-e: {sale.fiscalStatus}</p>
-        ) : null}
-        {sale.fiscalNumber ? (
-          <p className="text-[9px] text-black/70">
+        <p className="text-[8px] uppercase tracking-[0.08em] text-black/65">{getFiscalStatusLabel(sale.fiscalStatus)}</p>
+        {showFiscalSummary && sale.fiscalNumber ? (
+          <p className="text-[8px] text-black/70">
             Numero: {sale.fiscalNumber} / Serie: {sale.fiscalSeries ?? "-"}
           </p>
         ) : null}
-        {sale.fiscalAccessKey ? <p className="break-all text-[8px] leading-3 text-black/55">{sale.fiscalAccessKey}</p> : null}
+        {showFiscalSummary && sale.fiscalAccessKey ? (
+          <p className="break-all text-[7px] leading-3 text-black/55">{sale.fiscalAccessKey}</p>
+        ) : null}
       </div>
 
-      <div className="space-y-2 border-b border-dashed border-black/20 pb-3">
-        <div className="grid grid-cols-[18px_minmax(0,1fr)_56px] gap-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/55">
-          <span>It</span>
+      <div className="space-y-1.5 border-b border-black pb-2.5">
+        <div className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 border-b border-dashed border-black/25 pb-1 text-[7px] font-bold uppercase text-black/65">
+          <span>Cod.</span>
           <span>Descricao</span>
-          <span className="text-right">Valor</span>
+          <span className="text-right">Qtd.</span>
+          <span className="text-right">Total</span>
         </div>
         {sale.items.map((item, index) => (
-          <div key={item.id} className="grid grid-cols-[18px_minmax(0,1fr)_56px] gap-2 text-[10px] leading-4 text-black">
-            <span>{String(index + 1).padStart(2, "0")}</span>
+          <div key={item.id} className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 text-[9px] leading-3.5 text-black">
+            <span className="break-all text-[7px] text-black/70">{item.skuSnapshot || String(index + 1).padStart(2, "0")}</span>
             <div className="min-w-0">
-              <p className="font-medium leading-4">{item.productNameSnapshot}</p>
-              <p className="text-[9px] leading-4 text-black/60">
-                {item.quantity}x - {formatCurrency(toNumber(item.unitPrice))}
+              <p className="font-semibold leading-3.5">{item.productNameSnapshot}</p>
+              <p className="text-[8px] leading-3.5 text-black/60">
+                {formatCurrency(toNumber(item.unitPrice))} un.
               </p>
             </div>
+            <span className="text-right">{item.quantity}</span>
             <span className="text-right font-semibold">{formatCurrency(toNumber(item.lineTotal))}</span>
           </div>
         ))}
       </div>
 
-      <div className="space-y-2 border-b border-dashed border-black/20 pb-3">
+      <div className="space-y-1.5 border-b border-black pb-2.5">
         {sale.payments.map((payment) => (
-          <div key={payment.id} className="flex items-center justify-between gap-3 text-[10px] leading-4">
+          <div key={payment.id} className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
             <span className="text-black/70">{paymentLabels[payment.method]}</span>
             <span className="font-medium text-black">{formatCurrency(toNumber(payment.amount))}</span>
           </div>
         ))}
         {cashReceived ? (
-          <div className="flex items-center justify-between gap-3 text-[10px] leading-4">
+          <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
             <span className="text-black/70">Recebido</span>
             <span className="font-medium text-black">{formatCurrency(cashReceived)}</span>
           </div>
         ) : null}
         {computedChange > 0 ? (
-          <div className="flex items-center justify-between gap-3 text-[10px] leading-4">
+          <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
             <span className="text-black/70">Troco</span>
             <span className="font-medium text-black">{formatCurrency(computedChange)}</span>
           </div>
@@ -175,27 +204,23 @@ function ReceiptBody({ sale, cashReceived, title, subtitle }: ReceiptBodyProps) 
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3 text-[10px] leading-4 text-black/70">
+        <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5 text-black/70">
           <span>Subtotal</span>
           <span>{formatCurrency(toNumber(sale.subtotalAmount))}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 text-[10px] leading-4 text-black/70">
+        <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5 text-black/70">
           <span>Desconto</span>
           <span>{formatCurrency(toNumber(sale.discountAmount))}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-black/15 pt-2 text-[1.05rem] font-semibold tracking-[-0.03em] text-black">
+        <div className="flex items-center justify-between gap-3 border-t border-black/25 pt-1.5 text-[1rem] font-bold text-black">
           <span>Total</span>
           <span>{formatCurrency(toNumber(sale.totalAmount))}</span>
         </div>
       </div>
 
-      {sale.fiscalDanfeUrl || sale.fiscalXmlUrl || sale.fiscalMessage ? (
-        <div className="space-y-1 border-t border-dashed border-black/20 pt-2 text-[9px] leading-4 text-black/70">
-          {sale.fiscalMessage ? <p>{sale.fiscalMessage}</p> : null}
-          {sale.fiscalDanfeUrl ? <p>DANFE: {sale.fiscalDanfeUrl}</p> : null}
-          {sale.fiscalXmlUrl ? <p>XML: {sale.fiscalXmlUrl}</p> : null}
-        </div>
-      ) : null}
+      <div className="border-t border-dashed border-black/25 pt-2 text-center text-[8px] uppercase tracking-[0.16em] text-black/55">
+        Ticket operacional
+      </div>
     </div>
   );
 }
@@ -216,6 +241,17 @@ export function ReceiptPreviewCard({ sale, cashReceived, ticketMode = false }: R
           <ArrowLeft className="h-4 w-4" />
           Voltar ao PDV
         </Link>
+        {sale.fiscalDanfeUrl ? (
+          <a
+            href={sale.fiscalDanfeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black transition-colors hover:bg-black/5"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir NFC-e
+          </a>
+        ) : null}
         <PrintReceiptButton />
       </div>
 
@@ -224,13 +260,19 @@ export function ReceiptPreviewCard({ sale, cashReceived, ticketMode = false }: R
           {ticketMode ? (
             <>
               <ReceiptBody sale={sale} cashReceived={cashReceived} title={quickTicketTitle} subtitle={quickTicketSubtitle} />
-              <div className="border-t border-dashed border-black/25 py-2 text-center text-[9px] uppercase tracking-[0.2em] text-black/60">
+              <div className="border-t border-dashed border-black/25 py-2 text-center text-[8px] uppercase tracking-[0.18em] text-black/60">
                 destaque no corte
               </div>
               <ReceiptBody sale={sale} cashReceived={cashReceived} title={quickKitchenTitle} subtitle={quickKitchenSubtitle} />
             </>
           ) : (
-            <ReceiptBody sale={sale} cashReceived={cashReceived} title="Guilda Maia" subtitle="Comprovante de venda" />
+            <ReceiptBody
+              sale={sale}
+              cashReceived={cashReceived}
+              title="Via cliente"
+              subtitle="Comprovante operacional"
+              showFiscalSummary
+            />
           )}
         </CardContent>
       </Card>
