@@ -14,10 +14,15 @@ export type InternalGameplayReleaseResult = {
   stationId: string;
   planCode: string;
   durationMinutes: number;
+  serviceStartsAt: string;
+  preparationSeconds: number;
+  preparationEndsAt: string;
   unlockedUntil: string;
   releasedUntil: string;
   message: string;
 };
+
+const DEFAULT_PREPARATION_SECONDS = 30;
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -28,20 +33,34 @@ function parsePaidAt(value: string) {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
-function calculateReleasedUntil(paidAt: Date, durationMinutes: number) {
-  return new Date(paidAt.getTime() + durationMinutes * 60_000);
+function calculateServiceWindow(paidAt: Date, durationMinutes: number, preparationSeconds = DEFAULT_PREPARATION_SECONDS) {
+  const serviceStartsAt = new Date(paidAt.getTime() + preparationSeconds * 1000);
+  const releasedUntil = new Date(serviceStartsAt.getTime() + durationMinutes * 60_000);
+
+  return {
+    serviceStartsAt,
+    releasedUntil,
+  };
 }
 
-function buildResponse(payload: XpGatewayReleasePayload, releasedUntil: Date): InternalGameplayReleaseResult {
+function buildResponse(
+  payload: XpGatewayReleasePayload,
+  serviceStartsAt: Date,
+  releasedUntil: Date,
+  preparationSeconds = DEFAULT_PREPARATION_SECONDS,
+): InternalGameplayReleaseResult {
   return {
     status: GameplayReleaseStatus.LIBERADA,
     saleId: payload.saleId,
     stationId: payload.stationId,
     planCode: payload.planCode,
     durationMinutes: payload.durationMinutes,
+    serviceStartsAt: serviceStartsAt.toISOString(),
+    preparationSeconds,
+    preparationEndsAt: serviceStartsAt.toISOString(),
     unlockedUntil: releasedUntil.toISOString(),
     releasedUntil: releasedUntil.toISOString(),
-    message: `TV ${payload.stationId.toUpperCase()} liberada com sucesso.`,
+    message: `TV ${payload.stationId.toUpperCase()} em preparacao e liberada automaticamente em ${preparationSeconds}s.`,
   };
 }
 
@@ -52,13 +71,18 @@ export async function releaseGameplayInsidePdv(
   const existingRelease = await getGameplayReleaseBySaleId(payload.saleId);
 
   if (existingRelease?.status === GameplayReleaseStatus.LIBERADA && existingRelease.releasedUntil) {
-    return buildResponse(payload, existingRelease.releasedUntil);
+    return buildResponse(
+      payload,
+      existingRelease.serviceStartsAt ?? existingRelease.paidAt,
+      existingRelease.releasedUntil,
+      existingRelease.preparationSeconds,
+    );
   }
 
   const paidAt = parsePaidAt(payload.paidAt);
   const amount = new Prisma.Decimal(payload.amount);
-  const releasedUntil = calculateReleasedUntil(paidAt, payload.durationMinutes);
-  const responsePayload = buildResponse(payload, releasedUntil);
+  const { serviceStartsAt, releasedUntil } = calculateServiceWindow(paidAt, payload.durationMinutes);
+  const responsePayload = buildResponse(payload, serviceStartsAt, releasedUntil);
 
   await upsertPendingGameplayRelease({
     saleId: payload.saleId,
@@ -79,6 +103,8 @@ export async function releaseGameplayInsidePdv(
     attemptsToAdd: 0,
     responsePayload: toJsonValue(responsePayload),
     lastError: null,
+    serviceStartsAt,
+    preparationSeconds: DEFAULT_PREPARATION_SECONDS,
     releasedUntil,
   });
 

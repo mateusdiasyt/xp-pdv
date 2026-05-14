@@ -10,6 +10,22 @@ function getRemainingSeconds(unlockedUntil: Date, serverTime: Date) {
   return Math.max(0, Math.floor((unlockedUntil.getTime() - serverTime.getTime()) / 1000));
 }
 
+function buildLockedResponse(stationId: string, serverTime: Date) {
+  return {
+    stationId,
+    status: "LOCKED",
+    saleId: null,
+    planCode: null,
+    unlockedUntil: null,
+    releasedUntil: null,
+    serviceStartsAt: null,
+    preparationEndsAt: null,
+    preparationRemainingSeconds: 0,
+    remainingSeconds: 0,
+    serverTime: serverTime.toISOString(),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const expectedDeviceKey = getExpectedDeviceKey();
   const receivedDeviceKey = request.headers.get("x-device-key")?.trim();
@@ -42,14 +58,25 @@ export async function GET(request: NextRequest) {
   const activeRelease = await getActiveGameplayReleaseByStationId(stationId, serverTime);
 
   if (!activeRelease?.releasedUntil) {
+    return NextResponse.json(buildLockedResponse(stationId, serverTime));
+  }
+
+  const serviceStartsAt = activeRelease.serviceStartsAt ?? activeRelease.paidAt;
+  const isPreparing = serviceStartsAt.getTime() > serverTime.getTime();
+
+  if (isPreparing) {
     return NextResponse.json({
-      stationId,
-      status: "LOCKED",
-      saleId: null,
-      planCode: null,
-      unlockedUntil: null,
-      releasedUntil: null,
-      remainingSeconds: 0,
+      stationId: activeRelease.stationId,
+      status: "PREPARING",
+      saleId: activeRelease.saleId,
+      saleNumber: activeRelease.sale.saleNumber,
+      planCode: activeRelease.planCode,
+      unlockedUntil: activeRelease.releasedUntil.toISOString(),
+      releasedUntil: activeRelease.releasedUntil.toISOString(),
+      serviceStartsAt: serviceStartsAt.toISOString(),
+      preparationEndsAt: serviceStartsAt.toISOString(),
+      preparationRemainingSeconds: getRemainingSeconds(serviceStartsAt, serverTime),
+      remainingSeconds: activeRelease.durationMinutes * 60,
       serverTime: serverTime.toISOString(),
     });
   }
@@ -62,6 +89,9 @@ export async function GET(request: NextRequest) {
     planCode: activeRelease.planCode,
     unlockedUntil: activeRelease.releasedUntil.toISOString(),
     releasedUntil: activeRelease.releasedUntil.toISOString(),
+    serviceStartsAt: serviceStartsAt.toISOString(),
+    preparationEndsAt: serviceStartsAt.toISOString(),
+    preparationRemainingSeconds: 0,
     remainingSeconds: getRemainingSeconds(activeRelease.releasedUntil, serverTime),
     serverTime: serverTime.toISOString(),
   });

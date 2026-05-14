@@ -18,6 +18,7 @@ import { parseDecimalInput } from "@/lib/decimal";
 import { cancelSaleNfce, issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
 import { triggerGameplayReleaseForSale } from "@/application/gameplay/gameplay-release-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
+import { getBusyGameplayReleasesByStationIds } from "@/infrastructure/db/repositories/gameplay-release-repository";
 import {
   addItemToComanda,
   cancelComanda,
@@ -108,6 +109,39 @@ function parseGameplaySelections(formData: FormData) {
       stationId: stationIds[index]?.trim().toLowerCase() ?? "",
     }))
     .filter((selection) => selection.productId && selection.stationId);
+}
+
+async function assertGameplayStationsAvailable(
+  gameplaySelections: Array<{ productId: string; stationId: string }>,
+) {
+  const stationIds = [...new Set(gameplaySelections.map((selection) => selection.stationId).filter(Boolean))];
+
+  if (stationIds.length === 0) {
+    return;
+  }
+
+  if (stationIds.length > 1) {
+    throw new Error("Venda de servico deve liberar apenas uma TV por vez. Contate o Mateus.");
+  }
+
+  const busyReleases = await getBusyGameplayReleasesByStationIds(stationIds);
+  const busyRelease = busyReleases[0];
+
+  if (!busyRelease?.releasedUntil) {
+    return;
+  }
+
+  const serviceStartsAt = busyRelease.serviceStartsAt ?? busyRelease.paidAt;
+  const isPreparing = serviceStartsAt.getTime() > Date.now();
+  const statusLabel = isPreparing ? "em preparacao" : "em uso";
+  const releasedUntil = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(busyRelease.releasedUntil);
+
+  throw new Error(
+    `${busyRelease.stationId.toUpperCase()} ja esta ${statusLabel} ate ${releasedUntil}. Aguarde finalizar antes de vender novamente. Contate o Mateus.`,
+  );
 }
 
 function resolveCashReceivedForReceipt(data: {
@@ -206,6 +240,8 @@ export async function createSaleRecord(input: FormData, actorId: string) {
   if (cashReceived && cashReceived.lessThan(cashPaymentTotal)) {
     throw new Error("Valor recebido em dinheiro nao pode ser menor que a parte paga em dinheiro.");
   }
+
+  await assertGameplayStationsAvailable(gameplaySelections);
 
   const sale = await createSaleWithStockAdjustment({
     saleNumber: createSaleNumber(),

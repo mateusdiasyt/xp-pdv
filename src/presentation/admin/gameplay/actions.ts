@@ -22,6 +22,7 @@ export async function retryGameplayReleaseAction(
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     const result = await triggerGameplayReleaseForSale(saleId, session.user.id);
 
+    revalidatePath("/admin/services");
     revalidatePath("/admin/gameplay");
     revalidatePath("/admin/pdv");
 

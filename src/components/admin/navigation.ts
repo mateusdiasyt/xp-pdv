@@ -40,8 +40,8 @@ export const adminNavigation: AdminNavigationItem[] = [
     permission: PERMISSIONS.PDV_VIEW,
   },
   {
-    label: "Gameplay",
-    href: "/admin/gameplay",
+    label: "Servicos",
+    href: "/admin/services",
     icon: Gamepad2,
     permission: PERMISSIONS.PDV_VIEW,
   },

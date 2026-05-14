@@ -86,6 +86,8 @@ export async function markGameplayReleaseResult(data: {
   attemptsToAdd: number;
   responsePayload?: Prisma.InputJsonValue;
   lastError?: string | null;
+  serviceStartsAt?: Date;
+  preparationSeconds?: number;
   releasedUntil?: Date;
 }) {
   return prisma.gameplayRelease.update({
@@ -96,6 +98,8 @@ export async function markGameplayReleaseResult(data: {
       status: data.status,
       responsePayload: data.responsePayload,
       lastError: data.lastError,
+      serviceStartsAt: data.serviceStartsAt,
+      preparationSeconds: data.preparationSeconds,
       releasedUntil: data.releasedUntil,
       attempts: {
         increment: data.attemptsToAdd,
@@ -148,6 +152,44 @@ export async function getActiveGameplayReleaseByStationId(stationId: string, now
     },
     orderBy: {
       releasedUntil: "desc",
+    },
+  });
+}
+
+export async function getBusyGameplayReleasesByStationIds(stationIds: string[], now = new Date()) {
+  const normalizedStationIds = stationIds
+    .map((stationId) => stationId.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (normalizedStationIds.length === 0) {
+    return [];
+  }
+
+  return prisma.gameplayRelease.findMany({
+    where: {
+      stationId: {
+        in: normalizedStationIds,
+      },
+      status: GameplayReleaseStatus.LIBERADA,
+      releasedUntil: {
+        gt: now,
+      },
+      sale: {
+        status: SaleStatus.COMPLETED,
+      },
+    },
+    include: {
+      sale: {
+        select: {
+          id: true,
+          saleNumber: true,
+          customerName: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: {
+      releasedUntil: "asc",
     },
   });
 }

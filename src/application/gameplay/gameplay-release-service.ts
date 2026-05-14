@@ -24,6 +24,7 @@ type GameplayReleaseOutcome = {
   status: "SKIPPED" | GameplayReleaseStatus;
   message: string;
   releasedUntil?: Date | null;
+  serviceStartsAt?: Date | null;
   stationId?: string;
 };
 
@@ -70,6 +71,22 @@ function formatReleaseTime(date?: Date | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatPreparationMessage(stationId: string, serviceStartsAt?: Date | null, releasedUntil?: Date | null) {
+  const stationLabel = stationId.toUpperCase();
+  const startTime = formatReleaseTime(serviceStartsAt);
+  const endTime = formatReleaseTime(releasedUntil);
+
+  if (startTime && endTime) {
+    return `TV ${stationLabel} prepara por 30s, inicia as ${startTime} e termina as ${endTime}.`;
+  }
+
+  if (endTime) {
+    return `TV ${stationLabel} liberada ate ${endTime}.`;
+  }
+
+  return `TV ${stationLabel} liberada.`;
 }
 
 function buildReleaseDraft(
@@ -170,8 +187,13 @@ export async function triggerGameplayReleaseForSale(
     if (sale.gameplayRelease?.status === GameplayReleaseStatus.LIBERADA) {
       return {
         status: GameplayReleaseStatus.LIBERADA,
-        message: `Gameplay ja liberado para ${sale.gameplayRelease.stationId}.`,
+        message: formatPreparationMessage(
+          sale.gameplayRelease.stationId,
+          sale.gameplayRelease.serviceStartsAt,
+          sale.gameplayRelease.releasedUntil,
+        ),
         releasedUntil: sale.gameplayRelease.releasedUntil,
+        serviceStartsAt: sale.gameplayRelease.serviceStartsAt,
         stationId: sale.gameplayRelease.stationId,
       };
     }
@@ -224,11 +246,13 @@ export async function triggerGameplayReleaseForSale(
     if (!config) {
       const internalResult = await releaseGameplayInsidePdv(draft.payload, actorId);
       const releasedUntil = new Date(internalResult.releasedUntil);
+      const serviceStartsAt = new Date(internalResult.serviceStartsAt);
 
       return {
         status: GameplayReleaseStatus.LIBERADA,
-        message: `TV ${draft.payload.stationId.toUpperCase()} liberada ate ${formatReleaseTime(releasedUntil)}.`,
+        message: formatPreparationMessage(draft.payload.stationId, serviceStartsAt, releasedUntil),
         releasedUntil,
+        serviceStartsAt,
         stationId: draft.payload.stationId,
       };
     }
@@ -271,7 +295,7 @@ export async function triggerGameplayReleaseForSale(
 
     return {
       status: GameplayReleaseStatus.LIBERADA,
-      message: `TV ${draft.payload.stationId.toUpperCase()} liberada ate ${formatReleaseTime(releasedUntil)}.`,
+      message: formatPreparationMessage(draft.payload.stationId, undefined, releasedUntil),
       releasedUntil,
       stationId: draft.payload.stationId,
     };
@@ -279,7 +303,7 @@ export async function triggerGameplayReleaseForSale(
     console.error("[GAMEPLAY] Falha inesperada na liberacao:", error);
     return {
       status: GameplayReleaseStatus.FALHA_ENVIO,
-      message: "A venda foi concluida, mas a liberacao do gameplay falhou. Reenvie pela aba Gameplay. Contate o Mateus.",
+      message: "A venda foi concluida, mas a liberacao do servico falhou. Reenvie pela aba Servicos. Contate o Mateus.",
     };
   }
 }

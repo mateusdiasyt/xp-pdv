@@ -104,11 +104,15 @@ Observacao: o sistema usa o NCM cadastrado em cada produto no catalogo. O NCM pa
 
 O sistema pode liberar a TV diretamente pelo proprio `xp-pdv`, sem precisar hospedar um backend separado.
 
+Estacoes padrao do projeto:
+
+- `tv-01` = TV 01 - PS5
+- `tv-02` = TV 02 - Simulador
+
 Configuracao recomendada para operar no mesmo link do PDV:
 
 - APK da TV: `Backend URL` = URL publica do PDV, por exemplo `https://xp-pdv.vercel.app`
-- APK da TV: `stationId` = codigo da estacao, por exemplo `tv-01`
-- APK da TV: `Modo` = `PDV` ou `Hibrido`
+- APK da TV: na primeira abertura, selecione a estacao (`TV 01 - PS5` ou `TV 02 - Simulador`)
 - Vercel: `XP_GATEWAY_INTEGRATION_KEY` = chave usada se algum cliente externo chamar a rota de liberacao
 - Vercel: `XP_TV_DEVICE_KEY` = opcional; se existir, o APK precisa enviar no header `x-device-key`
 
@@ -131,6 +135,23 @@ Resposta quando a TV esta liberada:
   "unlockedUntil": "2026-05-14T20:40:00.000Z",
   "remainingSeconds": 582,
   "serverTime": "2026-05-14T20:30:18.000Z"
+}
+```
+
+Resposta durante a preparacao de 30 segundos:
+
+```json
+{
+  "stationId": "tv-01",
+  "status": "PREPARING",
+  "saleId": "cm...",
+  "saleNumber": "VEN-...",
+  "planCode": "PS5-20",
+  "serviceStartsAt": "2026-05-14T20:30:48.000Z",
+  "preparationRemainingSeconds": 24,
+  "releasedUntil": "2026-05-14T20:50:48.000Z",
+  "remainingSeconds": 1200,
+  "serverTime": "2026-05-14T20:30:24.000Z"
 }
 ```
 
@@ -158,8 +179,10 @@ Fluxo operacional:
 1. Cadastre um produto como `Gameplay` em `Admin > Produtos`.
 2. Informe o `Codigo do plano`, a duracao em minutos e o preco de venda.
 3. No PDV, use `Venda rapida`, adicione o produto de gameplay e selecione a TV/estacao no resumo do pedido.
-4. Ao finalizar a venda, o sistema cria a venda, emite/processa a NFC-e normalmente e libera a TV no proprio banco do PDV.
-5. O APK consulta a rota `/api/integrations/tv/status` e destrava a TV ate o horario retornado.
+4. Ao finalizar a venda, o sistema cria a venda, emite/processa a NFC-e normalmente e registra a liberacao no proprio banco do PDV.
+5. A TV entra em `PREPARING` por 30 segundos para o cliente sentar e se preparar.
+6. Depois dos 30 segundos, o tempo vendido comeca a contar e o APK destrava a TV ate o horario retornado.
+7. Enquanto uma estacao estiver em preparacao ou em uso, o PDV bloqueia nova venda para a mesma TV.
 
 Compatibilidade com gateway externo:
 
@@ -168,8 +191,8 @@ POST {XP_GATEWAY_BASE_URL}/api/integrations/pdv/release
 x-integration-key: {XP_GATEWAY_INTEGRATION_KEY}
 ```
 
-6. A falha do gateway externo nao cancela a venda nem bloqueia a NFC-e. O status fica na aba `Admin > Gameplay`.
-7. Use `Reenviar liberacao` para reprocessar uma venda com status `PENDENTE_ENVIO` ou `FALHA_ENVIO`.
+8. A falha do gateway externo nao cancela a venda nem bloqueia a NFC-e. O status fica na aba `Admin > Servicos`.
+9. Use `Reenviar liberacao` para reprocessar uma venda com status `PENDENTE_ENVIO` ou `FALHA_ENVIO`.
 
 Idempotencia:
 - cada liberacao usa o `saleId` interno da venda;

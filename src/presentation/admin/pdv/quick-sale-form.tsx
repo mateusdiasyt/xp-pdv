@@ -96,7 +96,12 @@ const paymentLabels: Record<PaymentMethod, string> = {
   DEBIT_CARD: "Cartao de debito",
 };
 
-const gameplayStations = Array.from({ length: 8 }, (_, index) => `tv-${String(index + 1).padStart(2, "0")}`);
+const gameplayStations = [
+  { id: "tv-01", label: "TV 01 - PS5" },
+  { id: "tv-02", label: "TV 02 - Simulador" },
+];
+
+const defaultGameplayStationId = gameplayStations[0].id;
 
 const quantityInputClassName =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
@@ -306,7 +311,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     if (product?.kind === ProductKind.GAMEPLAY) {
       setStationByProduct((currentMap) => ({
         ...currentMap,
-        [productId]: currentMap[productId] ?? gameplayStations[0],
+        [productId]: currentMap[productId] ?? defaultGameplayStationId,
       }));
     }
 
@@ -430,7 +435,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                 <input
                   type="hidden"
                   name="gameplayStationId"
-                  value={stationByProduct[item.productId] ?? gameplayStations[0]}
+                  value={stationByProduct[item.productId] ?? defaultGameplayStationId}
                 />
               </div>
             ))}
@@ -727,7 +732,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                 <select
                                   id={`quick-gameplay-station-${item.productId}`}
                                   className="admin-native-select pl-9"
-                                  value={stationByProduct[item.productId] ?? gameplayStations[0]}
+                                  value={stationByProduct[item.productId] ?? defaultGameplayStationId}
                                   onChange={(event) =>
                                     setStationByProduct((currentMap) => ({
                                       ...currentMap,
@@ -736,9 +741,9 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                   }
                                   required
                                 >
-                                  {gameplayStations.map((stationId) => (
-                                    <option key={stationId} value={stationId}>
-                                      {stationId.toUpperCase()}
+                                  {gameplayStations.map((station) => (
+                                    <option key={station.id} value={station.id}>
+                                      {station.label}
                                     </option>
                                   ))}
                                 </select>

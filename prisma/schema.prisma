@@ -511,6 +511,8 @@ model GameplayRelease {
   status          GameplayReleaseStatus @default(PENDENTE_ENVIO)
   attempts        Int                   @default(0)
   lastError       String?
+  serviceStartsAt DateTime?
+  preparationSeconds Int                 @default(30)
   releasedUntil   DateTime?
   lastAttemptAt   DateTime?
   createdAt       DateTime              @default(now())
@@ -520,6 +522,7 @@ model GameplayRelease {
 
   @@index([status, updatedAt])
   @@index([stationId])
+  @@index([stationId, releasedUntil])
 }
 
 model Payment {
