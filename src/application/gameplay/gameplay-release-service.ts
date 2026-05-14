@@ -3,6 +3,9 @@ import { GameplayReleaseStatus, Prisma, SaleStatus } from "@prisma/client";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   countGameplayReleasesByStatus,
+  createManualGameplayRelease,
+  endActiveGameplayReleaseByStationId,
+  getBusyGameplayReleasesByStationIds,
   getSaleGameplaySnapshot,
   listGameplayReleases,
   markGameplayReleaseFailureWithoutRequest,
@@ -19,6 +22,17 @@ import { releaseGameplayInsidePdv } from "@/application/gameplay/internal-gamepl
 const XP_GATEWAY_INTEGRATION_ID = "pdv-xp-main";
 const FALLBACK_STATION_ID = "sem-estacao";
 const FALLBACK_PLAN_CODE = "gameplay";
+const MANUAL_FREE_RELEASE_UNTIL = new Date("2099-12-31T23:59:59.000Z");
+
+const manualReleaseDurations = {
+  "15": { label: "15 min", durationMinutes: 15, planCode: "MANUAL-15" },
+  "30": { label: "30 min", durationMinutes: 30, planCode: "MANUAL-30" },
+  "45": { label: "45 min", durationMinutes: 45, planCode: "MANUAL-45" },
+  "60": { label: "1h", durationMinutes: 60, planCode: "MANUAL-60" },
+  FREE: { label: "Livre", durationMinutes: 0, planCode: "MANUAL-LIVRE" },
+} as const;
+
+type ManualReleaseDurationKey = keyof typeof manualReleaseDurations;
 
 type GameplayReleaseOutcome = {
   status: "SKIPPED" | GameplayReleaseStatus;
@@ -87,6 +101,20 @@ function formatPreparationMessage(stationId: string, serviceStartsAt?: Date | nu
   }
 
   return `TV ${stationLabel} liberada.`;
+}
+
+function isManualReleaseDurationKey(value: string): value is ManualReleaseDurationKey {
+  return value in manualReleaseDurations;
+}
+
+function formatManualReleaseMessage(stationId: string, label: string, releasedUntil: Date) {
+  const stationLabel = stationId.toUpperCase();
+
+  if (label === "Livre") {
+    return `${stationLabel} liberada em modo livre ate encerramento manual.`;
+  }
+
+  return `${stationLabel} liberada por ${label}, ate ${formatReleaseTime(releasedUntil)}.`;
 }
 
 function buildReleaseDraft(
@@ -320,5 +348,126 @@ export async function getGameplayReleaseData(filters?: {
   return {
     summary,
     releases,
+  };
+}
+
+export async function releaseManualGameplayStation(data: {
+  stationId: string;
+  durationPreset: string;
+  operator: string;
+  actorId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para liberar manualmente.");
+  }
+
+  if (!isManualReleaseDurationKey(data.durationPreset)) {
+    throw new Error("Selecione um tempo valido para liberar o servico.");
+  }
+
+  const busyRelease = (await getBusyGameplayReleasesByStationIds([stationId]))[0];
+
+  if (busyRelease?.releasedUntil) {
+    throw new Error(
+      `${stationId.toUpperCase()} ja esta em uso. Encerre o tempo atual antes de liberar novamente.`,
+    );
+  }
+
+  const option = manualReleaseDurations[data.durationPreset];
+  const now = new Date();
+  const releasedUntil =
+    option.durationMinutes === 0 ? MANUAL_FREE_RELEASE_UNTIL : new Date(now.getTime() + option.durationMinutes * 60_000);
+  const requestPayload = {
+    integrationId: "manual-admin",
+    saleId: null,
+    stationId,
+    planCode: option.planCode,
+    durationMinutes: option.durationMinutes,
+    amount: 0,
+    paidAt: now.toISOString(),
+    operator: data.operator,
+    manualRelease: true,
+  };
+  const responsePayload = {
+    status: GameplayReleaseStatus.LIBERADA,
+    stationId,
+    planCode: option.planCode,
+    durationMinutes: option.durationMinutes,
+    serviceStartsAt: now.toISOString(),
+    preparationSeconds: 0,
+    releasedUntil: releasedUntil.toISOString(),
+    manualRelease: true,
+  };
+
+  const release = await createManualGameplayRelease({
+    stationId,
+    planCode: option.planCode,
+    durationMinutes: option.durationMinutes,
+    amount: new Prisma.Decimal(0),
+    paidAt: now,
+    operator: data.operator,
+    requestPayload: toJsonValue(requestPayload),
+    responsePayload: toJsonValue(responsePayload),
+    serviceStartsAt: now,
+    preparationSeconds: 0,
+    releasedUntil,
+  });
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_release",
+    entity: "GameplayRelease",
+    entityId: release.id,
+    metadata: {
+      stationId,
+      planCode: option.planCode,
+      durationMinutes: option.durationMinutes,
+      manualRelease: true,
+    },
+  });
+
+  return {
+    release,
+    message: formatManualReleaseMessage(stationId, option.label, releasedUntil),
+  };
+}
+
+export async function endManualGameplayStation(data: {
+  stationId: string;
+  operator: string;
+  actorId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para encerrar o tempo.");
+  }
+
+  const endedRelease = await endActiveGameplayReleaseByStationId(stationId);
+
+  if (!endedRelease) {
+    return {
+      release: null,
+      message: `${stationId.toUpperCase()} ja esta livre. Nenhum tempo ativo para encerrar.`,
+    };
+  }
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_end",
+    entity: "GameplayRelease",
+    entityId: endedRelease.id,
+    metadata: {
+      stationId,
+      operator: data.operator,
+      previousReleasedUntil: endedRelease.responsePayload,
+    },
+  });
+
+  return {
+    release: endedRelease,
+    message: `${stationId.toUpperCase()} encerrada manualmente. A TV volta ao bloqueio na proxima consulta.`,
   };
 }

@@ -2,6 +2,19 @@ import { GameplayReleaseStatus, Prisma, SaleStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
+const completedSaleOrManualReleaseWhere = {
+  OR: [
+    {
+      saleId: null,
+    },
+    {
+      sale: {
+        status: SaleStatus.COMPLETED,
+      },
+    },
+  ],
+} satisfies Prisma.GameplayReleaseWhereInput;
+
 export async function getSaleGameplaySnapshot(saleId: string) {
   return prisma.sale.findUnique({
     where: { id: saleId },
@@ -136,9 +149,7 @@ export async function getActiveGameplayReleaseByStationId(stationId: string, now
       releasedUntil: {
         gt: now,
       },
-      sale: {
-        status: SaleStatus.COMPLETED,
-      },
+      ...completedSaleOrManualReleaseWhere,
     },
     include: {
       sale: {
@@ -174,9 +185,7 @@ export async function getBusyGameplayReleasesByStationIds(stationIds: string[], 
       releasedUntil: {
         gt: now,
       },
-      sale: {
-        status: SaleStatus.COMPLETED,
-      },
+      ...completedSaleOrManualReleaseWhere,
     },
     include: {
       sale: {
@@ -190,6 +199,80 @@ export async function getBusyGameplayReleasesByStationIds(stationIds: string[], 
     },
     orderBy: {
       releasedUntil: "asc",
+    },
+  });
+}
+
+export async function createManualGameplayRelease(data: {
+  stationId: string;
+  planCode: string;
+  durationMinutes: number;
+  amount: Prisma.Decimal;
+  paidAt: Date;
+  operator: string;
+  requestPayload: Prisma.InputJsonValue;
+  responsePayload: Prisma.InputJsonValue;
+  serviceStartsAt: Date;
+  preparationSeconds: number;
+  releasedUntil: Date;
+}) {
+  return prisma.gameplayRelease.create({
+    data: {
+      saleId: null,
+      integrationId: "manual-admin",
+      stationId: data.stationId,
+      planCode: data.planCode,
+      durationMinutes: data.durationMinutes,
+      amount: data.amount,
+      paidAt: data.paidAt,
+      operator: data.operator,
+      requestPayload: data.requestPayload,
+      responsePayload: data.responsePayload,
+      status: GameplayReleaseStatus.LIBERADA,
+      attempts: 0,
+      lastError: null,
+      serviceStartsAt: data.serviceStartsAt,
+      preparationSeconds: data.preparationSeconds,
+      releasedUntil: data.releasedUntil,
+      lastAttemptAt: data.paidAt,
+    },
+  });
+}
+
+export async function endActiveGameplayReleaseByStationId(stationId: string, now = new Date()) {
+  const activeRelease = await prisma.gameplayRelease.findFirst({
+    where: {
+      stationId,
+      status: GameplayReleaseStatus.LIBERADA,
+      releasedUntil: {
+        gt: now,
+      },
+      ...completedSaleOrManualReleaseWhere,
+    },
+    orderBy: {
+      releasedUntil: "desc",
+    },
+  });
+
+  if (!activeRelease) {
+    return null;
+  }
+
+  return prisma.gameplayRelease.update({
+    where: {
+      id: activeRelease.id,
+    },
+    data: {
+      releasedUntil: now,
+      responsePayload: {
+        status: "ENDED_MANUALLY",
+        endedAt: now.toISOString(),
+        previousReleasedUntil: activeRelease.releasedUntil?.toISOString() ?? null,
+        stationId: activeRelease.stationId,
+        planCode: activeRelease.planCode,
+      },
+      lastError: null,
+      lastAttemptAt: now,
     },
   });
 }

@@ -9,7 +9,7 @@ import { initialActionState } from "@/presentation/admin/common/action-state";
 import { retryGameplayReleaseAction } from "@/presentation/admin/gameplay/actions";
 
 type RetryGameplayReleaseFormProps = {
-  saleId: string;
+  saleId: string | null;
   disabled?: boolean;
 };
 
@@ -18,7 +18,7 @@ export function RetryGameplayReleaseForm({ saleId, disabled }: RetryGameplayRele
 
   return (
     <form action={formAction} className="space-y-2">
-      <input type="hidden" name="saleId" value={saleId} />
+      <input type="hidden" name="saleId" value={saleId ?? ""} />
       <Button type="submit" size="sm" variant="outline" className="gap-2" disabled={disabled}>
         <RotateCcw className="h-4 w-4" />
         Reenviar liberacao

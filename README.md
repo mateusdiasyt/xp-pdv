@@ -184,6 +184,14 @@ Fluxo operacional:
 6. Depois dos 30 segundos, o tempo vendido comeca a contar e o APK destrava a TV ate o horario retornado.
 7. Enquanto uma estacao estiver em preparacao ou em uso, o PDV bloqueia nova venda para a mesma TV.
 
+Controle manual pela aba `Admin > Servicos`:
+
+- Cada estacao possui acoes rapidas para liberar sem venda fiscal vinculada.
+- Tempos disponiveis: `15 min`, `30 min`, `45 min`, `1h` e `Livre`.
+- `Livre` mantem a TV liberada ate alguem clicar em `Encerrar tempo`.
+- `Encerrar tempo` finaliza a sessao ativa da estacao, mesmo quando ela veio de uma venda normal, e a TV volta ao bloqueio na proxima consulta do APK.
+- Liberacao manual nao cria venda, nao emite NFC-e e nao altera o caixa; ela serve apenas para operacao/controle da estacao.
+
 Compatibilidade com gateway externo:
 
 ```http

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
+import { ManualServiceControlForm } from "@/presentation/admin/gameplay/manual-service-control-form";
 import { RetryGameplayReleaseForm } from "@/presentation/admin/gameplay/retry-gameplay-release-form";
 
 type ServicesPageProps = {
@@ -81,6 +82,7 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
 
   const serviceStartsAt = release.serviceStartsAt ?? release.paidAt;
   const isPreparing = serviceStartsAt.getTime() > now.getTime();
+  const isFreeMode = release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE";
 
   if (isPreparing) {
     return {
@@ -93,10 +95,22 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
 
   return {
     label: "EM USO",
-    helper: `Ocupada ate ${timeFormatter.format(release.releasedUntil)}`,
+    helper: isFreeMode ? "Modo livre ate encerramento manual" : `Ocupada ate ${timeFormatter.format(release.releasedUntil)}`,
     className: "border-emerald-300/45 bg-emerald-400/10",
     badgeClassName: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
   };
+}
+
+function getReleaseOriginLabel(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number]) {
+  return release.sale?.saleNumber ?? "Liberacao manual";
+}
+
+function getReleaseDurationLabel(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number]) {
+  if (release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE") {
+    return "Livre";
+  }
+
+  return `${release.durationMinutes} min`;
 }
 
 export default async function ServicesPage({ searchParams }: ServicesPageProps) {
@@ -143,13 +157,14 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
               <CardContent className="text-sm text-muted-foreground">
                 {release ? (
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <span>Venda: {release.sale.saleNumber}</span>
+                    <span>Origem: {getReleaseOriginLabel(release)}</span>
                     <span>Plano: {release.planCode}</span>
-                    <span>{release.durationMinutes} min</span>
+                    <span>{getReleaseDurationLabel(release)}</span>
                   </div>
                 ) : (
                   <p>Nenhuma venda ativa nesta estacao.</p>
                 )}
+                <ManualServiceControlForm stationId={station.id} isBusy={Boolean(release)} />
               </CardContent>
             </Card>
           );
@@ -228,18 +243,18 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                 return (
                   <TableRow key={release.id}>
                     <TableCell className="font-medium text-foreground">
-                      {release.sale.saleNumber}
+                      {getReleaseOriginLabel(release)}
                       <p className="text-xs text-muted-foreground">
-                        {dateTimeFormatter.format(release.sale.createdAt)} - {release.operator}
+                        {dateTimeFormatter.format(release.sale?.createdAt ?? release.createdAt)} - {release.operator}
                       </p>
-                      {release.sale.customerName ? (
+                      {release.sale?.customerName ? (
                         <p className="text-xs text-muted-foreground">{release.sale.customerName}</p>
                       ) : null}
                     </TableCell>
                     <TableCell>
                       <p className="font-medium text-foreground">{release.stationId.toUpperCase()}</p>
                       <p className="text-xs text-muted-foreground">
-                        {release.planCode} - {release.durationMinutes} min
+                        {release.planCode} - {getReleaseDurationLabel(release)}
                       </p>
                     </TableCell>
                     <TableCell>
@@ -276,7 +291,7 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                     <TableCell>
                       <RetryGameplayReleaseForm
                         saleId={release.saleId}
-                        disabled={release.status === GameplayReleaseStatus.LIBERADA}
+                        disabled={!release.saleId || release.status === GameplayReleaseStatus.LIBERADA}
                       />
                     </TableCell>
                   </TableRow>

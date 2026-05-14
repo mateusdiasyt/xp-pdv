@@ -14,7 +14,9 @@ function buildLockedResponse(stationId: string, serverTime: Date) {
   return {
     stationId,
     status: "LOCKED",
+    releaseId: null,
     saleId: null,
+    saleNumber: null,
     planCode: null,
     unlockedUntil: null,
     releasedUntil: null,
@@ -63,13 +65,16 @@ export async function GET(request: NextRequest) {
 
   const serviceStartsAt = activeRelease.serviceStartsAt ?? activeRelease.paidAt;
   const isPreparing = serviceStartsAt.getTime() > serverTime.getTime();
+  const releaseSessionId = activeRelease.saleId ?? activeRelease.id;
+  const saleNumber = activeRelease.sale?.saleNumber ?? "LIBERACAO-MANUAL";
 
   if (isPreparing) {
     return NextResponse.json({
       stationId: activeRelease.stationId,
       status: "PREPARING",
-      saleId: activeRelease.saleId,
-      saleNumber: activeRelease.sale.saleNumber,
+      releaseId: activeRelease.id,
+      saleId: releaseSessionId,
+      saleNumber,
       planCode: activeRelease.planCode,
       unlockedUntil: activeRelease.releasedUntil.toISOString(),
       releasedUntil: activeRelease.releasedUntil.toISOString(),
@@ -84,8 +89,9 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     stationId: activeRelease.stationId,
     status: "ACTIVE",
-    saleId: activeRelease.saleId,
-    saleNumber: activeRelease.sale.saleNumber,
+    releaseId: activeRelease.id,
+    saleId: releaseSessionId,
+    saleNumber,
     planCode: activeRelease.planCode,
     unlockedUntil: activeRelease.releasedUntil.toISOString(),
     releasedUntil: activeRelease.releasedUntil.toISOString(),

@@ -497,7 +497,7 @@ model SaleItem {
 
 model GameplayRelease {
   id              String                @id @default(cuid())
-  saleId          String                @unique
+  saleId          String?               @unique
   integrationId   String                @default("pdv-xp-main")
   stationId       String
   planCode        String
@@ -518,7 +518,7 @@ model GameplayRelease {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
-  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale Sale? @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([status, updatedAt])
   @@index([stationId])
