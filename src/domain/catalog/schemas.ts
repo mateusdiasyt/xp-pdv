@@ -1,4 +1,4 @@
-import { RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus } from "@prisma/client";
 import { z } from "zod";
 
 const decimalRegex = /^\d+(\.\d{1,2})?$/;
@@ -25,7 +25,29 @@ export const createSupplierSchema = z.object({
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 
-export const createProductSchema = z.object({
+const productGameplayFieldsRefinement = (data: { kind: ProductKind; gameplayPlanCode?: string; gameplayDurationMinutes?: number }, context: z.RefinementCtx) => {
+  if (data.kind !== ProductKind.GAMEPLAY) {
+    return;
+  }
+
+  if (!data.gameplayPlanCode?.trim()) {
+    context.addIssue({
+      code: "custom",
+      path: ["gameplayPlanCode"],
+      message: "Informe o codigo do plano de gameplay.",
+    });
+  }
+
+  if (!data.gameplayDurationMinutes) {
+    context.addIssue({
+      code: "custom",
+      path: ["gameplayDurationMinutes"],
+      message: "Informe a duracao do gameplay em minutos.",
+    });
+  }
+};
+
+const productSchemaBase = z.object({
   name: z.string().min(2, "Nome obrigatorio"),
   sku: z.string().min(2, "SKU obrigatorio"),
   ncm: z.preprocess(
@@ -50,6 +72,18 @@ export const createProductSchema = z.object({
     ),
   categoryId: z.string().min(1, "Categoria obrigatoria"),
   supplierId: z.string().optional().or(z.literal("")),
+  kind: z.nativeEnum(ProductKind).default(ProductKind.STANDARD),
+  gameplayPlanCode: z.string().max(80, "Codigo do plano muito longo").optional().or(z.literal("")),
+  gameplayDurationMinutes: z.preprocess(
+    (value) => {
+      if (value === null || value === undefined || value === "") {
+        return undefined;
+      }
+
+      return Number(value);
+    },
+    z.number().int("Duracao deve ser um numero inteiro").positive("Duracao deve ser maior que zero").optional(),
+  ),
   costPrice: z.string().regex(decimalRegex, "Custo invalido"),
   salePrice: z.string().regex(decimalRegex, "Preco invalido"),
   minStock: z.coerce.number().int().min(0, "Estoque minimo invalido"),
@@ -57,8 +91,15 @@ export const createProductSchema = z.object({
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 
-export const updateProductSchema = createProductSchema.extend({
+export const createProductSchema = productSchemaBase.superRefine(productGameplayFieldsRefinement);
+
+export const updateProductSchema = productSchemaBase.extend({
   productId: z.string().min(1, "Produto obrigatorio"),
+}).superRefine(productGameplayFieldsRefinement);
+
+export const updateProductStatusSchema = z.object({
+  productId: z.string().min(1, "Produto obrigatorio"),
+  status: z.nativeEnum(RecordStatus),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus } from "@prisma/client";
 import { Download, Search, SlidersHorizontal } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
@@ -213,12 +213,18 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         </div>
                         <Badge
                           className={
-                            product.status === RecordStatus.ACTIVE
+                            product.kind === ProductKind.GAMEPLAY
+                              ? "border border-sky-400/20 bg-sky-500/15 text-sky-200 hover:bg-sky-500/15"
+                              : product.status === RecordStatus.ACTIVE
                               ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
                               : "border border-rose-400/20 bg-rose-500/15 text-rose-300 hover:bg-rose-500/15"
                           }
                         >
-                          {product.status === RecordStatus.ACTIVE ? "Ativo" : "Inativo"}
+                          {product.kind === ProductKind.GAMEPLAY
+                            ? "Gameplay"
+                            : product.status === RecordStatus.ACTIVE
+                              ? "Ativo"
+                              : "Inativo"}
                         </Badge>
                       </div>
 
@@ -240,18 +246,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Estoque</p>
-                        <p className="mt-1 text-sm font-medium text-foreground">{product.currentStock}</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {product.kind === ProductKind.GAMEPLAY ? `${product.gameplayDurationMinutes ?? 0} min` : product.currentStock}
+                        </p>
                         <p
                           className={cn(
                             "text-xs",
-                            isOutOfStock
+                            product.kind === ProductKind.GAMEPLAY
+                              ? "text-sky-300"
+                              : isOutOfStock
                               ? "text-rose-400"
                               : isLowStock
                                 ? "text-amber-400"
                                 : "text-emerald-400",
                           )}
                         >
-                          {stockLabel}
+                          {product.kind === ProductKind.GAMEPLAY ? product.gameplayPlanCode ?? "Plano" : stockLabel}
                         </p>
                       </div>
                     </div>
@@ -269,6 +279,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               ncm: product.ncm,
                               description: product.description,
                               imageUrl: product.imageUrl,
+                              kind: product.kind,
+                              gameplayPlanCode: product.gameplayPlanCode,
+                              gameplayDurationMinutes: product.gameplayDurationMinutes,
                               categoryId: product.categoryId,
                               supplierId: product.supplierId,
                               costPrice: Number(product.costPrice).toFixed(2),

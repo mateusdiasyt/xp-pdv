@@ -1,4 +1,12 @@
-import { CashSessionStatus, PaymentMethod, Prisma, RecordStatus, SaleStatus, StockMovementType } from "@prisma/client";
+import {
+  CashSessionStatus,
+  PaymentMethod,
+  Prisma,
+  ProductKind,
+  RecordStatus,
+  SaleStatus,
+  StockMovementType,
+} from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -12,6 +20,11 @@ type SalePaymentInput = {
   amount: Prisma.Decimal;
 };
 
+type GameplaySelectionInput = {
+  productId: string;
+  stationId: string;
+};
+
 type CreateSaleWithStockAdjustmentInput = {
   saleNumber: string;
   cashSessionId: string;
@@ -20,6 +33,7 @@ type CreateSaleWithStockAdjustmentInput = {
   discountAmount: Prisma.Decimal;
   items: SaleItemInput[];
   payments: SalePaymentInput[];
+  gameplaySelections?: GameplaySelectionInput[];
 };
 
 type PrismaTx = Prisma.TransactionClient;
@@ -78,6 +92,9 @@ export async function listPdvProductOptions() {
         name: true,
         sku: true,
         imageUrl: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         salePrice: true,
         currentStock: true,
         status: true,
@@ -106,6 +123,9 @@ export async function listPdvProductOptions() {
         id: true,
         name: true,
         sku: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         salePrice: true,
         currentStock: true,
         status: true,
@@ -173,6 +193,7 @@ export async function listRecentSales() {
         },
       },
       payments: true,
+      gameplayRelease: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -216,6 +237,7 @@ export async function getSaleReceiptById(saleId: string) {
           createdAt: "asc",
         },
       },
+      gameplayRelease: true,
     },
   });
 }
@@ -246,6 +268,9 @@ async function runCreateSaleWithStockAdjustment(
       name: true,
       sku: true,
       ncm: true,
+      kind: true,
+      gameplayPlanCode: true,
+      gameplayDurationMinutes: true,
       salePrice: true,
       costPrice: true,
       currentStock: true,
@@ -254,6 +279,10 @@ async function runCreateSaleWithStockAdjustment(
   });
 
   const productMap = new Map(products.map((product) => [product.id, product]));
+  const gameplaySelectionMap = new Map(
+    (data.gameplaySelections ?? []).map((selection) => [selection.productId, selection.stationId.trim().toLowerCase()]),
+  );
+
   const subtotalAmount = data.items.reduce((acc, item) => {
     const product = productMap.get(item.productId);
     if (!product) {
@@ -264,7 +293,16 @@ async function runCreateSaleWithStockAdjustment(
       throw new Error(`Produto ${product.name} inativo para venda.`);
     }
 
-    if (product.currentStock < item.quantity) {
+    if (product.kind === ProductKind.GAMEPLAY) {
+      const stationId = gameplaySelectionMap.get(product.id);
+      if (!stationId) {
+        throw new Error(`Selecione a TV/estacao para o gameplay ${product.name}.`);
+      }
+
+      if (!product.gameplayPlanCode || !product.gameplayDurationMinutes) {
+        throw new Error(`Produto de gameplay ${product.name} precisa de plano e duracao configurados.`);
+      }
+    } else if (product.currentStock < item.quantity) {
       throw new Error(`Estoque insuficiente para ${product.name}.`);
     }
 
@@ -345,6 +383,11 @@ async function runCreateSaleWithStockAdjustment(
             productNameSnapshot: product.name,
             skuSnapshot: product.sku,
             ncmSnapshot: product.ncm,
+            gameplayStationId:
+              product.kind === ProductKind.GAMEPLAY ? gameplaySelectionMap.get(product.id) ?? null : null,
+            gameplayPlanCode: product.kind === ProductKind.GAMEPLAY ? product.gameplayPlanCode : null,
+            gameplayDurationMinutes:
+              product.kind === ProductKind.GAMEPLAY ? product.gameplayDurationMinutes : null,
             quantity: item.quantity,
             unitPrice: product.salePrice,
             unitCost: product.costPrice,
@@ -368,6 +411,10 @@ async function runCreateSaleWithStockAdjustment(
   for (const item of data.items) {
     const product = productMap.get(item.productId);
     if (!product) {
+      continue;
+    }
+
+    if (product.kind === ProductKind.GAMEPLAY) {
       continue;
     }
 

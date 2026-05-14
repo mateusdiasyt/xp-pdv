@@ -78,6 +78,36 @@ function getFiscalStatusPresentation(status?: string | null) {
   };
 }
 
+function getGameplayStatusPresentation(status?: string | null) {
+  const normalized = (status ?? "").trim().toUpperCase();
+
+  if (normalized === "LIBERADA") {
+    return {
+      label: "Liberada",
+      className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+    };
+  }
+
+  if (normalized === "PENDENTE_ENVIO") {
+    return {
+      label: "Pendente",
+      className: "bg-sky-100 text-sky-700 hover:bg-sky-100",
+    };
+  }
+
+  if (normalized === "FALHA_ENVIO") {
+    return {
+      label: "Falha",
+      className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
+    };
+  }
+
+  return {
+    label: "-",
+    className: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
+  };
+}
+
 type PdvPageProps = {
   searchParams: Promise<{
     receipt?: string;
@@ -142,6 +172,9 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     name: product.name,
     sku: product.sku,
     imageUrl: product.imageUrl,
+    kind: product.kind,
+    gameplayPlanCode: product.gameplayPlanCode,
+    gameplayDurationMinutes: product.gameplayDurationMinutes,
     salePrice: Number(product.salePrice),
     currentStock: product.currentStock,
     category: {
@@ -239,6 +272,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fiscal</TableHead>
+                  <TableHead>Gameplay</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Total (R$)</TableHead>
                   <TableHead>Acoes</TableHead>
@@ -247,7 +281,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
               <TableBody>
                 {sales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                       Nenhuma venda registrada.
                     </TableCell>
                   </TableRow>
@@ -255,7 +289,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                 {groupedSales.map((group) => (
                   <Fragment key={`group-fragment-${group.dateKey}`}>
                     <TableRow key={`group-${group.dateKey}`} className="bg-muted/20">
-                      <TableCell colSpan={9} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <TableCell colSpan={10} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {group.dateLabel}
                       </TableCell>
                     </TableRow>
@@ -290,6 +324,20 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                               </p>
                             ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {sale.gameplayRelease ? (
+                            <div className="space-y-1">
+                              <Badge className={getGameplayStatusPresentation(sale.gameplayRelease.status).className}>
+                                {getGameplayStatusPresentation(sale.gameplayRelease.status).label}
+                              </Badge>
+                              <p className="text-[11px] text-muted-foreground">
+                                {sale.gameplayRelease.stationId.toUpperCase()}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">{sale.items.length}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(sale.totalAmount))}</TableCell>

@@ -100,6 +100,42 @@ Campos opcionais (com padrao no codigo):
 
 Observacao: o sistema usa o NCM cadastrado em cada produto no catalogo. O NCM padrao entra apenas como fallback.
 
+## XP Gateway - liberacao de gameplay
+
+Para liberar gameplay automaticamente apos venda concluida/paga, configure:
+
+- `XP_GATEWAY_BASE_URL` = URL base do backend do XP Gateway
+- `XP_GATEWAY_INTEGRATION_KEY` = chave enviada no header `x-integration-key`
+- `XP_GATEWAY_TIMEOUT_MS` = timeout da chamada em ms (padrao `8000`)
+- `XP_GATEWAY_RETRY_MAX` = quantidade de retentativas em timeout/5xx (padrao `2`)
+
+Fluxo operacional:
+
+1. Cadastre um produto como `Gameplay` em `Admin > Produtos`.
+2. Informe o `Codigo do plano`, a duracao em minutos e o preco de venda.
+3. No PDV, use `Venda rapida`, adicione o produto de gameplay e selecione a TV/estacao no resumo do pedido.
+4. Ao finalizar a venda, o sistema cria a venda, emite/processa a NFC-e normalmente e depois chama:
+
+```http
+POST {XP_GATEWAY_BASE_URL}/api/integrations/pdv/release
+x-integration-key: {XP_GATEWAY_INTEGRATION_KEY}
+```
+
+5. A falha do XP Gateway nao cancela a venda nem bloqueia a NFC-e. O status fica na aba `Admin > Gameplay`.
+6. Use `Reenviar liberacao` para reprocessar uma venda com status `PENDENTE_ENVIO` ou `FALHA_ENVIO`.
+
+Idempotencia:
+- cada liberacao usa o `saleId` interno da venda;
+- a tabela `GameplayRelease` possui `saleId` unico;
+- se uma venda ja estiver `LIBERADA`, o reenvio nao duplica a liberacao.
+
+Validação:
+
+```bash
+npm run test
+npm run build
+```
+
 ## Painel fiscal para contabilidade
 
 Nova aba `Admin > Fiscal`:

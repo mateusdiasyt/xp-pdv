@@ -5,6 +5,7 @@ import {
   ChartColumnBig,
   ContactRound,
   FileCode2,
+  Gamepad2,
   Receipt,
   LineChart,
   Package,
@@ -36,6 +37,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "PDV",
     href: "/admin/pdv",
     icon: Receipt,
+    permission: PERMISSIONS.PDV_VIEW,
+  },
+  {
+    label: "Gameplay",
+    href: "/admin/gameplay",
+    icon: Gamepad2,
     permission: PERMISSIONS.PDV_VIEW,
   },
   {

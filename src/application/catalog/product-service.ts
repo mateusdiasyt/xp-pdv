@@ -1,6 +1,6 @@
 import { Prisma, RecordStatus } from "@prisma/client";
 
-import { createProductSchema, updateProductSchema } from "@/domain/catalog/schemas";
+import { createProductSchema, updateProductSchema, updateProductStatusSchema } from "@/domain/catalog/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import { listCategoryOptions } from "@/infrastructure/db/repositories/category-repository";
@@ -47,6 +47,9 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     imageUrl: input.get("imageUrl"),
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
+    kind: input.get("kind"),
+    gameplayPlanCode: input.get("gameplayPlanCode"),
+    gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
     salePrice: input.get("salePrice"),
     minStock: input.get("minStock"),
@@ -66,6 +69,9 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
     supplierId: emptyToUndefined(parsed.supplierId),
+    kind: parsed.kind,
+    gameplayPlanCode: parsed.kind === "GAMEPLAY" ? emptyToUndefined(parsed.gameplayPlanCode) : undefined,
+    gameplayDurationMinutes: parsed.kind === "GAMEPLAY" ? parsed.gameplayDurationMinutes : undefined,
     costPrice,
     salePrice,
     marginPercent,
@@ -83,6 +89,9 @@ export async function createProductRecord(input: FormData, actorId?: string) {
       sku: created.sku,
       ncm: created.ncm,
       imageUrl: created.imageUrl,
+      kind: created.kind,
+      gameplayPlanCode: created.gameplayPlanCode,
+      gameplayDurationMinutes: created.gameplayDurationMinutes,
       categoryId: created.categoryId,
       supplierId: created.supplierId,
     },
@@ -99,6 +108,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     imageUrl: input.get("imageUrl"),
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
+    kind: input.get("kind"),
+    gameplayPlanCode: input.get("gameplayPlanCode"),
+    gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
     salePrice: input.get("salePrice"),
     minStock: input.get("minStock"),
@@ -119,6 +131,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
     supplierId: emptyToUndefined(parsed.supplierId),
+    kind: parsed.kind,
+    gameplayPlanCode: parsed.kind === "GAMEPLAY" ? emptyToUndefined(parsed.gameplayPlanCode) : undefined,
+    gameplayDurationMinutes: parsed.kind === "GAMEPLAY" ? parsed.gameplayDurationMinutes : undefined,
     costPrice,
     salePrice,
     marginPercent,
@@ -136,6 +151,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
       sku: updated.sku,
       ncm: updated.ncm,
       imageUrl: updated.imageUrl,
+      kind: updated.kind,
+      gameplayPlanCode: updated.gameplayPlanCode,
+      gameplayDurationMinutes: updated.gameplayDurationMinutes,
       categoryId: updated.categoryId,
       supplierId: updated.supplierId,
     },
@@ -143,10 +161,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
 }
 
 export async function updateProductStatusRecord(input: FormData, actorId?: string) {
-  const parsed = updateProductSchema.pick({
-    productId: true,
-    status: true,
-  }).parse({
+  const parsed = updateProductStatusSchema.parse({
     productId: input.get("productId"),
     status: input.get("status"),
   });

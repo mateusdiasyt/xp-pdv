@@ -1,4 +1,4 @@
-import { Prisma, RecordStatus } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -49,6 +49,9 @@ export async function listProducts(filters?: ListProductsFilters) {
         ncm: true,
         description: true,
         imageUrl: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         costPrice: true,
         salePrice: true,
         marginPercent: true,
@@ -80,6 +83,9 @@ export async function listProducts(filters?: ListProductsFilters) {
         sku: true,
         ncm: true,
         description: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         costPrice: true,
         salePrice: true,
         marginPercent: true,
@@ -112,6 +118,9 @@ export async function createProduct(data: {
   ncm: string;
   description?: string;
   imageUrl?: string;
+  kind: ProductKind;
+  gameplayPlanCode?: string;
+  gameplayDurationMinutes?: number;
   categoryId: string;
   supplierId?: string;
   costPrice: Prisma.Decimal;
@@ -133,6 +142,9 @@ export async function updateProduct(data: {
   ncm: string;
   description?: string;
   imageUrl?: string;
+  kind: ProductKind;
+  gameplayPlanCode?: string;
+  gameplayDurationMinutes?: number;
   categoryId: string;
   supplierId?: string;
   costPrice: Prisma.Decimal;
@@ -150,6 +162,9 @@ export async function updateProduct(data: {
       ncm: data.ncm,
       description: data.description,
       imageUrl: data.imageUrl,
+      kind: data.kind,
+      gameplayPlanCode: data.gameplayPlanCode,
+      gameplayDurationMinutes: data.gameplayDurationMinutes,
       categoryId: data.categoryId,
       supplierId: data.supplierId,
       costPrice: data.costPrice,
@@ -174,6 +189,9 @@ export async function listProductOptions() {
         name: true,
         sku: true,
         imageUrl: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         currentStock: true,
         status: true,
         salePrice: true,
@@ -199,6 +217,9 @@ export async function listProductOptions() {
         id: true,
         name: true,
         sku: true,
+        kind: true,
+        gameplayPlanCode: true,
+        gameplayDurationMinutes: true,
         currentStock: true,
         status: true,
         salePrice: true,

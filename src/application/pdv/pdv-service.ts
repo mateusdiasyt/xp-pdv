@@ -16,6 +16,7 @@ import {
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { parseDecimalInput } from "@/lib/decimal";
 import { cancelSaleNfce, issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
+import { triggerGameplayReleaseForSale } from "@/application/gameplay/gameplay-release-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   addItemToComanda,
@@ -97,6 +98,18 @@ function parsePayments(formData: FormData) {
   });
 }
 
+function parseGameplaySelections(formData: FormData) {
+  const productIds = formData.getAll("gameplayProductId").map((value) => String(value));
+  const stationIds = formData.getAll("gameplayStationId").map((value) => String(value));
+
+  return productIds
+    .map((productId, index) => ({
+      productId,
+      stationId: stationIds[index]?.trim().toLowerCase() ?? "",
+    }))
+    .filter((selection) => selection.productId && selection.stationId);
+}
+
 function resolveCashReceivedForReceipt(data: {
   explicitCashReceived?: Prisma.Decimal;
   cashPaymentTotal: Prisma.Decimal;
@@ -172,6 +185,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
 
   const items = parseItems(input);
   const payments = parsePayments(input);
+  const gameplaySelections = parseGameplaySelections(input);
   const discountAmount = parseDecimalInput(parsed.discountAmount || "0");
 
   if (discountAmount.lessThan(0)) {
@@ -201,6 +215,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     discountAmount,
     items,
     payments,
+    gameplaySelections,
   });
 
   await createAuditLog({
@@ -219,6 +234,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     saleId: sale.id,
     actorId,
   });
+  const gameplayResult = await triggerGameplayReleaseForSale(sale.id, actorId);
 
   const receiptCashReceived = resolveCashReceivedForReceipt({
     explicitCashReceived: cashReceived,
@@ -232,6 +248,8 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     cashReceived: receiptCashReceived,
     fiscalStatus: fiscalResult.status,
     fiscalMessage: fiscalResult.message,
+    gameplayStatus: gameplayResult.status,
+    gameplayMessage: gameplayResult.message,
   };
 }
 

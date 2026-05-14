@@ -1,7 +1,7 @@
 "use client";
 
 import { PencilLine } from "lucide-react";
-import { RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus } from "@prisma/client";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,9 @@ type EditProductDialogProps = {
     ncm?: string | null;
     description?: string | null;
     imageUrl?: string | null;
+    kind: ProductKind;
+    gameplayPlanCode?: string | null;
+    gameplayDurationMinutes?: number | null;
     categoryId: string;
     supplierId?: string | null;
     costPrice: string;
@@ -66,6 +69,9 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
               ncm: product.ncm ?? "",
               description: product.description,
               imageUrl: product.imageUrl,
+              kind: product.kind,
+              gameplayPlanCode: product.gameplayPlanCode,
+              gameplayDurationMinutes: product.gameplayDurationMinutes,
               categoryId: product.categoryId,
               supplierId: product.supplierId,
               costPrice: product.costPrice,

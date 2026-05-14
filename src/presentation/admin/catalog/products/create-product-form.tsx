@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus } from "@prisma/client";
 import { ImageIcon } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useEffect, useState } from "react";
@@ -32,6 +32,9 @@ type ProductFormInitialData = {
   ncm?: string;
   description?: string | null;
   imageUrl?: string | null;
+  kind?: ProductKind;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
   categoryId?: string;
   supplierId?: string | null;
   costPrice?: string;
@@ -127,6 +130,7 @@ export function CreateProductForm({
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialData?.imageUrl ?? "");
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
   const currentStockValue = initialData?.currentStock ?? 0;
 
   useEffect(() => {
@@ -254,6 +258,57 @@ export function CreateProductForm({
             ))}
           </select>
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="kind">Tipo de produto</Label>
+          <select
+            id="kind"
+            name="kind"
+            className="admin-native-select"
+            value={productKind}
+            onChange={(event) => setProductKind(event.target.value as ProductKind)}
+          >
+            <option value={ProductKind.STANDARD}>Produto comum</option>
+            <option value={ProductKind.GAMEPLAY}>Gameplay</option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Use Gameplay para planos que liberam automaticamente uma TV/estacao apos a venda.
+          </p>
+        </div>
+
+        {productKind === ProductKind.GAMEPLAY ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="gameplayPlanCode">Codigo do plano</Label>
+              <Input
+                id="gameplayPlanCode"
+                name="gameplayPlanCode"
+                placeholder="GAMEPLAY-60"
+                defaultValue={initialData?.gameplayPlanCode ?? ""}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gameplayDurationMinutes">Duracao (minutos)</Label>
+              <Input
+                id="gameplayDurationMinutes"
+                name="gameplayDurationMinutes"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="60"
+                defaultValue={initialData?.gameplayDurationMinutes ?? ""}
+                required
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <input type="hidden" name="gameplayPlanCode" value="" />
+            <input type="hidden" name="gameplayDurationMinutes" value="" />
+          </>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="costPrice">Custo (R$)</Label>

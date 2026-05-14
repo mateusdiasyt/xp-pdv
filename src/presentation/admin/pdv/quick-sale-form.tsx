@@ -3,12 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, ProductKind } from "@prisma/client";
 import {
   Beef,
   Candy,
   Check,
   Coffee,
+  Gamepad2,
   GlassWater,
   Grid2x2,
   Package2,
@@ -18,6 +19,7 @@ import {
   Sandwich,
   Search,
   Trash2,
+  Tv,
   Wallet,
 } from "lucide-react";
 import { useActionState, useDeferredValue, useState } from "react";
@@ -51,6 +53,9 @@ type ProductOption = {
   name: string;
   sku: string;
   imageUrl?: string | null;
+  kind: ProductKind;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
   salePrice: number;
   currentStock: number;
   category: {
@@ -90,6 +95,8 @@ const paymentLabels: Record<PaymentMethod, string> = {
   CREDIT_CARD: "Cartao de credito",
   DEBIT_CARD: "Cartao de debito",
 };
+
+const gameplayStations = Array.from({ length: 8 }, (_, index) => `tv-${String(index + 1).padStart(2, "0")}`);
 
 const quantityInputClassName =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
@@ -211,6 +218,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     { id: 1, method: PaymentMethod.PIX, amount: "0.00" },
   ]);
+  const [stationByProduct, setStationByProduct] = useState<Record<string, string>>({});
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
@@ -260,6 +268,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
       };
     })
     .filter(Boolean) as Array<{ productId: string; quantity: number; product: ProductOption; lineTotal: number }>;
+  const gameplayCartItems = cartItems.filter((item) => item.product.kind === ProductKind.GAMEPLAY);
 
   const subtotalInCents = cartItems.reduce((sum, item) => sum + Math.round(item.lineTotal * 100), 0);
   const discountInCents = Math.max(0, parseMoneyToCents(discountAmount));
@@ -291,6 +300,14 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     const quantity = Number(quantityRaw);
     if (!Number.isFinite(quantity) || quantity < 1) {
       return;
+    }
+
+    const product = productMap.get(productId);
+    if (product?.kind === ProductKind.GAMEPLAY) {
+      setStationByProduct((currentMap) => ({
+        ...currentMap,
+        [productId]: currentMap[productId] ?? gameplayStations[0],
+      }));
     }
 
     setCartLines((currentLines) => {
@@ -326,6 +343,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
 
   function removeFromCart(productId: string) {
     setCartLines((currentLines) => currentLines.filter((line) => line.productId !== productId));
+    setStationByProduct((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[productId];
+      return nextMap;
+    });
   }
 
   function updatePaymentLine(id: number, field: "method" | "amount", value: string) {
@@ -400,6 +422,16 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
               <div key={`quick-item-${item.productId}`}>
                 <input type="hidden" name="itemProductId" value={item.productId} />
                 <input type="hidden" name="itemQuantity" value={String(item.quantity)} />
+              </div>
+            ))}
+            {gameplayCartItems.map((item) => (
+              <div key={`quick-gameplay-${item.productId}`}>
+                <input type="hidden" name="gameplayProductId" value={item.productId} />
+                <input
+                  type="hidden"
+                  name="gameplayStationId"
+                  value={stationByProduct[item.productId] ?? gameplayStations[0]}
+                />
               </div>
             ))}
           </fieldset>
@@ -583,7 +615,14 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                               </p>
                               <div className="space-y-0.5 text-xs text-muted-foreground">
                                 <p className="font-medium text-foreground/88">{formatCurrency(product.salePrice)}</p>
-                                <p>{product.currentStock} em estoque</p>
+                                {product.kind === ProductKind.GAMEPLAY ? (
+                                  <p className="inline-flex items-center gap-1 text-sky-200">
+                                    <Gamepad2 className="h-3.5 w-3.5" />
+                                    {product.gameplayDurationMinutes ?? 0} min
+                                  </p>
+                                ) : (
+                                  <p>{product.currentStock} em estoque</p>
+                                )}
                               </div>
                             </div>
 
@@ -644,7 +683,15 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                     {cartItems.map((item) => (
                       <div key={`quick-cart-${item.productId}`} className="rounded-[1.35rem] border border-border/75 bg-background/30 p-3">
                         <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 truncate text-sm font-medium text-foreground">{item.product.name}</p>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{item.product.name}</p>
+                            {item.product.kind === ProductKind.GAMEPLAY ? (
+                              <p className="mt-1 inline-flex items-center gap-1 text-xs text-sky-200">
+                                <Gamepad2 className="h-3.5 w-3.5" />
+                                {item.product.gameplayPlanCode} - {item.product.gameplayDurationMinutes ?? 0} min
+                              </p>
+                            ) : null}
+                          </div>
                           <p className="shrink-0 text-sm font-semibold text-foreground">{formatCurrency(item.lineTotal)}</p>
                         </div>
                         <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -672,6 +719,32 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Remover item do ticket</span>
                           </Button>
+                          {item.product.kind === ProductKind.GAMEPLAY ? (
+                            <div className="min-w-[150px] flex-1 space-y-1">
+                              <Label htmlFor={`quick-gameplay-station-${item.productId}`}>TV/estacao</Label>
+                              <div className="relative">
+                                <Tv className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200" />
+                                <select
+                                  id={`quick-gameplay-station-${item.productId}`}
+                                  className="admin-native-select pl-9"
+                                  value={stationByProduct[item.productId] ?? gameplayStations[0]}
+                                  onChange={(event) =>
+                                    setStationByProduct((currentMap) => ({
+                                      ...currentMap,
+                                      [item.productId]: event.target.value,
+                                    }))
+                                  }
+                                  required
+                                >
+                                  {gameplayStations.map((stationId) => (
+                                    <option key={stationId} value={stationId}>
+                                      {stationId.toUpperCase()}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ))}

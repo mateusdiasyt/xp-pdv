@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LayoutGrid, Plus, Receipt } from "lucide-react";
+import { ProductKind } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,9 @@ type ProductOption = {
   name: string;
   sku: string;
   imageUrl?: string | null;
+  kind: ProductKind;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
   salePrice: number;
   currentStock: number;
   category: {
@@ -93,6 +97,7 @@ export function PdvWorkspace({
   const [lockCreateDialogNumber, setLockCreateDialogNumber] = useState(false);
 
   const selectedComanda = openComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
+  const comandaProducts = products.filter((product) => product.kind !== ProductKind.GAMEPLAY);
   const highestActiveNumber = openComandas.reduce(
     (currentMax, comanda) => Math.max(currentMax, comanda.number),
     DEFAULT_SLOT_COUNT,
@@ -214,7 +219,7 @@ export function PdvWorkspace({
                 canManage={canManage}
                 customers={customers}
                 openSessions={openSessions}
-                products={products}
+                products={comandaProducts}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}
               />

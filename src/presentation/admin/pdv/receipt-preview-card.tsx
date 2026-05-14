@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { PaymentMethod, SaleStatus } from "@prisma/client";
+import { GameplayReleaseStatus, PaymentMethod, SaleStatus } from "@prisma/client";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +19,12 @@ type ReceiptSale = {
   fiscalMessage?: string | null;
   fiscalDanfeUrl?: string | null;
   fiscalXmlUrl?: string | null;
+  gameplayRelease?: {
+    status: GameplayReleaseStatus;
+    stationId: string;
+    releasedUntil?: Date | null;
+    lastError?: string | null;
+  } | null;
   subtotalAmount: { toString(): string };
   discountAmount: { toString(): string };
   totalAmount: { toString(): string };
@@ -117,12 +123,33 @@ function getFiscalStatusLabel(status?: string | null) {
   return "NFC-e nao emitida";
 }
 
+function getGameplayStatusLabel(release?: ReceiptSale["gameplayRelease"]) {
+  if (!release) {
+    return null;
+  }
+
+  if (release.status === GameplayReleaseStatus.LIBERADA) {
+    const time = release.releasedUntil
+      ? new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(release.releasedUntil)
+      : "";
+
+    return `TV ${release.stationId.toUpperCase()} liberada${time ? ` ate ${time}` : ""}`;
+  }
+
+  if (release.status === GameplayReleaseStatus.PENDENTE_ENVIO) {
+    return `TV ${release.stationId.toUpperCase()} pendente de envio`;
+  }
+
+  return `Falha ao liberar ${release.stationId.toUpperCase()}`;
+}
+
 function ReceiptBody({ sale, cashReceived, title, subtitle, showFiscalSummary = false }: ReceiptBodyProps) {
   const cashPaymentTotal = sale.payments
     .filter((payment) => payment.method === PaymentMethod.CASH)
     .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
   const computedChange = cashReceived && cashReceived > cashPaymentTotal ? cashReceived - cashPaymentTotal : 0;
   const ticketCode = formatTicketCode(sale.saleNumber);
+  const gameplayStatusLabel = getGameplayStatusLabel(sale.gameplayRelease);
 
   return (
     <div className="space-y-2.5 pb-4">
@@ -150,6 +177,11 @@ function ReceiptBody({ sale, cashReceived, title, subtitle, showFiscalSummary = 
           {sale.status === SaleStatus.COMPLETED ? "Pago / Concluido" : "Cancelada"}
         </p>
         <p className="text-[8px] uppercase tracking-[0.08em] text-black/65">{getFiscalStatusLabel(sale.fiscalStatus)}</p>
+        {gameplayStatusLabel ? (
+          <p className="rounded-sm border border-black/20 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-black">
+            {gameplayStatusLabel}
+          </p>
+        ) : null}
         {showFiscalSummary && sale.fiscalNumber ? (
           <p className="text-[8px] text-black/70">
             Numero: {sale.fiscalNumber} / Serie: {sale.fiscalSeries ?? "-"}
