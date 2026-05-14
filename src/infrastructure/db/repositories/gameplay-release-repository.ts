@@ -105,6 +105,53 @@ export async function markGameplayReleaseResult(data: {
   });
 }
 
+export async function getGameplayReleaseBySaleId(saleId: string) {
+  return prisma.gameplayRelease.findUnique({
+    where: {
+      saleId,
+    },
+    include: {
+      sale: {
+        select: {
+          id: true,
+          saleNumber: true,
+          status: true,
+          createdAt: true,
+          totalAmount: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getActiveGameplayReleaseByStationId(stationId: string, now = new Date()) {
+  return prisma.gameplayRelease.findFirst({
+    where: {
+      stationId,
+      status: GameplayReleaseStatus.LIBERADA,
+      releasedUntil: {
+        gt: now,
+      },
+      sale: {
+        status: SaleStatus.COMPLETED,
+      },
+    },
+    include: {
+      sale: {
+        select: {
+          id: true,
+          saleNumber: true,
+          customerName: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: {
+      releasedUntil: "desc",
+    },
+  });
+}
+
 export async function markGameplayReleaseFailureWithoutRequest(data: {
   saleId: string;
   requestPayload: Prisma.InputJsonValue;

@@ -100,29 +100,76 @@ Campos opcionais (com padrao no codigo):
 
 Observacao: o sistema usa o NCM cadastrado em cada produto no catalogo. O NCM padrao entra apenas como fallback.
 
-## XP Gateway - liberacao de gameplay
+## Gameplay - liberacao de TV
 
-Para liberar gameplay automaticamente apos venda concluida/paga, configure:
+O sistema pode liberar a TV diretamente pelo proprio `xp-pdv`, sem precisar hospedar um backend separado.
+
+Configuracao recomendada para operar no mesmo link do PDV:
+
+- APK da TV: `Backend URL` = URL publica do PDV, por exemplo `https://xp-pdv.vercel.app`
+- APK da TV: `stationId` = codigo da estacao, por exemplo `tv-01`
+- APK da TV: `Modo` = `PDV` ou `Hibrido`
+- Vercel: `XP_GATEWAY_INTEGRATION_KEY` = chave usada se algum cliente externo chamar a rota de liberacao
+- Vercel: `XP_TV_DEVICE_KEY` = opcional; se existir, o APK precisa enviar no header `x-device-key`
+
+Rotas internas usadas pelo APK:
+
+```http
+GET https://xp-pdv.vercel.app/api/integrations/tv/status?stationId=tv-01
+x-device-key: {XP_TV_DEVICE_KEY opcional}
+```
+
+Resposta quando a TV esta liberada:
+
+```json
+{
+  "stationId": "tv-01",
+  "status": "ACTIVE",
+  "saleId": "cm...",
+  "saleNumber": "VEN-...",
+  "planCode": "SIMULADOR-10",
+  "unlockedUntil": "2026-05-14T20:40:00.000Z",
+  "remainingSeconds": 582,
+  "serverTime": "2026-05-14T20:30:18.000Z"
+}
+```
+
+Resposta quando nao existe sessao ativa:
+
+```json
+{
+  "stationId": "tv-01",
+  "status": "LOCKED",
+  "remainingSeconds": 0
+}
+```
+
+Se no futuro houver um XP Gateway separado, configure:
 
 - `XP_GATEWAY_BASE_URL` = URL base do backend do XP Gateway
 - `XP_GATEWAY_INTEGRATION_KEY` = chave enviada no header `x-integration-key`
 - `XP_GATEWAY_TIMEOUT_MS` = timeout da chamada em ms (padrao `8000`)
 - `XP_GATEWAY_RETRY_MAX` = quantidade de retentativas em timeout/5xx (padrao `2`)
 
+Se `XP_GATEWAY_BASE_URL` estiver vazio, `internal`, `self`, `same-app` ou ainda com o placeholder `https://URL-DO-SEU-GATEWAY`, o sistema usa automaticamente a liberacao interna do proprio PDV.
+
 Fluxo operacional:
 
 1. Cadastre um produto como `Gameplay` em `Admin > Produtos`.
 2. Informe o `Codigo do plano`, a duracao em minutos e o preco de venda.
 3. No PDV, use `Venda rapida`, adicione o produto de gameplay e selecione a TV/estacao no resumo do pedido.
-4. Ao finalizar a venda, o sistema cria a venda, emite/processa a NFC-e normalmente e depois chama:
+4. Ao finalizar a venda, o sistema cria a venda, emite/processa a NFC-e normalmente e libera a TV no proprio banco do PDV.
+5. O APK consulta a rota `/api/integrations/tv/status` e destrava a TV ate o horario retornado.
+
+Compatibilidade com gateway externo:
 
 ```http
 POST {XP_GATEWAY_BASE_URL}/api/integrations/pdv/release
 x-integration-key: {XP_GATEWAY_INTEGRATION_KEY}
 ```
 
-5. A falha do XP Gateway nao cancela a venda nem bloqueia a NFC-e. O status fica na aba `Admin > Gameplay`.
-6. Use `Reenviar liberacao` para reprocessar uma venda com status `PENDENTE_ENVIO` ou `FALHA_ENVIO`.
+6. A falha do gateway externo nao cancela a venda nem bloqueia a NFC-e. O status fica na aba `Admin > Gameplay`.
+7. Use `Reenviar liberacao` para reprocessar uma venda com status `PENDENTE_ENVIO` ou `FALHA_ENVIO`.
 
 Idempotencia:
 - cada liberacao usa o `saleId` interno da venda;

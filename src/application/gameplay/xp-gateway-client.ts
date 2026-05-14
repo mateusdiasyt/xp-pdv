@@ -36,6 +36,10 @@ export function getXpGatewayConfig(): XpGatewayClientConfig | null {
     return null;
   }
 
+  if (["internal", "self", "same-app", "https://url-do-seu-gateway"].includes(baseUrl.toLowerCase())) {
+    return null;
+  }
+
   const timeoutMs = Number(process.env.XP_GATEWAY_TIMEOUT_MS ?? "8000");
   const retryMax = Number(process.env.XP_GATEWAY_RETRY_MAX ?? "2");
 

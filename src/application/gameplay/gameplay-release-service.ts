@@ -14,6 +14,7 @@ import {
   postGameplayRelease,
   type XpGatewayReleasePayload,
 } from "@/application/gameplay/xp-gateway-client";
+import { releaseGameplayInsidePdv } from "@/application/gameplay/internal-gameplay-gateway";
 
 const XP_GATEWAY_INTEGRATION_ID = "pdv-xp-main";
 const FALLBACK_STATION_ID = "sem-estacao";
@@ -221,17 +222,13 @@ export async function triggerGameplayReleaseForSale(
     const config = getXpGatewayConfig();
 
     if (!config) {
-      const lastError = "XP Gateway nao configurado. Verifique XP_GATEWAY_BASE_URL e XP_GATEWAY_INTEGRATION_KEY. Contate o Mateus.";
-      await markGameplayReleaseResult({
-        saleId: sale.id,
-        status: GameplayReleaseStatus.FALHA_ENVIO,
-        attemptsToAdd: 0,
-        lastError,
-      });
+      const internalResult = await releaseGameplayInsidePdv(draft.payload, actorId);
+      const releasedUntil = new Date(internalResult.releasedUntil);
 
       return {
-        status: GameplayReleaseStatus.FALHA_ENVIO,
-        message: lastError,
+        status: GameplayReleaseStatus.LIBERADA,
+        message: `TV ${draft.payload.stationId.toUpperCase()} liberada ate ${formatReleaseTime(releasedUntil)}.`,
+        releasedUntil,
         stationId: draft.payload.stationId,
       };
     }
