@@ -131,6 +131,7 @@ export function CreateProductForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
+  const isGameplay = productKind === ProductKind.GAMEPLAY;
   const currentStockValue = initialData?.currentStock ?? 0;
 
   useEffect(() => {
@@ -243,23 +244,6 @@ export function CreateProductForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="supplierId">Fornecedor</Label>
-          <select
-            id="supplierId"
-            name="supplierId"
-            className="admin-native-select"
-            defaultValue={initialData?.supplierId ?? ""}
-          >
-            <option value="">Sem fornecedor</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.tradeName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="kind">Tipo de produto</Label>
           <select
             id="kind"
@@ -276,7 +260,7 @@ export function CreateProductForm({
           </p>
         </div>
 
-        {productKind === ProductKind.GAMEPLAY ? (
+        {isGameplay ? (
           <>
             <div className="space-y-2">
               <Label htmlFor="gameplayPlanCode">Codigo do plano</Label>
@@ -302,51 +286,87 @@ export function CreateProductForm({
                 required
               />
             </div>
+
+            <input type="hidden" name="supplierId" value="" />
+            <input type="hidden" name="costPrice" value="0.00" />
+            <input type="hidden" name="minStock" value="0" />
+            <input type="hidden" name="currentStock" value="0" />
+
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
+              <strong className="mb-1 block text-foreground">Gameplay nao usa estoque, custo nem fornecedor.</strong>
+              O controle desse tipo fica na duracao, codigo do plano e estacao escolhida no PDV. O valor abaixo e o preco cobrado do cliente.
+            </div>
           </>
         ) : (
           <>
+            <div className="space-y-2">
+              <Label htmlFor="supplierId">Fornecedor</Label>
+              <select
+                id="supplierId"
+                name="supplierId"
+                className="admin-native-select"
+                defaultValue={initialData?.supplierId ?? ""}
+              >
+                <option value="">Sem fornecedor</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.tradeName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <input type="hidden" name="gameplayPlanCode" value="" />
             <input type="hidden" name="gameplayDurationMinutes" value="" />
           </>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="costPrice">Custo (R$)</Label>
-          <Input id="costPrice" name="costPrice" placeholder="10.00" defaultValue={initialData?.costPrice ?? ""} required />
-        </div>
+        {!isGameplay ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="costPrice">Custo (R$)</Label>
+              <Input id="costPrice" name="costPrice" placeholder="10.00" defaultValue={initialData?.costPrice ?? ""} required />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="salePrice">Preco de venda (R$)</Label>
-          <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="salePrice">Preco de venda (R$)</Label>
+              <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="minStock">Estoque minimo</Label>
-          <Input
-            id="minStock"
-            name="minStock"
-            type="number"
-            min={0}
-            defaultValue={initialData?.minStock ?? 0}
-            required
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="minStock">Estoque minimo</Label>
+              <Input
+                id="minStock"
+                name="minStock"
+                type="number"
+                min={0}
+                defaultValue={initialData?.minStock ?? 0}
+                required
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="currentStock">Estoque atual</Label>
-          <input type="hidden" name="currentStock" value={String(currentStockValue)} />
-          <Input
-            id="currentStock"
-            type="number"
-            min={0}
-            value={currentStockValue}
-            readOnly
-            disabled
-          />
-          <p className="text-xs text-muted-foreground">
-            O saldo atual e somente informativo. Ajustes de estoque devem ser feitos na aba Estoque.
-          </p>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="currentStock">Estoque atual</Label>
+              <input type="hidden" name="currentStock" value={String(currentStockValue)} />
+              <Input
+                id="currentStock"
+                type="number"
+                min={0}
+                value={currentStockValue}
+                readOnly
+                disabled
+              />
+              <p className="text-xs text-muted-foreground">
+                O saldo atual e somente informativo. Ajustes de estoque devem ser feitos na aba Estoque.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="salePrice">Valor do plano (R$)</Label>
+            <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>

@@ -119,10 +119,10 @@ export async function createProduct(data: {
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
-  gameplayPlanCode?: string;
-  gameplayDurationMinutes?: number;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
   categoryId: string;
-  supplierId?: string;
+  supplierId?: string | null;
   costPrice: Prisma.Decimal;
   salePrice: Prisma.Decimal;
   marginPercent: Prisma.Decimal;
@@ -143,10 +143,10 @@ export async function updateProduct(data: {
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
-  gameplayPlanCode?: string;
-  gameplayDurationMinutes?: number;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
   categoryId: string;
-  supplierId?: string;
+  supplierId?: string | null;
   costPrice: Prisma.Decimal;
   salePrice: Prisma.Decimal;
   marginPercent: Prisma.Decimal;

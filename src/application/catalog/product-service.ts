@@ -57,7 +57,8 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     status: input.get("status"),
   });
 
-  const costPrice = new Prisma.Decimal(parsed.costPrice);
+  const isGameplay = parsed.kind === "GAMEPLAY";
+  const costPrice = new Prisma.Decimal(isGameplay ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
 
@@ -68,15 +69,15 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
-    supplierId: emptyToUndefined(parsed.supplierId),
+    supplierId: isGameplay ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
-    gameplayPlanCode: parsed.kind === "GAMEPLAY" ? emptyToUndefined(parsed.gameplayPlanCode) : undefined,
-    gameplayDurationMinutes: parsed.kind === "GAMEPLAY" ? parsed.gameplayDurationMinutes : undefined,
+    gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
+    gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
     marginPercent,
-    minStock: parsed.minStock,
-    currentStock: parsed.currentStock,
+    minStock: isGameplay ? 0 : parsed.minStock,
+    currentStock: isGameplay ? 0 : parsed.currentStock,
     status: parsed.status,
   });
 
@@ -118,7 +119,8 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     status: input.get("status"),
   });
 
-  const costPrice = new Prisma.Decimal(parsed.costPrice);
+  const isGameplay = parsed.kind === "GAMEPLAY";
+  const costPrice = new Prisma.Decimal(isGameplay ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
 
@@ -130,15 +132,15 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
-    supplierId: emptyToUndefined(parsed.supplierId),
+    supplierId: isGameplay ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
-    gameplayPlanCode: parsed.kind === "GAMEPLAY" ? emptyToUndefined(parsed.gameplayPlanCode) : undefined,
-    gameplayDurationMinutes: parsed.kind === "GAMEPLAY" ? parsed.gameplayDurationMinutes : undefined,
+    gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
+    gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
     marginPercent,
-    minStock: parsed.minStock,
-    currentStock: parsed.currentStock,
+    minStock: isGameplay ? 0 : parsed.minStock,
+    currentStock: isGameplay ? 0 : parsed.currentStock,
     status: parsed.status,
   });
 
