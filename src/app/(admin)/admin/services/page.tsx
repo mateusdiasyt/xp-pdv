@@ -164,7 +164,11 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                 ) : (
                   <p>Nenhuma venda ativa nesta estacao.</p>
                 )}
-                <ManualServiceControlForm stationId={station.id} isBusy={Boolean(release)} />
+                <ManualServiceControlForm
+                  key={`${station.id}-${release?.id ?? "free"}`}
+                  stationId={station.id}
+                  isBusy={Boolean(release)}
+                />
               </CardContent>
             </Card>
           );
