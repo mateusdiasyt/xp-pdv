@@ -4,6 +4,7 @@ import {
   Calculator,
   ChartColumnBig,
   ContactRound,
+  CreditCard,
   FileCode2,
   Gamepad2,
   Receipt,
@@ -43,6 +44,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "Servicos",
     href: "/admin/services",
     icon: Gamepad2,
+    permission: PERMISSIONS.PDV_VIEW,
+  },
+  {
+    label: "Pagamentos",
+    href: "/admin/payments",
+    icon: CreditCard,
     permission: PERMISSIONS.PDV_VIEW,
   },
   {
