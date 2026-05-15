@@ -33,6 +33,8 @@ type ProductFormInitialData = {
   description?: string | null;
   imageUrl?: string | null;
   kind?: ProductKind;
+  serviceCnae?: string | null;
+  serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
   categoryId?: string;
@@ -85,6 +87,17 @@ function ProductImagePreview({
   );
 }
 
+const serviceCnaeOptions = [
+  {
+    value: "9329804",
+    label: "93.29-8-04 - Jogos eletronicos recreativos",
+  },
+  {
+    value: "9329803",
+    label: "93.29-8-03 - Sinuca, bilhar e similares",
+  },
+];
+
 async function buildImagePreviewDataUrl(file: File) {
   const imageBitmapUrl = URL.createObjectURL(file);
 
@@ -131,7 +144,11 @@ export function CreateProductForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
+  const [serviceCnae, setServiceCnae] = useState(
+    initialData?.serviceCnae ?? (initialData?.kind === ProductKind.GAMEPLAY ? "9329804" : "9329803"),
+  );
   const isGameplay = productKind === ProductKind.GAMEPLAY;
+  const isServiceLike = productKind !== ProductKind.STANDARD;
   const currentStockValue = initialData?.currentStock ?? 0;
 
   useEffect(() => {
@@ -170,6 +187,18 @@ export function CreateProductForm({
     setImagePreviewUrl("");
     setImageError(null);
     setFileInputKey((currentValue) => currentValue + 1);
+  }
+
+  function handleProductKindChange(nextKind: ProductKind) {
+    setProductKind(nextKind);
+
+    if (nextKind === ProductKind.GAMEPLAY) {
+      setServiceCnae("9329804");
+    }
+
+    if (nextKind === ProductKind.SERVICE) {
+      setServiceCnae("9329803");
+    }
   }
 
   return (
@@ -212,19 +241,23 @@ export function CreateProductForm({
           <Input id="sku" name="sku" placeholder="SKU-0001" defaultValue={initialData?.sku ?? ""} required />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="ncm">NCM</Label>
-          <Input
-            id="ncm"
-            name="ncm"
-            placeholder="22021000"
-            defaultValue={initialData?.ncm ?? ""}
-            inputMode="numeric"
-            maxLength={8}
-            required
-          />
-          <p className="text-xs text-muted-foreground">Informe o NCM fiscal com 8 digitos.</p>
-        </div>
+        {!isServiceLike ? (
+          <div className="space-y-2">
+            <Label htmlFor="ncm">NCM</Label>
+            <Input
+              id="ncm"
+              name="ncm"
+              placeholder="22021000"
+              defaultValue={initialData?.ncm ?? ""}
+              inputMode="numeric"
+              maxLength={8}
+              required
+            />
+            <p className="text-xs text-muted-foreground">Informe o NCM fiscal com 8 digitos.</p>
+          </div>
+        ) : (
+          <input type="hidden" name="ncm" value="" />
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="categoryId">Categoria</Label>
@@ -250,15 +283,56 @@ export function CreateProductForm({
             name="kind"
             className="admin-native-select"
             value={productKind}
-            onChange={(event) => setProductKind(event.target.value as ProductKind)}
+            onChange={(event) => handleProductKindChange(event.target.value as ProductKind)}
           >
             <option value={ProductKind.STANDARD}>Produto comum</option>
-            <option value={ProductKind.GAMEPLAY}>Gameplay</option>
+            <option value={ProductKind.GAMEPLAY}>Gameplay / TV</option>
+            <option value={ProductKind.SERVICE}>Servico manual</option>
           </select>
           <p className="text-xs text-muted-foreground">
-            Use Gameplay para planos que liberam automaticamente uma TV/estacao apos a venda.
+            Produto comum gera NFC-e. Gameplay e servico manual entram na apuracao de NFS-e municipal.
           </p>
         </div>
+
+        {isServiceLike ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="serviceCnae">CNAE do servico</Label>
+              <select
+                id="serviceCnae"
+                name="serviceCnae"
+                className="admin-native-select"
+                value={serviceCnae}
+                onChange={(event) => setServiceCnae(event.target.value)}
+                required
+              >
+                {serviceCnaeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Esse CNAE sera usado na apuracao semanal para emitir NFS-e no Gestao ISS.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="serviceDescription">Descricao fiscal do servico</Label>
+              <Input
+                id="serviceDescription"
+                name="serviceDescription"
+                placeholder={isGameplay ? "Uso de jogos eletronicos recreativos" : "Uso de sinuca/bilhar"}
+                defaultValue={initialData?.serviceDescription ?? ""}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <input type="hidden" name="serviceCnae" value="" />
+            <input type="hidden" name="serviceDescription" value="" />
+          </>
+        )}
 
         {isGameplay ? (
           <>
@@ -293,8 +367,22 @@ export function CreateProductForm({
             <input type="hidden" name="currentStock" value="0" />
 
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
-              <strong className="mb-1 block text-foreground">Gameplay nao usa estoque, custo nem fornecedor.</strong>
-              O controle desse tipo fica na duracao, codigo do plano e estacao escolhida no PDV. O valor abaixo e o preco cobrado do cliente.
+              <strong className="mb-1 block text-foreground">Gameplay e tratado como servico municipal.</strong>
+              Ele nao usa estoque, custo, fornecedor ou NCM. O valor vai para apuracao de NFS-e e a TV continua sendo liberada pelo PDV.
+            </div>
+          </>
+        ) : isServiceLike ? (
+          <>
+            <input type="hidden" name="supplierId" value="" />
+            <input type="hidden" name="costPrice" value="0.00" />
+            <input type="hidden" name="minStock" value="0" />
+            <input type="hidden" name="currentStock" value="0" />
+            <input type="hidden" name="gameplayPlanCode" value="" />
+            <input type="hidden" name="gameplayDurationMinutes" value="" />
+
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
+              <strong className="mb-1 block text-foreground">Servico manual nao entra na NFC-e de produtos.</strong>
+              Use para sinuca, bilhar e servicos semelhantes. Ele vai para a apuracao semanal de NFS-e por CNAE.
             </div>
           </>
         ) : (
@@ -321,7 +409,7 @@ export function CreateProductForm({
           </>
         )}
 
-        {!isGameplay ? (
+        {!isServiceLike ? (
           <>
             <div className="space-y-2">
               <Label htmlFor="costPrice">Custo (R$)</Label>
@@ -363,7 +451,7 @@ export function CreateProductForm({
           </>
         ) : (
           <div className="space-y-2">
-            <Label htmlFor="salePrice">Valor do plano (R$)</Label>
+            <Label htmlFor="salePrice">{isGameplay ? "Valor do plano (R$)" : "Valor do servico (R$)"}</Label>
             <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
           </div>
         )}

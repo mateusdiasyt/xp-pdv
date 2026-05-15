@@ -50,6 +50,8 @@ export async function listProducts(filters?: ListProductsFilters) {
         description: true,
         imageUrl: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         costPrice: true,
@@ -84,6 +86,8 @@ export async function listProducts(filters?: ListProductsFilters) {
         ncm: true,
         description: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         costPrice: true,
@@ -119,6 +123,8 @@ export async function createProduct(data: {
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
+  serviceCnae?: string | null;
+  serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
   categoryId: string;
@@ -143,6 +149,8 @@ export async function updateProduct(data: {
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
+  serviceCnae?: string | null;
+  serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
   categoryId: string;
@@ -163,6 +171,8 @@ export async function updateProduct(data: {
       description: data.description,
       imageUrl: data.imageUrl,
       kind: data.kind,
+      serviceCnae: data.serviceCnae,
+      serviceDescription: data.serviceDescription,
       gameplayPlanCode: data.gameplayPlanCode,
       gameplayDurationMinutes: data.gameplayDurationMinutes,
       categoryId: data.categoryId,
@@ -190,6 +200,8 @@ export async function listProductOptions() {
         sku: true,
         imageUrl: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         currentStock: true,
@@ -218,6 +230,8 @@ export async function listProductOptions() {
         name: true,
         sku: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         currentStock: true,

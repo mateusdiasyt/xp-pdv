@@ -67,6 +67,18 @@ function ProductImageCard({
   );
 }
 
+function getProductKindLabel(kind: ProductKind) {
+  if (kind === ProductKind.GAMEPLAY) {
+    return "Gameplay";
+  }
+
+  if (kind === ProductKind.SERVICE) {
+    return "Servico";
+  }
+
+  return "Produto";
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const session = await requirePermission(PERMISSIONS.PRODUCTS_VIEW);
   const { q, status, categoryId } = await searchParams;
@@ -209,19 +221,23 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         <div>
                           <p className="text-base font-semibold text-foreground">{product.name}</p>
                           <p className="text-xs text-muted-foreground">{product.sku}</p>
-                          <p className="text-xs text-muted-foreground">NCM {product.ncm ?? "Nao informado"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {product.kind === ProductKind.STANDARD
+                              ? `NCM ${product.ncm ?? "Nao informado"}`
+                              : `CNAE ${product.serviceCnae ?? "Nao informado"}`}
+                          </p>
                         </div>
                         <Badge
                           className={
-                            product.kind === ProductKind.GAMEPLAY
+                            product.kind !== ProductKind.STANDARD
                               ? "border border-sky-400/20 bg-sky-500/15 text-sky-200 hover:bg-sky-500/15"
                               : product.status === RecordStatus.ACTIVE
                               ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
                               : "border border-rose-400/20 bg-rose-500/15 text-rose-300 hover:bg-rose-500/15"
                           }
                         >
-                          {product.kind === ProductKind.GAMEPLAY
-                            ? "Gameplay"
+                          {product.kind !== ProductKind.STANDARD
+                            ? getProductKindLabel(product.kind)
                             : product.status === RecordStatus.ACTIVE
                               ? "Ativo"
                               : "Inativo"}
@@ -247,12 +263,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Estoque</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {product.kind === ProductKind.GAMEPLAY ? `${product.gameplayDurationMinutes ?? 0} min` : product.currentStock}
+                          {product.kind === ProductKind.GAMEPLAY
+                            ? `${product.gameplayDurationMinutes ?? 0} min`
+                            : product.kind === ProductKind.SERVICE
+                              ? "NFS-e"
+                              : product.currentStock}
                         </p>
                         <p
                           className={cn(
                             "text-xs",
-                            product.kind === ProductKind.GAMEPLAY
+                            product.kind !== ProductKind.STANDARD
                               ? "text-sky-300"
                               : isOutOfStock
                               ? "text-rose-400"
@@ -261,7 +281,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                                 : "text-emerald-400",
                           )}
                         >
-                          {product.kind === ProductKind.GAMEPLAY ? product.gameplayPlanCode ?? "Plano" : stockLabel}
+                          {product.kind === ProductKind.GAMEPLAY
+                            ? product.gameplayPlanCode ?? "Plano"
+                            : product.kind === ProductKind.SERVICE
+                              ? product.serviceDescription ?? "Servico municipal"
+                              : stockLabel}
                         </p>
                       </div>
                     </div>
@@ -280,6 +304,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               description: product.description,
                               imageUrl: product.imageUrl,
                               kind: product.kind,
+                              serviceCnae: product.serviceCnae,
+                              serviceDescription: product.serviceDescription,
                               gameplayPlanCode: product.gameplayPlanCode,
                               gameplayDurationMinutes: product.gameplayDurationMinutes,
                               categoryId: product.categoryId,

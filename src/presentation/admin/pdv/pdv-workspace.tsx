@@ -97,7 +97,7 @@ export function PdvWorkspace({
   const [lockCreateDialogNumber, setLockCreateDialogNumber] = useState(false);
 
   const selectedComanda = openComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
-  const comandaProducts = products.filter((product) => product.kind !== ProductKind.GAMEPLAY);
+  const comandaProducts = products.filter((product) => product.kind === ProductKind.STANDARD);
   const highestActiveNumber = openComandas.reduce(
     (currentMax, comanda) => Math.max(currentMax, comanda.number),
     DEFAULT_SLOT_COUNT,

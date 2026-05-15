@@ -116,6 +116,10 @@ function getFiscalStatusLabel(status?: string | null) {
     return "NFC-e nao configurada";
   }
 
+  if (normalized === "SERVICE_ONLY") {
+    return "Servico em apuracao NFS-e";
+  }
+
   if (normalized === "ERROR") {
     return "NFC-e com erro";
   }

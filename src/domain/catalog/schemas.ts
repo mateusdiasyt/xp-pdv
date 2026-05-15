@@ -5,6 +5,7 @@ const decimalRegex = /^\d+(\.\d{1,2})?$/;
 const imagePathRegex = /^(https?:\/\/.+|\/.+)$/i;
 const imageDataUrlRegex = /^data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+$/;
 const ncmRegex = /^\d{8}$/;
+const cnaeRegex = /^\d{7}$/;
 
 export const createCategorySchema = z.object({
   name: z.string().min(2, "Nome da categoria obrigatorio"),
@@ -25,7 +26,32 @@ export const createSupplierSchema = z.object({
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 
-const productGameplayFieldsRefinement = (data: { kind: ProductKind; gameplayPlanCode?: string; gameplayDurationMinutes?: number }, context: z.RefinementCtx) => {
+const productFiscalFieldsRefinement = (
+  data: {
+    kind: ProductKind;
+    ncm?: string;
+    serviceCnae?: string;
+    gameplayPlanCode?: string;
+    gameplayDurationMinutes?: number;
+  },
+  context: z.RefinementCtx,
+) => {
+  if (data.kind === ProductKind.STANDARD && !data.ncm?.trim()) {
+    context.addIssue({
+      code: "custom",
+      path: ["ncm"],
+      message: "Informe o NCM fiscal com 8 digitos.",
+    });
+  }
+
+  if (data.kind !== ProductKind.STANDARD && !data.serviceCnae?.trim()) {
+    context.addIssue({
+      code: "custom",
+      path: ["serviceCnae"],
+      message: "Informe o CNAE do servico.",
+    });
+  }
+
   if (data.kind !== ProductKind.GAMEPLAY) {
     return;
   }
@@ -58,7 +84,7 @@ const productSchemaBase = z.object({
 
       return value.replace(/\D/g, "");
     },
-    z.string().regex(ncmRegex, "NCM invalido. Use 8 digitos."),
+    z.string().regex(ncmRegex, "NCM invalido. Use 8 digitos.").optional().or(z.literal("")),
   ),
   description: z.string().max(800).optional().or(z.literal("")),
   imageUrl: z
@@ -73,6 +99,17 @@ const productSchemaBase = z.object({
   categoryId: z.string().min(1, "Categoria obrigatoria"),
   supplierId: z.string().optional().or(z.literal("")),
   kind: z.nativeEnum(ProductKind).default(ProductKind.STANDARD),
+  serviceCnae: z.preprocess(
+    (value) => {
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      return value.replace(/\D/g, "");
+    },
+    z.string().regex(cnaeRegex, "CNAE invalido. Use 7 digitos.").optional().or(z.literal("")),
+  ),
+  serviceDescription: z.string().max(160, "Descricao fiscal do servico muito longa").optional().or(z.literal("")),
   gameplayPlanCode: z.string().max(80, "Codigo do plano muito longo").optional().or(z.literal("")),
   gameplayDurationMinutes: z.preprocess(
     (value) => {
@@ -91,11 +128,11 @@ const productSchemaBase = z.object({
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 
-export const createProductSchema = productSchemaBase.superRefine(productGameplayFieldsRefinement);
+export const createProductSchema = productSchemaBase.superRefine(productFiscalFieldsRefinement);
 
 export const updateProductSchema = productSchemaBase.extend({
   productId: z.string().min(1, "Produto obrigatorio"),
-}).superRefine(productGameplayFieldsRefinement);
+}).superRefine(productFiscalFieldsRefinement);
 
 export const updateProductStatusSchema = z.object({
   productId: z.string().min(1, "Produto obrigatorio"),

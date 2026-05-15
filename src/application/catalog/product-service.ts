@@ -1,4 +1,4 @@
-import { Prisma, RecordStatus } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus } from "@prisma/client";
 
 import { createProductSchema, updateProductSchema, updateProductStatusSchema } from "@/domain/catalog/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
@@ -48,6 +48,8 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
     kind: input.get("kind"),
+    serviceCnae: input.get("serviceCnae"),
+    serviceDescription: input.get("serviceDescription"),
     gameplayPlanCode: input.get("gameplayPlanCode"),
     gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
@@ -57,27 +59,30 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     status: input.get("status"),
   });
 
-  const isGameplay = parsed.kind === "GAMEPLAY";
-  const costPrice = new Prisma.Decimal(isGameplay ? "0.00" : parsed.costPrice);
+  const isServiceLike = parsed.kind !== ProductKind.STANDARD;
+  const isGameplay = parsed.kind === ProductKind.GAMEPLAY;
+  const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
 
   const created = await createProduct({
     name: parsed.name.trim(),
     sku: parsed.sku.trim(),
-    ncm: parsed.ncm,
+    ncm: isServiceLike ? "" : (parsed.ncm ?? ""),
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
-    supplierId: isGameplay ? null : emptyToUndefined(parsed.supplierId),
+    supplierId: isServiceLike ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
+    serviceCnae: isServiceLike ? emptyToUndefined(parsed.serviceCnae) : null,
+    serviceDescription: isServiceLike ? emptyToUndefined(parsed.serviceDescription) : null,
     gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
     gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
     marginPercent,
-    minStock: isGameplay ? 0 : parsed.minStock,
-    currentStock: isGameplay ? 0 : parsed.currentStock,
+    minStock: isServiceLike ? 0 : parsed.minStock,
+    currentStock: isServiceLike ? 0 : parsed.currentStock,
     status: parsed.status,
   });
 
@@ -91,6 +96,8 @@ export async function createProductRecord(input: FormData, actorId?: string) {
       ncm: created.ncm,
       imageUrl: created.imageUrl,
       kind: created.kind,
+      serviceCnae: created.serviceCnae,
+      serviceDescription: created.serviceDescription,
       gameplayPlanCode: created.gameplayPlanCode,
       gameplayDurationMinutes: created.gameplayDurationMinutes,
       categoryId: created.categoryId,
@@ -110,6 +117,8 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
     kind: input.get("kind"),
+    serviceCnae: input.get("serviceCnae"),
+    serviceDescription: input.get("serviceDescription"),
     gameplayPlanCode: input.get("gameplayPlanCode"),
     gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
@@ -119,8 +128,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     status: input.get("status"),
   });
 
-  const isGameplay = parsed.kind === "GAMEPLAY";
-  const costPrice = new Prisma.Decimal(isGameplay ? "0.00" : parsed.costPrice);
+  const isServiceLike = parsed.kind !== ProductKind.STANDARD;
+  const isGameplay = parsed.kind === ProductKind.GAMEPLAY;
+  const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
 
@@ -128,19 +138,21 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     productId: parsed.productId,
     name: parsed.name.trim(),
     sku: parsed.sku.trim(),
-    ncm: parsed.ncm,
+    ncm: isServiceLike ? "" : (parsed.ncm ?? ""),
     description: emptyToUndefined(parsed.description),
     imageUrl: emptyToUndefined(parsed.imageUrl),
     categoryId: parsed.categoryId,
-    supplierId: isGameplay ? null : emptyToUndefined(parsed.supplierId),
+    supplierId: isServiceLike ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
+    serviceCnae: isServiceLike ? emptyToUndefined(parsed.serviceCnae) : null,
+    serviceDescription: isServiceLike ? emptyToUndefined(parsed.serviceDescription) : null,
     gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
     gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
     marginPercent,
-    minStock: isGameplay ? 0 : parsed.minStock,
-    currentStock: isGameplay ? 0 : parsed.currentStock,
+    minStock: isServiceLike ? 0 : parsed.minStock,
+    currentStock: isServiceLike ? 0 : parsed.currentStock,
     status: parsed.status,
   });
 
@@ -154,6 +166,8 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
       ncm: updated.ncm,
       imageUrl: updated.imageUrl,
       kind: updated.kind,
+      serviceCnae: updated.serviceCnae,
+      serviceDescription: updated.serviceDescription,
       gameplayPlanCode: updated.gameplayPlanCode,
       gameplayDurationMinutes: updated.gameplayDurationMinutes,
       categoryId: updated.categoryId,

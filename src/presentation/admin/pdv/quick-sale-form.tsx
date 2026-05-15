@@ -671,6 +671,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                     <Gamepad2 className="h-3.5 w-3.5" />
                                     {product.gameplayDurationMinutes ?? 0} min
                                   </p>
+                                ) : product.kind === ProductKind.SERVICE ? (
+                                  <p className="inline-flex items-center gap-1 text-sky-200">
+                                    <Receipt className="h-3.5 w-3.5" />
+                                    Servico / NFS-e
+                                  </p>
                                 ) : (
                                   <p>{product.currentStock} em estoque</p>
                                 )}
@@ -740,6 +745,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                               <p className="mt-1 inline-flex items-center gap-1 text-xs text-sky-200">
                                 <Gamepad2 className="h-3.5 w-3.5" />
                                 {item.product.gameplayPlanCode} - {item.product.gameplayDurationMinutes ?? 0} min
+                              </p>
+                            ) : item.product.kind === ProductKind.SERVICE ? (
+                              <p className="mt-1 inline-flex items-center gap-1 text-xs text-sky-200">
+                                <Receipt className="h-3.5 w-3.5" />
+                                Servico para apuracao de NFS-e
                               </p>
                             ) : null}
                           </div>

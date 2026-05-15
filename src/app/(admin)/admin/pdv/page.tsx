@@ -91,6 +91,13 @@ function getFiscalStatusPresentation(status?: string | null) {
     };
   }
 
+  if (normalized === "SERVICE_ONLY") {
+    return {
+      label: "NFS-e semanal",
+      className: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100",
+    };
+  }
+
   if (normalized === "ERROR") {
     return {
       label: "Erro",
@@ -404,7 +411,8 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                             ) : null}
                             {canManage &&
                             sale.status === SaleStatus.COMPLETED &&
-                            sale.fiscalStatus !== "AUTHORIZED" ? (
+                            sale.fiscalStatus !== "AUTHORIZED" &&
+                            sale.fiscalStatus !== "SERVICE_ONLY" ? (
                               <form action={retrySaleNfceRequest}>
                                 <input type="hidden" name="saleId" value={sale.id} />
                                 <button

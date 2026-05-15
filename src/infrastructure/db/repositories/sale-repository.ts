@@ -263,6 +263,8 @@ export async function listPdvProductOptions() {
         sku: true,
         imageUrl: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         salePrice: true,
@@ -294,6 +296,8 @@ export async function listPdvProductOptions() {
         name: true,
         sku: true,
         kind: true,
+        serviceCnae: true,
+        serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         salePrice: true,
@@ -467,6 +471,8 @@ async function runCreateSaleWithStockAdjustment(
       sku: true,
       ncm: true,
       kind: true,
+      serviceCnae: true,
+      serviceDescription: true,
       gameplayPlanCode: true,
       gameplayDurationMinutes: true,
       salePrice: true,
@@ -500,7 +506,7 @@ async function runCreateSaleWithStockAdjustment(
       if (!product.gameplayPlanCode || !product.gameplayDurationMinutes) {
         throw new Error(`Produto de gameplay ${product.name} precisa de plano e duracao configurados.`);
       }
-    } else if (product.currentStock < item.quantity) {
+    } else if (product.kind === ProductKind.STANDARD && product.currentStock < item.quantity) {
       throw new Error(`Estoque insuficiente para ${product.name}.`);
     }
 
@@ -584,6 +590,12 @@ async function runCreateSaleWithStockAdjustment(
             productNameSnapshot: product.name,
             skuSnapshot: product.sku,
             ncmSnapshot: product.ncm,
+            productKindSnapshot: product.kind,
+            serviceCnaeSnapshot: product.kind === ProductKind.STANDARD ? null : product.serviceCnae,
+            serviceDescriptionSnapshot:
+              product.kind === ProductKind.STANDARD
+                ? null
+                : product.serviceDescription ?? product.name,
             gameplayStationId:
               product.kind === ProductKind.GAMEPLAY
                 ? resolveGameplayStationId(product, gameplaySelectionMap.get(product.id))
@@ -628,7 +640,7 @@ async function runCreateSaleWithStockAdjustment(
       continue;
     }
 
-    if (product.kind === ProductKind.GAMEPLAY) {
+    if (product.kind !== ProductKind.STANDARD) {
       continue;
     }
 

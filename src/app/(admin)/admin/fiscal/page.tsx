@@ -61,6 +61,13 @@ function getFiscalStatusBadge(status?: string | null) {
     };
   }
 
+  if (normalized === "SERVICE_ONLY") {
+    return {
+      label: "NFS-e semanal",
+      className: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100",
+    };
+  }
+
   if (normalized === "ERROR") {
     return {
       label: "Erro",
@@ -143,6 +150,7 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
                 <option value="REJECTED">Rejeitada</option>
                 <option value="ERROR">Erro</option>
                 <option value="CANCELLED">Cancelada</option>
+                <option value="SERVICE_ONLY">NFS-e semanal</option>
               </select>
             </div>
             <button
@@ -225,12 +233,21 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
                   <TableCell className="text-right">{formatCurrency(Number(sale.totalAmount))}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={`/api/fiscal/sales/${sale.id}/xml`}
-                        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:bg-muted/70"
-                      >
-                        Baixar XML
-                      </a>
+                      {sale.fiscalStatus === "SERVICE_ONLY" ? (
+                        <a
+                          href="/admin/service-fiscal"
+                          className="inline-flex h-8 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 text-[0.8rem] font-medium text-cyan-50 shadow-sm transition-colors hover:bg-cyan-500/20"
+                        >
+                          Ver apuracao
+                        </a>
+                      ) : (
+                        <a
+                          href={`/api/fiscal/sales/${sale.id}/xml`}
+                          className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:bg-muted/70"
+                        >
+                          Baixar XML
+                        </a>
+                      )}
                       {sale.fiscalDanfeUrl ? (
                         <a
                           href={sale.fiscalDanfeUrl}

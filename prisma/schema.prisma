@@ -44,6 +44,7 @@ enum PaymentStatus {
 enum ProductKind {
   STANDARD
   GAMEPLAY
+  SERVICE
 }
 
 enum SaleStatus {
@@ -55,6 +56,11 @@ enum GameplayReleaseStatus {
   LIBERADA
   PENDENTE_ENVIO
   FALHA_ENVIO
+}
+
+enum ServiceDeclarationStatus {
+  DECLARED
+  CANCELLED
 }
 
 enum CustomerDocumentType {
@@ -157,9 +163,10 @@ model User {
   createdMonthlyGoalPlans MonthlyGoalPlan[] @relation("MonthlyGoalPlanCreatedBy")
   openedComandas Comanda[] @relation("ComandaOpenedBy")
   closedComandas Comanda[] @relation("ComandaClosedBy")
-  uploadedStockXmls StockInvoiceXml[] @relation("StockInvoiceXmlUploadedBy")
-  createdSystemUpdates SystemUpdate[] @relation("SystemUpdateCreatedBy")
-  updatedBrandCustomizations BrandCustomization[] @relation("BrandCustomizationUpdatedBy")
+    uploadedStockXmls StockInvoiceXml[] @relation("StockInvoiceXmlUploadedBy")
+    createdSystemUpdates SystemUpdate[] @relation("SystemUpdateCreatedBy")
+    updatedBrandCustomizations BrandCustomization[] @relation("BrandCustomizationUpdatedBy")
+    serviceFiscalDeclarations ServiceFiscalDeclaration[] @relation("ServiceFiscalDeclarationCreatedBy")
 
   @@index([status])
   @@index([roleId])
@@ -220,11 +227,13 @@ model Product {
   sku           String       @unique
   ncm           String?
   description   String?
-  imageUrl      String?
-  kind          ProductKind  @default(STANDARD)
-  gameplayPlanCode String?
-  gameplayDurationMinutes Int?
-  costPrice     Decimal      @db.Decimal(12, 2)
+    imageUrl      String?
+    kind          ProductKind  @default(STANDARD)
+    gameplayPlanCode String?
+    gameplayDurationMinutes Int?
+    serviceCnae   String?
+    serviceDescription String?
+    costPrice     Decimal      @db.Decimal(12, 2)
   salePrice     Decimal      @db.Decimal(12, 2)
   marginPercent Decimal      @default(0) @db.Decimal(5, 2)
   minStock      Int          @default(0)
@@ -245,11 +254,13 @@ model Product {
   comandaItems   ComandaItem[]
 
   @@index([name])
-  @@index([categoryId])
-  @@index([supplierId])
-  @@index([status])
-  @@index([unitId])
-}
+    @@index([categoryId])
+    @@index([supplierId])
+    @@index([status])
+    @@index([kind])
+    @@index([serviceCnae])
+    @@index([unitId])
+  }
 
 model StockMovement {
   id             String            @id @default(cuid())
@@ -483,9 +494,14 @@ model SaleItem {
   saleId              String
   productId           String
   productNameSnapshot String
-  skuSnapshot         String
-  ncmSnapshot         String?
-  gameplayStationId   String?
+    skuSnapshot         String
+    ncmSnapshot         String?
+    productKindSnapshot ProductKind @default(STANDARD)
+    serviceCnaeSnapshot String?
+    serviceDescriptionSnapshot String?
+    serviceDeclarationId String?
+    serviceDeclaredAt   DateTime?
+    gameplayStationId   String?
   gameplayPlanCode    String?
   gameplayDurationMinutes Int?
   quantity            Int
@@ -495,12 +511,40 @@ model SaleItem {
   lineCostTotal       Decimal  @db.Decimal(12, 2)
   createdAt           DateTime @default(now())
 
-  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+    sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+    product Product @relation(fields: [productId], references: [id])
+    serviceDeclaration ServiceFiscalDeclaration? @relation(fields: [serviceDeclarationId], references: [id], onDelete: SetNull)
 
-  @@index([saleId])
-  @@index([productId])
-}
+    @@index([saleId])
+    @@index([productId])
+    @@index([productKindSnapshot])
+    @@index([serviceCnaeSnapshot])
+    @@index([serviceDeclarationId])
+  }
+
+  model ServiceFiscalDeclaration {
+    id                 String                   @id @default(cuid())
+    serviceCnae        String
+    serviceDescription String
+    periodStart        DateTime                 @db.Date
+    periodEnd          DateTime                 @db.Date
+    totalAmount        Decimal                  @db.Decimal(12, 2)
+    itemCount          Int
+    nfseNumber         String?
+    nfseIssuedAt       DateTime?                @db.Date
+    notes              String?
+    status             ServiceDeclarationStatus @default(DECLARED)
+    createdById        String?
+    createdAt          DateTime                 @default(now())
+    updatedAt          DateTime                 @updatedAt
+
+    createdBy User?      @relation("ServiceFiscalDeclarationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    items     SaleItem[]
+
+    @@index([serviceCnae, periodStart, periodEnd])
+    @@index([status])
+    @@index([createdById])
+  }
 
 model GameplayRelease {
   id              String                @id @default(cuid())

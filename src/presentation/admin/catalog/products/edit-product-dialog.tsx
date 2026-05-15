@@ -30,6 +30,8 @@ type EditProductDialogProps = {
     description?: string | null;
     imageUrl?: string | null;
     kind: ProductKind;
+    serviceCnae?: string | null;
+    serviceDescription?: string | null;
     gameplayPlanCode?: string | null;
     gameplayDurationMinutes?: number | null;
     categoryId: string;
@@ -70,6 +72,8 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
               description: product.description,
               imageUrl: product.imageUrl,
               kind: product.kind,
+              serviceCnae: product.serviceCnae,
+              serviceDescription: product.serviceDescription,
               gameplayPlanCode: product.gameplayPlanCode,
               gameplayDurationMinutes: product.gameplayDurationMinutes,
               categoryId: product.categoryId,

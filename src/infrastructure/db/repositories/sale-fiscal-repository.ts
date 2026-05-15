@@ -1,4 +1,4 @@
-import { Prisma, SaleStatus } from "@prisma/client";
+import { Prisma, ProductKind, SaleStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -19,6 +19,7 @@ type SaleFiscalSnapshot = {
     productNameSnapshot: string;
     skuSnapshot: string;
     ncmSnapshot: string | null;
+    productKindSnapshot: ProductKind;
     quantity: number;
     unitPrice: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
@@ -53,6 +54,7 @@ export async function getSaleFiscalSnapshot(saleId: string): Promise<SaleFiscalS
           productNameSnapshot: true,
           skuSnapshot: true,
           ncmSnapshot: true,
+          productKindSnapshot: true,
           quantity: true,
           unitPrice: true,
           lineTotal: true,

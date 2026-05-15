@@ -1,4 +1,4 @@
-import { PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
+import { PaymentMethod, Prisma, ProductKind, SaleStatus } from "@prisma/client";
 
 import { resolveFiscalEnvironment } from "@/application/fiscal/fiscal-configuration-service";
 import {
@@ -177,19 +177,34 @@ function deriveFocusStatus(payload: unknown, httpStatus: number): FiscalSaleStat
 
 function buildPaymentPayload(
   payments: Array<{ method: PaymentMethod; amount: { toString(): string } }>,
+  fiscalTotal?: number,
 ) {
-  return payments.map((payment) => {
+  let remainingAmount = fiscalTotal === undefined ? undefined : Math.max(fiscalTotal, 0);
+
+  return payments.flatMap((payment) => {
+    const paymentAmount = parseMoney(payment.amount);
+    const payloadAmount =
+      remainingAmount === undefined ? paymentAmount : Math.min(paymentAmount, remainingAmount);
+
+    if (payloadAmount <= 0) {
+      return [];
+    }
+
+    if (remainingAmount !== undefined) {
+      remainingAmount -= payloadAmount;
+    }
+
     const paymentCode = paymentMethodToFocusCode[payment.method];
     const payload: Record<string, string> = {
       forma_pagamento: paymentCode,
-      valor_pagamento: toDecimal(parseMoney(payment.amount), 2),
+      valor_pagamento: toDecimal(payloadAmount, 2),
     };
 
     if (paymentCode === "03" || paymentCode === "04") {
       payload.tipo_integracao = "2";
     }
 
-    return payload;
+    return [payload];
   });
 }
 
@@ -331,7 +346,28 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     };
   }
 
-  const hasMissingNcm = snapshot.items.some(
+  const fiscalItems = snapshot.items.filter((item) => item.productKindSnapshot === ProductKind.STANDARD);
+
+  if (fiscalItems.length === 0) {
+    const message =
+      "NFC-e nao emitida: venda composta somente por servicos. Lance esta venda na apuracao semanal de NFS-e municipal.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFSE",
+      fiscalEnvironment: config.environment,
+      fiscalStatus: "SERVICE_ONLY",
+      fiscalMessage: message,
+      fiscalUpdatedAt: new Date(),
+      fiscalErrorAt: null,
+    });
+
+    return {
+      status: "DISABLED" as const,
+      message,
+    };
+  }
+
+  const hasMissingNcm = fiscalItems.some(
     (item) => !String(item.ncmSnapshot ?? "").trim() && !String(config.defaultNcm ?? "").trim(),
   );
 
@@ -354,6 +390,13 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     };
   }
 
+  const saleSubtotal = parseMoney(snapshot.subtotalAmount);
+  const productSubtotal = fiscalItems.reduce((sum, item) => sum + parseMoney(item.lineTotal), 0);
+  const saleDiscount = parseMoney(snapshot.discountAmount);
+  const productDiscount =
+    saleSubtotal > 0 ? Math.min(productSubtotal, saleDiscount * (productSubtotal / saleSubtotal)) : 0;
+  const productTotal = Math.max(productSubtotal - productDiscount, 0);
+
   const payload = {
     cnpj_emitente: config.cnpjEmitente,
     data_emissao: toISOStringWithTimezone(new Date()),
@@ -364,27 +407,32 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     natureza_operacao: config.naturezaOperacao,
     nome_destinatario: snapshot.customerName ?? undefined,
     informacoes_adicionais_contribuinte: config.infoAdicional,
-    valor_produtos: toDecimal(parseMoney(snapshot.subtotalAmount), 2),
-    valor_desconto: toDecimal(parseMoney(snapshot.discountAmount), 2),
-    valor_total: toDecimal(parseMoney(snapshot.totalAmount), 2),
-    items: snapshot.items.map((item, index) => ({
-      numero_item: String(index + 1),
-      codigo_ncm: String(item.ncmSnapshot ?? "").trim() || config.defaultNcm,
-      codigo_produto: item.skuSnapshot || `ITEM-${index + 1}`,
-      descricao: item.productNameSnapshot || `ITEM ${index + 1}`,
-      quantidade_comercial: toDecimal(item.quantity, 4),
-      quantidade_tributavel: toDecimal(item.quantity, 4),
-      cfop: config.defaultCfop,
-      valor_unitario_comercial: toDecimal(parseMoney(item.unitPrice), 4),
-      valor_unitario_tributavel: toDecimal(parseMoney(item.unitPrice), 4),
-      valor_bruto: toDecimal(parseMoney(item.lineTotal), 2),
-      valor_desconto: "0.00",
-      unidade_comercial: config.defaultUnidade,
-      unidade_tributavel: config.defaultUnidade,
-      icms_origem: config.defaultIcmsOrigem,
-      icms_situacao_tributaria: config.defaultIcmsSituacaoTributaria,
-    })),
-    formas_pagamento: buildPaymentPayload(snapshot.payments),
+    valor_produtos: toDecimal(productSubtotal, 2),
+    valor_desconto: toDecimal(productDiscount, 2),
+    valor_total: toDecimal(productTotal, 2),
+    items: fiscalItems.map((item, index) => {
+      const lineTotal = parseMoney(item.lineTotal);
+      const itemDiscount = productSubtotal > 0 ? Math.min(lineTotal, productDiscount * (lineTotal / productSubtotal)) : 0;
+
+      return {
+        numero_item: String(index + 1),
+        codigo_ncm: String(item.ncmSnapshot ?? "").trim() || config.defaultNcm,
+        codigo_produto: item.skuSnapshot || `ITEM-${index + 1}`,
+        descricao: item.productNameSnapshot || `ITEM ${index + 1}`,
+        quantidade_comercial: toDecimal(item.quantity, 4),
+        quantidade_tributavel: toDecimal(item.quantity, 4),
+        cfop: config.defaultCfop,
+        valor_unitario_comercial: toDecimal(parseMoney(item.unitPrice), 4),
+        valor_unitario_tributavel: toDecimal(parseMoney(item.unitPrice), 4),
+        valor_bruto: toDecimal(lineTotal, 2),
+        valor_desconto: toDecimal(itemDiscount, 2),
+        unidade_comercial: config.defaultUnidade,
+        unidade_tributavel: config.defaultUnidade,
+        icms_origem: config.defaultIcmsOrigem,
+        icms_situacao_tributaria: config.defaultIcmsSituacaoTributaria,
+      };
+    }),
+    formas_pagamento: buildPaymentPayload(snapshot.payments, productTotal),
   };
 
   const { httpStatus, payload: focusPayload } = await requestFocusNfce(config, fiscalReference, payload);

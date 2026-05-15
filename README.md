@@ -221,6 +221,26 @@ Nova aba `Admin > Fiscal`:
 - mostra chave, numero/serie e status fiscal de cada venda;
 - permite baixar XML da NFC-e por venda via rota segura do sistema (`/api/fiscal/sales/[saleId]/xml`), sem expor token da Focus no navegador.
 
+## Apuracao semanal de servicos (NFS-e municipal)
+
+Servicos como PS5, simulador e sinuca nao entram na NFC-e de produtos. Eles ficam separados para emissao manual de NFS-e no portal da Prefeitura/GestaoISS.
+
+Fluxo operacional:
+
+1. Cadastre o produto como `Gameplay` ou `Servico manual`.
+2. Informe o CNAE correto:
+   - `9329804` para jogos eletronicos recreativos.
+   - `9329803` para sinuca, bilhar e similares.
+3. Venda normalmente no PDV, inclusive junto com produtos fisicos.
+4. O sistema emite NFC-e apenas para os produtos fisicos da venda.
+5. O valor dos servicos aparece em `Admin > NFS-e Servicos`, separado por CNAE e periodo.
+6. Ao fim da semana, emita a NFS-e no portal `https://fozdoiguacupr.gestaoiss.com.br/`.
+7. Depois de emitir, informe o numero da NFS-e no painel para marcar aqueles servicos como apurados.
+
+Observacao fiscal:
+- O sistema registra e separa os valores para facilitar a contabilidade, mas a emissao da NFS-e continua sendo feita no portal municipal.
+- A venda mista fica com dois tratamentos: produtos na NFC-e e servicos na apuracao semanal de NFS-e.
+
 ## Modulos implementados na fundacao
 
 - Dashboard administrativo base

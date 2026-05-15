@@ -6,6 +6,7 @@ import {
   ContactRound,
   CreditCard,
   FileCode2,
+  FileCheck2,
   Gamepad2,
   Receipt,
   LineChart,
@@ -62,6 +63,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "Fiscal",
     href: "/admin/fiscal",
     icon: FileCode2,
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+  },
+  {
+    label: "NFS-e Servicos",
+    href: "/admin/service-fiscal",
+    icon: FileCheck2,
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
   {
