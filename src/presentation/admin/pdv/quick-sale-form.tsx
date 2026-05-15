@@ -29,6 +29,7 @@ import { FormSubmitButton } from "@/components/admin/form-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
 import { initialActionState } from "@/presentation/admin/common/action-state";
 import { closeQuickSaleAction } from "@/presentation/admin/pdv/actions";
@@ -76,7 +77,17 @@ type PaymentLine = {
   id: number;
   method: PaymentMethod;
   amount: string;
+  approvedAmount?: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  nsu?: string;
+  authorizationCode?: string;
+  terminalId?: string;
+  externalTransactionId?: string;
+  receiptText?: string;
 };
+
+type PaymentLineField = Exclude<keyof PaymentLine, "id">;
 
 type CartLine = {
   productId: string;
@@ -95,6 +106,14 @@ const paymentLabels: Record<PaymentMethod, string> = {
   CREDIT_CARD: "Cartao de credito",
   DEBIT_CARD: "Cartao de debito",
 };
+
+function isCardPayment(method: PaymentMethod) {
+  return method === PaymentMethod.CREDIT_CARD || method === PaymentMethod.DEBIT_CARD;
+}
+
+function isTraceablePayment(method: PaymentMethod) {
+  return method === PaymentMethod.PIX || isCardPayment(method);
+}
 
 const gameplayStations = [
   { id: "tv-01", label: "TV 01 - PS5" },
@@ -382,7 +401,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     });
   }
 
-  function updatePaymentLine(id: number, field: "method" | "amount", value: string) {
+  function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
     setPaymentLines((currentLines) =>
       currentLines.map((line) =>
         line.id === id
@@ -805,53 +824,187 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
               </div>
 
               <div className="space-y-3">
-                {paymentLines.map((paymentLine) => (
-                  <div key={paymentLine.id} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
-                    <div className="space-y-2">
-                      <Label htmlFor={`quick-payment-method-${paymentLine.id}`}>Metodo</Label>
-                      <select
-                        id={`quick-payment-method-${paymentLine.id}`}
-                        name="paymentMethod"
-                        className="admin-native-select"
-                        value={paymentLine.method}
-                        onChange={(event) => updatePaymentLine(paymentLine.id, "method", event.target.value)}
-                        required
-                      >
-                        {Object.values(PaymentMethod).map((method) => (
-                          <option key={method} value={method}>
-                            {paymentLabels[method]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {paymentLines.map((paymentLine) => {
+                  const traceablePayment = isTraceablePayment(paymentLine.method);
+                  const cardPayment = isCardPayment(paymentLine.method);
 
-                    <div className="space-y-2">
-                      <Label htmlFor={`quick-payment-amount-${paymentLine.id}`}>
-                        {paymentLine.method === PaymentMethod.CASH ? "Valor recebido (R$)" : "Valor (R$)"}
-                      </Label>
-                      <Input
-                        id={`quick-payment-amount-${paymentLine.id}`}
-                        name="paymentAmount"
-                        value={paymentLine.amount}
-                        onChange={(event) => updatePaymentLine(paymentLine.id, "amount", event.target.value)}
-                        placeholder="0.00"
-                        required
-                      />
-                    </div>
+                  return (
+                    <div key={paymentLine.id} className="rounded-[1.15rem] border border-border/70 bg-background/30 p-3">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
+                        <div className="space-y-2">
+                          <Label htmlFor={`quick-payment-method-${paymentLine.id}`}>Metodo</Label>
+                          <select
+                            id={`quick-payment-method-${paymentLine.id}`}
+                            name="paymentMethod"
+                            className="admin-native-select"
+                            value={paymentLine.method}
+                            onChange={(event) => updatePaymentLine(paymentLine.id, "method", event.target.value)}
+                            required
+                          >
+                            {Object.values(PaymentMethod).map((method) => (
+                              <option key={method} value={method}>
+                                {paymentLabels[method]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full border border-border/70"
-                      onClick={() => removePaymentLine(paymentLine.id)}
-                      disabled={paymentLines.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remover forma de pagamento</span>
-                    </Button>
-                  </div>
-                ))}
+                        <div className="space-y-2">
+                          <Label htmlFor={`quick-payment-amount-${paymentLine.id}`}>
+                            {paymentLine.method === PaymentMethod.CASH ? "Valor recebido (R$)" : "Valor (R$)"}
+                          </Label>
+                          <Input
+                            id={`quick-payment-amount-${paymentLine.id}`}
+                            name="paymentAmount"
+                            value={paymentLine.amount}
+                            onChange={(event) => updatePaymentLine(paymentLine.id, "amount", event.target.value)}
+                            placeholder="0.00"
+                            required
+                          />
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="rounded-full border border-border/70"
+                          onClick={() => removePaymentLine(paymentLine.id)}
+                          disabled={paymentLines.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Remover forma de pagamento</span>
+                        </Button>
+                      </div>
+
+                      {traceablePayment ? (
+                        <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            Auditoria da transacao
+                          </p>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="space-y-2">
+                              <Label htmlFor={`quick-payment-approved-${paymentLine.id}`}>Valor aprovado (R$)</Label>
+                              <Input
+                                id={`quick-payment-approved-${paymentLine.id}`}
+                                name="paymentApprovedAmount"
+                                value={paymentLine.approvedAmount ?? ""}
+                                onChange={(event) =>
+                                  updatePaymentLine(paymentLine.id, "approvedAmount", event.target.value)
+                                }
+                                placeholder={paymentLine.amount || "0.00"}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`quick-payment-nsu-${paymentLine.id}`}>NSU / ID Pix</Label>
+                              <Input
+                                id={`quick-payment-nsu-${paymentLine.id}`}
+                                name="paymentNsu"
+                                value={paymentLine.nsu ?? ""}
+                                onChange={(event) => updatePaymentLine(paymentLine.id, "nsu", event.target.value)}
+                                placeholder="Ex.: 123456"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`quick-payment-auth-${paymentLine.id}`}>Autorizacao</Label>
+                              <Input
+                                id={`quick-payment-auth-${paymentLine.id}`}
+                                name="paymentAuthorizationCode"
+                                value={paymentLine.authorizationCode ?? ""}
+                                onChange={(event) =>
+                                  updatePaymentLine(paymentLine.id, "authorizationCode", event.target.value)
+                                }
+                                placeholder="Codigo da maquininha"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`quick-payment-terminal-${paymentLine.id}`}>Maquininha</Label>
+                              <Input
+                                id={`quick-payment-terminal-${paymentLine.id}`}
+                                name="paymentTerminalId"
+                                value={paymentLine.terminalId ?? ""}
+                                onChange={(event) =>
+                                  updatePaymentLine(paymentLine.id, "terminalId", event.target.value)
+                                }
+                                placeholder="Ex.: SICOOB-01"
+                              />
+                            </div>
+                            {cardPayment ? (
+                              <>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`quick-payment-brand-${paymentLine.id}`}>Bandeira</Label>
+                                  <Input
+                                    id={`quick-payment-brand-${paymentLine.id}`}
+                                    name="paymentCardBrand"
+                                    value={paymentLine.cardBrand ?? ""}
+                                    onChange={(event) =>
+                                      updatePaymentLine(paymentLine.id, "cardBrand", event.target.value)
+                                    }
+                                    placeholder="Visa, Master..."
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`quick-payment-last4-${paymentLine.id}`}>Final do cartao</Label>
+                                  <Input
+                                    id={`quick-payment-last4-${paymentLine.id}`}
+                                    name="paymentCardLast4"
+                                    value={paymentLine.cardLast4 ?? ""}
+                                    onChange={(event) =>
+                                      updatePaymentLine(paymentLine.id, "cardLast4", event.target.value)
+                                    }
+                                    placeholder="0000"
+                                    inputMode="numeric"
+                                    maxLength={4}
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <input type="hidden" name="paymentCardBrand" value="" />
+                                <input type="hidden" name="paymentCardLast4" value="" />
+                              </>
+                            )}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor={`quick-payment-external-${paymentLine.id}`}>ID unico da transacao</Label>
+                              <Input
+                                id={`quick-payment-external-${paymentLine.id}`}
+                                name="paymentExternalTransactionId"
+                                value={paymentLine.externalTransactionId ?? ""}
+                                onChange={(event) =>
+                                  updatePaymentLine(paymentLine.id, "externalTransactionId", event.target.value)
+                                }
+                                placeholder="ID do TEF, Pix ou comprovante"
+                              />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor={`quick-payment-receipt-${paymentLine.id}`}>Comprovante / observacao</Label>
+                              <Textarea
+                                id={`quick-payment-receipt-${paymentLine.id}`}
+                                name="paymentReceiptText"
+                                value={paymentLine.receiptText ?? ""}
+                                onChange={(event) =>
+                                  updatePaymentLine(paymentLine.id, "receiptText", event.target.value)
+                                }
+                                rows={2}
+                                placeholder="Opcional: cole dados do comprovante"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <input type="hidden" name="paymentApprovedAmount" value="" />
+                          <input type="hidden" name="paymentCardBrand" value="" />
+                          <input type="hidden" name="paymentCardLast4" value="" />
+                          <input type="hidden" name="paymentNsu" value="" />
+                          <input type="hidden" name="paymentAuthorizationCode" value="" />
+                          <input type="hidden" name="paymentTerminalId" value="" />
+                          <input type="hidden" name="paymentExternalTransactionId" value="" />
+                          <input type="hidden" name="paymentReceiptText" value="" />
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <input type="hidden" name="cashReceived" value="" />

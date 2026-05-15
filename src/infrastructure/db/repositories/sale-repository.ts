@@ -1,6 +1,7 @@
 import {
   CashSessionStatus,
   PaymentMethod,
+  PaymentStatus,
   Prisma,
   ProductKind,
   RecordStatus,
@@ -15,9 +16,19 @@ type SaleItemInput = {
   quantity: number;
 };
 
-type SalePaymentInput = {
+export type SalePaymentInput = {
   method: PaymentMethod;
   amount: Prisma.Decimal;
+  approvedAmount?: Prisma.Decimal;
+  cardBrand?: string;
+  cardLast4?: string;
+  nsu?: string;
+  authorizationCode?: string;
+  terminalId?: string;
+  externalTransactionId?: string;
+  receiptText?: string;
+  auditNote?: string;
+  processedAt?: Date;
 };
 
 type GameplaySelectionInput = {
@@ -77,6 +88,129 @@ function inferGameplayStationIdFromProduct(product: GameplayStationProductData) 
 
 function resolveGameplayStationId(product: GameplayStationProductData, selectedStationId?: string | null) {
   return inferGameplayStationIdFromProduct(product) ?? selectedStationId?.trim().toLowerCase() ?? null;
+}
+
+function normalizeOptionalPaymentText(value?: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function paymentAuditKeys(payment: SalePaymentInput) {
+  const keys: string[] = [];
+  const nsu = normalizeOptionalPaymentText(payment.nsu);
+  const externalTransactionId = normalizeOptionalPaymentText(payment.externalTransactionId);
+  const authorizationCode = normalizeOptionalPaymentText(payment.authorizationCode);
+  const terminalId = normalizeOptionalPaymentText(payment.terminalId);
+
+  if (externalTransactionId) {
+    keys.push(`external:${externalTransactionId.toLowerCase()}`);
+  }
+
+  if (nsu) {
+    keys.push(`nsu:${(terminalId ?? "sem-terminal").toLowerCase()}:${nsu.toLowerCase()}`);
+  }
+
+  if (authorizationCode && terminalId) {
+    keys.push(`auth:${terminalId.toLowerCase()}:${authorizationCode.toLowerCase()}`);
+  }
+
+  return keys;
+}
+
+function assertSubmittedPaymentsAreUnique(payments: SalePaymentInput[]) {
+  const seenKeys = new Set<string>();
+
+  for (const payment of payments) {
+    for (const key of paymentAuditKeys(payment)) {
+      if (seenKeys.has(key)) {
+        throw new Error("Pagamento duplicado na mesma venda. Confira NSU/autorizacao e contate o Mateus.");
+      }
+
+      seenKeys.add(key);
+    }
+  }
+}
+
+function assertApprovedAmountMatchesPayment(payment: SalePaymentInput) {
+  if (!payment.approvedAmount) {
+    return;
+  }
+
+  const tolerance = new Prisma.Decimal("0.01");
+  const difference = payment.approvedAmount.minus(payment.amount).abs();
+
+  if (difference.greaterThan(tolerance)) {
+    throw new Error(
+      "Valor aprovado na maquininha/Pix diferente do valor lancado no sistema. Confira antes de fechar. Contate o Mateus.",
+    );
+  }
+}
+
+function getPaymentStatus(payment: SalePaymentInput) {
+  if (!payment.approvedAmount) {
+    return PaymentStatus.APPROVED;
+  }
+
+  const tolerance = new Prisma.Decimal("0.01");
+  return payment.approvedAmount.minus(payment.amount).abs().greaterThan(tolerance)
+    ? PaymentStatus.DIVERGENT
+    : PaymentStatus.APPROVED;
+}
+
+async function assertPaymentNotPreviouslyRecorded(tx: PrismaTx, payment: SalePaymentInput) {
+  const duplicateFilters: Prisma.PaymentWhereInput[] = [];
+  const nsu = normalizeOptionalPaymentText(payment.nsu);
+  const externalTransactionId = normalizeOptionalPaymentText(payment.externalTransactionId);
+  const authorizationCode = normalizeOptionalPaymentText(payment.authorizationCode);
+  const terminalId = normalizeOptionalPaymentText(payment.terminalId);
+
+  if (externalTransactionId) {
+    duplicateFilters.push({ externalTransactionId });
+  }
+
+  if (nsu) {
+    duplicateFilters.push(terminalId ? { nsu, terminalId } : { nsu });
+  }
+
+  if (authorizationCode && terminalId) {
+    duplicateFilters.push({ authorizationCode, terminalId });
+  }
+
+  if (duplicateFilters.length === 0) {
+    return;
+  }
+
+  const duplicatePayment = await tx.payment.findFirst({
+    where: {
+      OR: duplicateFilters,
+      sale: {
+        status: SaleStatus.COMPLETED,
+      },
+    },
+    select: {
+      id: true,
+      sale: {
+        select: {
+          saleNumber: true,
+        },
+      },
+    },
+  });
+
+  if (duplicatePayment) {
+    throw new Error(
+      `Pagamento possivelmente duplicado. Esta transacao ja aparece na venda ${duplicatePayment.sale.saleNumber}. Contate o Mateus.`,
+    );
+  }
+}
+
+async function assertPaymentsAuditConsistency(tx: PrismaTx, payments: SalePaymentInput[]) {
+  assertSubmittedPaymentsAreUnique(payments);
+
+  for (const payment of payments) {
+    assertApprovedAmountMatchesPayment(payment);
+    await assertPaymentNotPreviouslyRecorded(tx, payment);
+  }
 }
 
 function isRetryableTransactionError(error: unknown) {
@@ -422,9 +556,12 @@ async function runCreateSaleWithStockAdjustment(
       normalizedPayments.push({
         method: PaymentMethod.CASH,
         amount: remainingForCash,
+        processedAt: new Date(),
       });
     }
   }
+
+  await assertPaymentsAuditConsistency(tx, normalizedPayments);
 
   const sale = await tx.sale.create({
     data: {
@@ -466,6 +603,17 @@ async function runCreateSaleWithStockAdjustment(
         create: normalizedPayments.map((payment) => ({
           method: payment.method,
           amount: payment.amount,
+          status: getPaymentStatus(payment),
+          approvedAmount: payment.approvedAmount,
+          cardBrand: normalizeOptionalPaymentText(payment.cardBrand),
+          cardLast4: normalizeOptionalPaymentText(payment.cardLast4),
+          nsu: normalizeOptionalPaymentText(payment.nsu),
+          authorizationCode: normalizeOptionalPaymentText(payment.authorizationCode),
+          terminalId: normalizeOptionalPaymentText(payment.terminalId),
+          externalTransactionId: normalizeOptionalPaymentText(payment.externalTransactionId),
+          receiptText: normalizeOptionalPaymentText(payment.receiptText),
+          auditNote: normalizeOptionalPaymentText(payment.auditNote),
+          processedAt: payment.processedAt ?? new Date(),
         })),
       },
     },

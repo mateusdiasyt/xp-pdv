@@ -67,14 +67,43 @@ function parseItems(formData: FormData) {
   return items.map((item) => saleItemSchema.parse(item));
 }
 
+function formDataList(formData: FormData, key: string) {
+  return formData.getAll(key).map((value) => String(value));
+}
+
+function valueAt(values: string[], index: number) {
+  return values[index] ?? "";
+}
+
+function parseOptionalDecimalInput(value?: string) {
+  const normalized = emptyToUndefined(value);
+  return normalized ? parseDecimalInput(normalized) : undefined;
+}
+
 function parsePayments(formData: FormData) {
-  const methods = formData.getAll("paymentMethod").map((value) => String(value));
-  const amounts = formData.getAll("paymentAmount").map((value) => String(value));
+  const methods = formDataList(formData, "paymentMethod");
+  const amounts = formDataList(formData, "paymentAmount");
+  const approvedAmounts = formDataList(formData, "paymentApprovedAmount");
+  const cardBrands = formDataList(formData, "paymentCardBrand");
+  const cardLast4Values = formDataList(formData, "paymentCardLast4");
+  const nsuValues = formDataList(formData, "paymentNsu");
+  const authorizationCodes = formDataList(formData, "paymentAuthorizationCode");
+  const terminalIds = formDataList(formData, "paymentTerminalId");
+  const externalTransactionIds = formDataList(formData, "paymentExternalTransactionId");
+  const receiptTexts = formDataList(formData, "paymentReceiptText");
 
   const payments = methods
     .map((method, index) => ({
       method,
       amount: amounts[index] ?? "0",
+      approvedAmount: valueAt(approvedAmounts, index),
+      cardBrand: valueAt(cardBrands, index),
+      cardLast4: valueAt(cardLast4Values, index),
+      nsu: valueAt(nsuValues, index),
+      authorizationCode: valueAt(authorizationCodes, index),
+      terminalId: valueAt(terminalIds, index),
+      externalTransactionId: valueAt(externalTransactionIds, index),
+      receiptText: valueAt(receiptTexts, index),
     }))
     .filter((payment) => payment.method && payment.amount);
 
@@ -86,6 +115,14 @@ function parsePayments(formData: FormData) {
     const parsed = salePaymentSchema.parse({
       method: payment.method as PaymentMethod,
       amount: payment.amount,
+      approvedAmount: payment.approvedAmount,
+      cardBrand: payment.cardBrand,
+      cardLast4: payment.cardLast4,
+      nsu: payment.nsu,
+      authorizationCode: payment.authorizationCode,
+      terminalId: payment.terminalId,
+      externalTransactionId: payment.externalTransactionId,
+      receiptText: payment.receiptText,
     });
 
     const decimalAmount = parseDecimalInput(parsed.amount);
@@ -96,6 +133,15 @@ function parsePayments(formData: FormData) {
     return {
       method: parsed.method,
       amount: decimalAmount,
+      approvedAmount: parseOptionalDecimalInput(parsed.approvedAmount),
+      cardBrand: emptyToUndefined(parsed.cardBrand),
+      cardLast4: emptyToUndefined(parsed.cardLast4),
+      nsu: emptyToUndefined(parsed.nsu),
+      authorizationCode: emptyToUndefined(parsed.authorizationCode),
+      terminalId: emptyToUndefined(parsed.terminalId),
+      externalTransactionId: emptyToUndefined(parsed.externalTransactionId),
+      receiptText: emptyToUndefined(parsed.receiptText),
+      processedAt: new Date(),
     };
   });
 }

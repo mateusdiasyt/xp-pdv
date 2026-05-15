@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { SaleStatus } from "@prisma/client";
+import { PaymentMethod, PaymentStatus, SaleStatus } from "@prisma/client";
 
 import { requirePermission } from "@/application/auth/guards";
 import { getPdvData, getSaleReceiptData } from "@/application/pdv/pdv-service";
@@ -26,6 +26,32 @@ const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+const paymentLabels: Record<PaymentMethod, string> = {
+  CASH: "Dinheiro",
+  PIX: "Pix",
+  CREDIT_CARD: "Credito",
+  DEBIT_CARD: "Debito",
+};
+
+function formatPaymentAudit(payment: {
+  method: PaymentMethod;
+  amount: { toString(): string };
+  status: PaymentStatus;
+  nsu?: string | null;
+  authorizationCode?: string | null;
+  externalTransactionId?: string | null;
+}) {
+  const identifiers = [
+    payment.nsu ? `NSU ${payment.nsu}` : null,
+    payment.authorizationCode ? `Aut. ${payment.authorizationCode}` : null,
+    payment.externalTransactionId ? `ID ${payment.externalTransactionId}` : null,
+  ].filter(Boolean);
+
+  const statusLabel = payment.status === PaymentStatus.DIVERGENT ? "Divergente" : null;
+
+  return [paymentLabels[payment.method], statusLabel, ...identifiers].filter(Boolean).join(" - ");
+}
 
 function getFiscalStatusPresentation(status?: string | null) {
   const normalized = (status ?? "").trim().toUpperCase();
@@ -272,6 +298,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fiscal</TableHead>
+                  <TableHead>Pagamento</TableHead>
                   <TableHead>Gameplay</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Total (R$)</TableHead>
@@ -281,7 +308,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
               <TableBody>
                 {sales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center text-sm text-muted-foreground">
                       Nenhuma venda registrada.
                     </TableCell>
                   </TableRow>
@@ -289,7 +316,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                 {groupedSales.map((group) => (
                   <Fragment key={`group-fragment-${group.dateKey}`}>
                     <TableRow key={`group-${group.dateKey}`} className="bg-muted/20">
-                      <TableCell colSpan={10} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <TableCell colSpan={11} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {group.dateLabel}
                       </TableCell>
                     </TableRow>
@@ -323,6 +350,22 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                                 {sale.fiscalAccessKey}
                               </p>
                             ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {sale.payments.map((payment) => (
+                              <p
+                                key={payment.id}
+                                className={
+                                  payment.status === PaymentStatus.DIVERGENT
+                                    ? "text-xs font-semibold text-rose-300"
+                                    : "text-xs text-muted-foreground"
+                                }
+                              >
+                                {formatPaymentAudit(payment)}
+                              </p>
+                            ))}
                           </div>
                         </TableCell>
                         <TableCell>

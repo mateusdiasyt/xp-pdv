@@ -109,6 +109,19 @@ export const saleItemSchema = z.object({
 export const salePaymentSchema = z.object({
   method: z.nativeEnum(PaymentMethod),
   amount: z.string().regex(decimalRegex, "Valor de pagamento invalido"),
+  approvedAmount: z.string().regex(decimalRegex, "Valor aprovado invalido").optional().or(z.literal("")),
+  cardBrand: z.string().trim().max(40, "Bandeira muito longa").optional().or(z.literal("")),
+  cardLast4: z
+    .string()
+    .trim()
+    .regex(/^\d{0,4}$/, "Ultimos digitos do cartao invalidos")
+    .optional()
+    .or(z.literal("")),
+  nsu: z.string().trim().max(80, "NSU muito longo").optional().or(z.literal("")),
+  authorizationCode: z.string().trim().max(80, "Codigo de autorizacao muito longo").optional().or(z.literal("")),
+  terminalId: z.string().trim().max(80, "Identificacao da maquininha muito longa").optional().or(z.literal("")),
+  externalTransactionId: z.string().trim().max(120, "ID da transacao muito longo").optional().or(z.literal("")),
+  receiptText: z.string().trim().max(1000, "Comprovante muito longo").optional().or(z.literal("")),
 });
 
 export const cancelSaleSchema = z.object({

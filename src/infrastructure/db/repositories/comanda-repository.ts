@@ -1,7 +1,10 @@
 import { ComandaStatus, Prisma, RecordStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { createSaleWithStockAdjustmentInTransaction } from "@/infrastructure/db/repositories/sale-repository";
+import {
+  createSaleWithStockAdjustmentInTransaction,
+  type SalePaymentInput,
+} from "@/infrastructure/db/repositories/sale-repository";
 
 const PDV_TRANSACTION_OPTIONS = {
   maxWait: 20_000,
@@ -501,10 +504,7 @@ export async function cancelComanda(data: {
 export async function closeComandaWithSale(data: {
   comandaId: string;
   cashSessionId: string;
-  payments: Array<{
-    method: import("@prisma/client").PaymentMethod;
-    amount: Prisma.Decimal;
-  }>;
+  payments: SalePaymentInput[];
   discountAmount: Prisma.Decimal;
   operatorId: string;
   saleNumber: string;
