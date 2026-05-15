@@ -37,6 +37,7 @@ import {
   listPdvOpenSessions,
   listPdvProductOptions,
   listRecentSales,
+  resolveGameplayStationIdsForSelections,
 } from "@/infrastructure/db/repositories/sale-repository";
 
 function createSaleNumber() {
@@ -114,7 +115,7 @@ function parseGameplaySelections(formData: FormData) {
 async function assertGameplayStationsAvailable(
   gameplaySelections: Array<{ productId: string; stationId: string }>,
 ) {
-  const stationIds = [...new Set(gameplaySelections.map((selection) => selection.stationId).filter(Boolean))];
+  const stationIds = await resolveGameplayStationIdsForSelections(gameplaySelections);
 
   if (stationIds.length === 0) {
     return;

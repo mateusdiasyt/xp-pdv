@@ -189,6 +189,33 @@ function getCategoryIcon(slug: string, name: string) {
   return Package2;
 }
 
+function inferGameplayStationId(product?: ProductOption | null) {
+  const source = `${product?.name ?? ""} ${product?.gameplayPlanCode ?? ""}`.toLowerCase();
+
+  if (
+    source.includes("tv 02") ||
+    source.includes("tv-02") ||
+    source.includes("simulador") ||
+    source.includes("simulator") ||
+    source.includes("corrida") ||
+    source.includes("racing")
+  ) {
+    return "tv-02";
+  }
+
+  if (
+    source.includes("tv 01") ||
+    source.includes("tv-01") ||
+    source.includes("ps5") ||
+    source.includes("playstation") ||
+    source.includes("play station")
+  ) {
+    return "tv-01";
+  }
+
+  return defaultGameplayStationId;
+}
+
 function ProductCardMedia({
   name,
   imageUrl,
@@ -311,7 +338,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     if (product?.kind === ProductKind.GAMEPLAY) {
       setStationByProduct((currentMap) => ({
         ...currentMap,
-        [productId]: currentMap[productId] ?? defaultGameplayStationId,
+        [productId]: currentMap[productId] ?? inferGameplayStationId(product),
       }));
     }
 
@@ -435,7 +462,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                 <input
                   type="hidden"
                   name="gameplayStationId"
-                  value={stationByProduct[item.productId] ?? defaultGameplayStationId}
+                  value={stationByProduct[item.productId] ?? inferGameplayStationId(item.product)}
                 />
               </div>
             ))}
@@ -732,7 +759,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                 <select
                                   id={`quick-gameplay-station-${item.productId}`}
                                   className="admin-native-select pl-9"
-                                  value={stationByProduct[item.productId] ?? defaultGameplayStationId}
+                                  value={stationByProduct[item.productId] ?? inferGameplayStationId(item.product)}
                                   onChange={(event) =>
                                     setStationByProduct((currentMap) => ({
                                       ...currentMap,

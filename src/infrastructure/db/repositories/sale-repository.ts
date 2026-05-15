@@ -43,6 +43,42 @@ const PDV_TRANSACTION_OPTIONS = {
   timeout: 40_000,
 };
 
+type GameplayStationProductData = {
+  name: string;
+  gameplayPlanCode: string | null;
+};
+
+function inferGameplayStationIdFromProduct(product: GameplayStationProductData) {
+  const source = `${product.name} ${product.gameplayPlanCode ?? ""}`.toLowerCase();
+
+  if (
+    source.includes("tv 02") ||
+    source.includes("tv-02") ||
+    source.includes("simulador") ||
+    source.includes("simulator") ||
+    source.includes("corrida") ||
+    source.includes("racing")
+  ) {
+    return "tv-02";
+  }
+
+  if (
+    source.includes("tv 01") ||
+    source.includes("tv-01") ||
+    source.includes("ps5") ||
+    source.includes("playstation") ||
+    source.includes("play station")
+  ) {
+    return "tv-01";
+  }
+
+  return null;
+}
+
+function resolveGameplayStationId(product: GameplayStationProductData, selectedStationId?: string | null) {
+  return inferGameplayStationIdFromProduct(product) ?? selectedStationId?.trim().toLowerCase() ?? null;
+}
+
 function isRetryableTransactionError(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return error.code === "P2028";
@@ -242,6 +278,34 @@ export async function getSaleReceiptById(saleId: string) {
   });
 }
 
+export async function resolveGameplayStationIdsForSelections(selections: GameplaySelectionInput[]) {
+  const productIds = [...new Set(selections.map((selection) => selection.productId).filter(Boolean))];
+
+  if (productIds.length === 0) {
+    return [];
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: productIds },
+      kind: ProductKind.GAMEPLAY,
+    },
+    select: {
+      id: true,
+      name: true,
+      gameplayPlanCode: true,
+    },
+  });
+  const selectionMap = new Map(
+    selections.map((selection) => [selection.productId, selection.stationId.trim().toLowerCase()]),
+  );
+  const stationIds = products
+    .map((product) => resolveGameplayStationId(product, selectionMap.get(product.id)))
+    .filter(Boolean) as string[];
+
+  return [...new Set(stationIds)];
+}
+
 async function runCreateSaleWithStockAdjustment(
   tx: PrismaTx,
   data: CreateSaleWithStockAdjustmentInput,
@@ -294,7 +358,7 @@ async function runCreateSaleWithStockAdjustment(
     }
 
     if (product.kind === ProductKind.GAMEPLAY) {
-      const stationId = gameplaySelectionMap.get(product.id);
+      const stationId = resolveGameplayStationId(product, gameplaySelectionMap.get(product.id));
       if (!stationId) {
         throw new Error(`Selecione a TV/estacao para o gameplay ${product.name}.`);
       }
@@ -384,7 +448,9 @@ async function runCreateSaleWithStockAdjustment(
             skuSnapshot: product.sku,
             ncmSnapshot: product.ncm,
             gameplayStationId:
-              product.kind === ProductKind.GAMEPLAY ? gameplaySelectionMap.get(product.id) ?? null : null,
+              product.kind === ProductKind.GAMEPLAY
+                ? resolveGameplayStationId(product, gameplaySelectionMap.get(product.id))
+                : null,
             gameplayPlanCode: product.kind === ProductKind.GAMEPLAY ? product.gameplayPlanCode : null,
             gameplayDurationMinutes:
               product.kind === ProductKind.GAMEPLAY ? product.gameplayDurationMinutes : null,
