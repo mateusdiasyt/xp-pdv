@@ -91,6 +91,21 @@ function parseXmlNumber(rawValue?: string) {
   return parsedValue;
 }
 
+function inferSellableUnitMultiplier(description: string) {
+  const normalizedDescription = description.toUpperCase();
+  const packageMatch = normalizedDescription.match(/\b(\d{1,3})\s*X\s*(\d{1,3})\s*UN\b/);
+
+  if (!packageMatch) {
+    return 1;
+  }
+
+  const firstPackQuantity = Number(packageMatch[1]);
+  const secondPackQuantity = Number(packageMatch[2]);
+  const multiplier = firstPackQuantity * secondPackQuantity;
+
+  return Number.isInteger(multiplier) && multiplier > 1 ? multiplier : 1;
+}
+
 function parseXmlDate(rawValue?: string) {
   if (!rawValue) {
     return undefined;
@@ -128,10 +143,21 @@ function parseStockInvoiceItems(rawXml: string) {
       );
     }
 
+    const sellableUnitMultiplier = inferSellableUnitMultiplier(description);
+    const quantity = rawQuantity * sellableUnitMultiplier;
+
+    if (!Number.isInteger(quantity)) {
+      throw new Error(
+        `O item "${description}" resultou em quantidade fracionada (${quantity}). Ajuste manualmente antes de importar.`,
+      );
+    }
+
     const lineTotal = parseXmlDecimal(extractTagValue(productBlock, "vProd"), 2);
+    const commercialUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 2);
     const unitCost =
-      parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 2) ??
-      (lineTotal ? lineTotal.dividedBy(rawQuantity).toDecimalPlaces(2) : undefined);
+      (commercialUnitCost
+        ? commercialUnitCost.dividedBy(sellableUnitMultiplier).toDecimalPlaces(2)
+        : undefined) ?? (lineTotal ? lineTotal.dividedBy(quantity).toDecimalPlaces(2) : undefined);
 
     if (!unitCost) {
       continue;
@@ -145,7 +171,7 @@ function parseStockInvoiceItems(rawXml: string) {
       supplierEan: normalizeXmlText(extractTagValue(productBlock, "cEAN")),
       description,
       ncm: normalizedNcm.length === 8 ? normalizedNcm : undefined,
-      quantity: rawQuantity,
+      quantity,
       unitCost,
     });
   }
@@ -173,7 +199,7 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
   const issuedAt = parseXmlDate(extractTagValue(ideBlock, "dhEmi") ?? extractTagValue(ideBlock, "dEmi"));
   const totalAmount = parseXmlDecimal(extractTagValue(totalBlock, "vNF"));
   const items = parseStockInvoiceItems(rawXml);
-  const itemCount = items.length;
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return {
     accessKey,
