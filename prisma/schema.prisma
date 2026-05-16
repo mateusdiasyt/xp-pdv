@@ -238,6 +238,7 @@ model Product {
   marginPercent Decimal      @default(0) @db.Decimal(5, 2)
   minStock      Int          @default(0)
   currentStock  Int          @default(0)
+  tracksStock   Boolean      @default(true)
   status        RecordStatus @default(ACTIVE)
   categoryId    String
   supplierId    String?
@@ -258,6 +259,7 @@ model Product {
     @@index([supplierId])
     @@index([status])
     @@index([kind])
+    @@index([tracksStock])
     @@index([serviceCnae])
     @@index([unitId])
   }

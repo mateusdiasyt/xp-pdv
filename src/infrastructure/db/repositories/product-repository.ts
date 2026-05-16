@@ -54,6 +54,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
+        tracksStock: true,
         costPrice: true,
         salePrice: true,
         marginPercent: true,
@@ -90,6 +91,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
+        tracksStock: true,
         costPrice: true,
         salePrice: true,
         marginPercent: true,
@@ -127,6 +129,7 @@ export async function createProduct(data: {
   serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
+  tracksStock: boolean;
   categoryId: string;
   supplierId?: string | null;
   costPrice: Prisma.Decimal;
@@ -153,6 +156,7 @@ export async function updateProduct(data: {
   serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
+  tracksStock: boolean;
   categoryId: string;
   supplierId?: string | null;
   costPrice: Prisma.Decimal;
@@ -175,6 +179,7 @@ export async function updateProduct(data: {
       serviceDescription: data.serviceDescription,
       gameplayPlanCode: data.gameplayPlanCode,
       gameplayDurationMinutes: data.gameplayDurationMinutes,
+      tracksStock: data.tracksStock,
       categoryId: data.categoryId,
       supplierId: data.supplierId,
       costPrice: data.costPrice,
@@ -204,6 +209,7 @@ export async function listProductOptions() {
         serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
+        tracksStock: true,
         currentStock: true,
         status: true,
         salePrice: true,
@@ -234,6 +240,7 @@ export async function listProductOptions() {
         serviceDescription: true,
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
+        tracksStock: true,
         currentStock: true,
         status: true,
         salePrice: true,
@@ -265,11 +272,12 @@ export async function listLowStockProducts() {
       sku: true,
       currentStock: true,
       minStock: true,
+      tracksStock: true,
     },
   });
 
   return products
-    .filter((product) => product.currentStock <= product.minStock)
+    .filter((product) => product.tracksStock && product.currentStock <= product.minStock)
     .sort((a, b) => a.currentStock - b.currentStock)
     .slice(0, 5);
 }

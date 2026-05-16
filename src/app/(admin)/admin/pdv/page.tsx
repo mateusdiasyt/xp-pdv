@@ -208,6 +208,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     kind: product.kind,
     gameplayPlanCode: product.gameplayPlanCode,
     gameplayDurationMinutes: product.gameplayDurationMinutes,
+    tracksStock: product.tracksStock,
     salePrice: Number(product.salePrice),
     currentStock: product.currentStock,
     category: {
@@ -235,6 +236,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
         name: item.product.name,
         sku: item.product.sku,
         imageUrl: item.product.imageUrl,
+        tracksStock: item.product.tracksStock,
         currentStock: item.product.currentStock,
         category: {
           id: item.product.category.id,

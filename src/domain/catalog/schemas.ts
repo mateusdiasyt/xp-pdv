@@ -99,6 +99,17 @@ const productSchemaBase = z.object({
   categoryId: z.string().min(1, "Categoria obrigatoria"),
   supplierId: z.string().optional().or(z.literal("")),
   kind: z.nativeEnum(ProductKind).default(ProductKind.STANDARD),
+  tracksStock: z.preprocess((value) => {
+    if (value === true || value === "true" || value === "on") {
+      return true;
+    }
+
+    if (value === false || value === "false" || value === "off") {
+      return false;
+    }
+
+    return undefined;
+  }, z.boolean().default(true)),
   serviceCnae: z.preprocess(
     (value) => {
       if (typeof value !== "string") {

@@ -207,9 +207,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1750px]:grid-cols-5">
             {category.products.map((product) => {
-              const isLowStock = product.currentStock <= product.minStock;
-              const isOutOfStock = product.currentStock <= 0;
-              const stockLabel = isOutOfStock ? "Sem estoque" : isLowStock ? "Estoque baixo" : "Disponivel";
+              const tracksPhysicalStock = product.kind === ProductKind.STANDARD && product.tracksStock;
+              const isLowStock = tracksPhysicalStock && product.currentStock <= product.minStock;
+              const isOutOfStock = tracksPhysicalStock && product.currentStock <= 0;
+              const stockLabel = !tracksPhysicalStock
+                ? "Sem controle"
+                : isOutOfStock
+                  ? "Sem estoque"
+                  : isLowStock
+                    ? "Estoque baixo"
+                    : "Disponivel";
 
               return (
                 <Card key={product.id} className="overflow-hidden">
@@ -267,6 +274,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                             ? `${product.gameplayDurationMinutes ?? 0} min`
                             : product.kind === ProductKind.SERVICE
                               ? "NFS-e"
+                              : !product.tracksStock
+                                ? "Livre"
                               : product.currentStock}
                         </p>
                         <p
@@ -274,6 +283,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                             "text-xs",
                             product.kind !== ProductKind.STANDARD
                               ? "text-sky-300"
+                              : !product.tracksStock
+                                ? "text-primary"
                               : isOutOfStock
                               ? "text-rose-400"
                               : isLowStock
@@ -308,6 +319,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               serviceDescription: product.serviceDescription,
                               gameplayPlanCode: product.gameplayPlanCode,
                               gameplayDurationMinutes: product.gameplayDurationMinutes,
+                              tracksStock: product.tracksStock,
                               categoryId: product.categoryId,
                               supplierId: product.supplierId,
                               costPrice: Number(product.costPrice).toFixed(2),

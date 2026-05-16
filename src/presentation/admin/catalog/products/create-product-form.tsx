@@ -37,6 +37,7 @@ type ProductFormInitialData = {
   serviceDescription?: string | null;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
+  tracksStock?: boolean;
   categoryId?: string;
   supplierId?: string | null;
   costPrice?: string;
@@ -144,11 +145,13 @@ export function CreateProductForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
+  const [tracksStock, setTracksStock] = useState(initialData?.tracksStock ?? true);
   const [serviceCnae, setServiceCnae] = useState(
     initialData?.serviceCnae ?? (initialData?.kind === ProductKind.GAMEPLAY ? "9329804" : "9329803"),
   );
   const isGameplay = productKind === ProductKind.GAMEPLAY;
   const isServiceLike = productKind !== ProductKind.STANDARD;
+  const usesStockControls = !isServiceLike && tracksStock;
   const currentStockValue = initialData?.currentStock ?? 0;
 
   useEffect(() => {
@@ -362,6 +365,7 @@ export function CreateProductForm({
             </div>
 
             <input type="hidden" name="supplierId" value="" />
+            <input type="hidden" name="tracksStock" value="false" />
             <input type="hidden" name="costPrice" value="0.00" />
             <input type="hidden" name="minStock" value="0" />
             <input type="hidden" name="currentStock" value="0" />
@@ -374,6 +378,7 @@ export function CreateProductForm({
         ) : isServiceLike ? (
           <>
             <input type="hidden" name="supplierId" value="" />
+            <input type="hidden" name="tracksStock" value="false" />
             <input type="hidden" name="costPrice" value="0.00" />
             <input type="hidden" name="minStock" value="0" />
             <input type="hidden" name="currentStock" value="0" />
@@ -406,6 +411,23 @@ export function CreateProductForm({
 
             <input type="hidden" name="gameplayPlanCode" value="" />
             <input type="hidden" name="gameplayDurationMinutes" value="" />
+
+            <div className="space-y-2">
+              <Label htmlFor="tracksStock">Controle de estoque</Label>
+              <select
+                id="tracksStock"
+                name="tracksStock"
+                className="admin-native-select"
+                value={tracksStock ? "true" : "false"}
+                onChange={(event) => setTracksStock(event.target.value === "true")}
+              >
+                <option value="true">Controlar saldo</option>
+                <option value="false">Vender sem controlar estoque</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Use sem controle para drinks, chopp e itens preparados que continuam emitindo NFC-e.
+              </p>
+            </div>
           </>
         )}
 
@@ -421,33 +443,46 @@ export function CreateProductForm({
               <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="minStock">Estoque minimo</Label>
-              <Input
-                id="minStock"
-                name="minStock"
-                type="number"
-                min={0}
-                defaultValue={initialData?.minStock ?? 0}
-                required
-              />
-            </div>
+            {usesStockControls ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="minStock">Estoque minimo</Label>
+                  <Input
+                    id="minStock"
+                    name="minStock"
+                    type="number"
+                    min={0}
+                    defaultValue={initialData?.minStock ?? 0}
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="currentStock">Estoque atual</Label>
-              <input type="hidden" name="currentStock" value={String(currentStockValue)} />
-              <Input
-                id="currentStock"
-                type="number"
-                min={0}
-                value={currentStockValue}
-                readOnly
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                O saldo atual e somente informativo. Ajustes de estoque devem ser feitos na aba Estoque.
-              </p>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currentStock">Estoque atual</Label>
+                  <input type="hidden" name="currentStock" value={String(currentStockValue)} />
+                  <Input
+                    id="currentStock"
+                    type="number"
+                    min={0}
+                    value={currentStockValue}
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    O saldo atual e somente informativo. Ajustes de estoque devem ser feitos na aba Estoque.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <input type="hidden" name="minStock" value="0" />
+                <input type="hidden" name="currentStock" value="0" />
+                <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
+                  <strong className="mb-1 block text-foreground">Venda sem bloqueio por estoque.</strong>
+                  O item continua como produto fiscal para NFC-e, mas nao bloqueia venda nem gera baixa automatica de estoque.
+                </div>
+              </>
+            )}
           </>
         ) : (
           <div className="space-y-2">

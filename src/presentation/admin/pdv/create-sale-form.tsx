@@ -63,6 +63,7 @@ type ProductOption = {
   sku: string;
   imageUrl?: string | null;
   salePrice: number;
+  tracksStock: boolean;
   currentStock: number;
   category: {
     id: string;
@@ -89,6 +90,7 @@ type SelectedComanda = {
       name: string;
       sku: string;
       imageUrl?: string | null;
+      tracksStock: boolean;
       currentStock: number;
       category: {
         id: string;
@@ -437,6 +439,7 @@ export function CreateSaleForm({
             name: product.name,
             sku: product.sku,
             imageUrl: product.imageUrl,
+            tracksStock: product.tracksStock,
             currentStock: product.currentStock,
             category: product.category,
           },
@@ -691,7 +694,7 @@ export function CreateSaleForm({
                             </p>
                             <div className="space-y-0.5 text-xs text-muted-foreground">
                               <p className="font-medium text-foreground/88">{formatCurrency(product.salePrice)}</p>
-                              <p>{product.currentStock} em estoque</p>
+                              <p>{product.tracksStock ? `${product.currentStock} em estoque` : "Sem controle de estoque"}</p>
                             </div>
                           </div>
 

@@ -94,6 +94,7 @@ export async function listOpenComandas() {
                 name: true,
                 sku: true,
                 imageUrl: true,
+                tracksStock: true,
                 currentStock: true,
                 category: {
                   select: {
@@ -143,6 +144,7 @@ export async function listOpenComandas() {
                 id: true,
                 name: true,
                 sku: true,
+                tracksStock: true,
                 currentStock: true,
                 category: {
                   select: {

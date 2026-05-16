@@ -48,6 +48,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
     kind: input.get("kind"),
+    tracksStock: input.get("tracksStock"),
     serviceCnae: input.get("serviceCnae"),
     serviceDescription: input.get("serviceDescription"),
     gameplayPlanCode: input.get("gameplayPlanCode"),
@@ -61,6 +62,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
 
   const isServiceLike = parsed.kind !== ProductKind.STANDARD;
   const isGameplay = parsed.kind === ProductKind.GAMEPLAY;
+  const tracksStock = !isServiceLike && parsed.tracksStock;
   const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
@@ -74,6 +76,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     categoryId: parsed.categoryId,
     supplierId: isServiceLike ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
+    tracksStock,
     serviceCnae: isServiceLike ? emptyToUndefined(parsed.serviceCnae) : null,
     serviceDescription: isServiceLike ? emptyToUndefined(parsed.serviceDescription) : null,
     gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
@@ -81,8 +84,8 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     costPrice,
     salePrice,
     marginPercent,
-    minStock: isServiceLike ? 0 : parsed.minStock,
-    currentStock: isServiceLike ? 0 : parsed.currentStock,
+    minStock: tracksStock ? parsed.minStock : 0,
+    currentStock: tracksStock ? parsed.currentStock : 0,
     status: parsed.status,
   });
 
@@ -96,6 +99,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
       ncm: created.ncm,
       imageUrl: created.imageUrl,
       kind: created.kind,
+      tracksStock: created.tracksStock,
       serviceCnae: created.serviceCnae,
       serviceDescription: created.serviceDescription,
       gameplayPlanCode: created.gameplayPlanCode,
@@ -117,6 +121,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     categoryId: input.get("categoryId"),
     supplierId: input.get("supplierId"),
     kind: input.get("kind"),
+    tracksStock: input.get("tracksStock"),
     serviceCnae: input.get("serviceCnae"),
     serviceDescription: input.get("serviceDescription"),
     gameplayPlanCode: input.get("gameplayPlanCode"),
@@ -130,6 +135,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
 
   const isServiceLike = parsed.kind !== ProductKind.STANDARD;
   const isGameplay = parsed.kind === ProductKind.GAMEPLAY;
+  const tracksStock = !isServiceLike && parsed.tracksStock;
   const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const marginPercent = calculateMargin(costPrice, salePrice);
@@ -144,6 +150,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     categoryId: parsed.categoryId,
     supplierId: isServiceLike ? null : emptyToUndefined(parsed.supplierId),
     kind: parsed.kind,
+    tracksStock,
     serviceCnae: isServiceLike ? emptyToUndefined(parsed.serviceCnae) : null,
     serviceDescription: isServiceLike ? emptyToUndefined(parsed.serviceDescription) : null,
     gameplayPlanCode: isGameplay ? emptyToUndefined(parsed.gameplayPlanCode) : null,
@@ -151,8 +158,8 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     costPrice,
     salePrice,
     marginPercent,
-    minStock: isServiceLike ? 0 : parsed.minStock,
-    currentStock: isServiceLike ? 0 : parsed.currentStock,
+    minStock: tracksStock ? parsed.minStock : 0,
+    currentStock: tracksStock ? parsed.currentStock : 0,
     status: parsed.status,
   });
 
@@ -166,6 +173,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
       ncm: updated.ncm,
       imageUrl: updated.imageUrl,
       kind: updated.kind,
+      tracksStock: updated.tracksStock,
       serviceCnae: updated.serviceCnae,
       serviceDescription: updated.serviceDescription,
       gameplayPlanCode: updated.gameplayPlanCode,

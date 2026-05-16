@@ -34,6 +34,7 @@ type EditProductDialogProps = {
     serviceDescription?: string | null;
     gameplayPlanCode?: string | null;
     gameplayDurationMinutes?: number | null;
+    tracksStock: boolean;
     categoryId: string;
     supplierId?: string | null;
     costPrice: string;
@@ -76,6 +77,7 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
               serviceDescription: product.serviceDescription,
               gameplayPlanCode: product.gameplayPlanCode,
               gameplayDurationMinutes: product.gameplayDurationMinutes,
+              tracksStock: product.tracksStock,
               categoryId: product.categoryId,
               supplierId: product.supplierId,
               costPrice: product.costPrice,

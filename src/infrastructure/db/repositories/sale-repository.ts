@@ -263,6 +263,7 @@ export async function listPdvProductOptions() {
         sku: true,
         imageUrl: true,
         kind: true,
+        tracksStock: true,
         serviceCnae: true,
         serviceDescription: true,
         gameplayPlanCode: true,
@@ -296,6 +297,7 @@ export async function listPdvProductOptions() {
         name: true,
         sku: true,
         kind: true,
+        tracksStock: true,
         serviceCnae: true,
         serviceDescription: true,
         gameplayPlanCode: true,
@@ -471,6 +473,7 @@ async function runCreateSaleWithStockAdjustment(
       sku: true,
       ncm: true,
       kind: true,
+      tracksStock: true,
       serviceCnae: true,
       serviceDescription: true,
       gameplayPlanCode: true,
@@ -506,7 +509,7 @@ async function runCreateSaleWithStockAdjustment(
       if (!product.gameplayPlanCode || !product.gameplayDurationMinutes) {
         throw new Error(`Produto de gameplay ${product.name} precisa de plano e duracao configurados.`);
       }
-    } else if (product.kind === ProductKind.STANDARD && product.currentStock < item.quantity) {
+    } else if (product.kind === ProductKind.STANDARD && product.tracksStock && product.currentStock < item.quantity) {
       throw new Error(`Estoque insuficiente para ${product.name}.`);
     }
 
@@ -640,7 +643,7 @@ async function runCreateSaleWithStockAdjustment(
       continue;
     }
 
-    if (product.kind !== ProductKind.STANDARD) {
+    if (product.kind !== ProductKind.STANDARD || !product.tracksStock) {
       continue;
     }
 
@@ -710,6 +713,8 @@ export async function cancelSaleAndRestock(data: {
         where: { id: { in: productIds } },
         select: {
           id: true,
+          kind: true,
+          tracksStock: true,
           currentStock: true,
           costPrice: true,
         },
@@ -729,6 +734,10 @@ export async function cancelSaleAndRestock(data: {
       for (const item of sale.items) {
         const product = productMap.get(item.productId);
         if (!product) {
+          continue;
+        }
+
+        if (product.kind !== ProductKind.STANDARD || !product.tracksStock) {
           continue;
         }
 

@@ -35,6 +35,7 @@ type ProductOption = {
   kind: ProductKind;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
+  tracksStock: boolean;
   salePrice: number;
   currentStock: number;
   category: {
@@ -62,6 +63,7 @@ type OpenComandaView = {
       name: string;
       sku: string;
       imageUrl?: string | null;
+      tracksStock: boolean;
       currentStock: number;
       category: {
         id: string;

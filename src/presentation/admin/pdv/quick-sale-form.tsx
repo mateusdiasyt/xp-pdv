@@ -57,6 +57,7 @@ type ProductOption = {
   kind: ProductKind;
   gameplayPlanCode?: string | null;
   gameplayDurationMinutes?: number | null;
+  tracksStock: boolean;
   salePrice: number;
   currentStock: number;
   category: {
@@ -675,6 +676,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                   <p className="inline-flex items-center gap-1 text-sky-200">
                                     <Receipt className="h-3.5 w-3.5" />
                                     Servico / NFS-e
+                                  </p>
+                                ) : !product.tracksStock ? (
+                                  <p className="inline-flex items-center gap-1 text-primary">
+                                    <GlassWater className="h-3.5 w-3.5" />
+                                    Sem controle de estoque
                                   </p>
                                 ) : (
                                   <p>{product.currentStock} em estoque</p>
