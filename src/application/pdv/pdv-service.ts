@@ -1,4 +1,5 @@
-import { PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
+import { after } from "next/server";
+import { GameplayReleaseStatus, PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
 
 import {
   addComandaItemSchema,
@@ -15,8 +16,11 @@ import {
 } from "@/domain/pdv/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { parseDecimalInput } from "@/lib/decimal";
-import { cancelSaleNfce, issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
-import { triggerGameplayReleaseForSale } from "@/application/gameplay/gameplay-release-service";
+import { cancelSaleNfce, issueSaleNfce, queueSaleNfceIssue } from "@/application/fiscal/focus-nfce-service";
+import {
+  prepareGameplayReleaseForSale,
+  triggerGameplayReleaseForSale,
+} from "@/application/gameplay/gameplay-release-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import { getBusyGameplayReleasesByStationIds } from "@/infrastructure/db/repositories/gameplay-release-repository";
 import {
@@ -174,6 +178,12 @@ async function assertGameplayStationsAvailable(
   const busyReleases = await getBusyGameplayReleasesByStationIds(stationIds);
   const busyRelease = busyReleases[0];
 
+  if (busyRelease?.status === GameplayReleaseStatus.PENDENTE_ENVIO) {
+    throw new Error(
+      `${busyRelease.stationId.toUpperCase()} ja tem uma liberacao pendente. Aguarde alguns segundos ou reenvie pela aba Servicos. Contate o Mateus.`,
+    );
+  }
+
   if (!busyRelease?.releasedUntil) {
     return;
   }
@@ -210,6 +220,60 @@ function resolveCashReceivedForReceipt(data: {
   }
 
   return undefined;
+}
+
+function scheduleAfterResponse(label: string, task: () => Promise<void>) {
+  const guardedTask = async () => {
+    try {
+      await task();
+    } catch (error) {
+      console.error(`[PDV] Falha no processamento em segundo plano (${label}):`, error);
+    }
+  };
+
+  try {
+    after(guardedTask);
+  } catch (error) {
+    console.warn(`[PDV] Nao foi possivel agendar ${label}; executando sem bloquear a interface.`, error);
+    void guardedTask();
+  }
+}
+
+function scheduleSalePostProcessing(data: {
+  saleId: string;
+  actorId: string;
+  issueFiscal?: boolean;
+  releaseGameplay?: boolean;
+}) {
+  const tasks: Array<{ label: string; run: () => Promise<unknown> }> = [];
+
+  if (data.issueFiscal) {
+    tasks.push({
+      label: "NFC-e",
+      run: () => issueSaleNfce({ saleId: data.saleId, actorId: data.actorId }),
+    });
+  }
+
+  if (data.releaseGameplay) {
+    tasks.push({
+      label: "gameplay",
+      run: () => triggerGameplayReleaseForSale(data.saleId, data.actorId),
+    });
+  }
+
+  if (tasks.length === 0) {
+    return;
+  }
+
+  scheduleAfterResponse(`pos-venda ${data.saleId}`, async () => {
+    const results = await Promise.allSettled(tasks.map((task) => task.run()));
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(`[PDV] ${tasks[index]?.label ?? "tarefa"} falhou apos venda ${data.saleId}:`, result.reason);
+      }
+    });
+  });
 }
 
 async function settlePdvSection<T>(label: string, loader: () => Promise<T>, fallback: T) {
@@ -313,11 +377,20 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     },
   });
 
-  const fiscalResult = await issueSaleNfce({
+  const [fiscalResult, gameplayResult] = await Promise.all([
+    queueSaleNfceIssue({
+      saleId: sale.id,
+      actorId,
+    }),
+    prepareGameplayReleaseForSale(sale.id, actorId),
+  ]);
+
+  scheduleSalePostProcessing({
     saleId: sale.id,
     actorId,
+    issueFiscal: true,
+    releaseGameplay: gameplayResult.status === GameplayReleaseStatus.PENDENTE_ENVIO,
   });
-  const gameplayResult = await triggerGameplayReleaseForSale(sale.id, actorId);
 
   const receiptCashReceived = resolveCashReceivedForReceipt({
     explicitCashReceived: cashReceived,
@@ -504,9 +577,15 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
     },
   });
 
-  const fiscalResult = await issueSaleNfce({
+  const fiscalResult = await queueSaleNfceIssue({
     saleId: sale.id,
     actorId,
+  });
+
+  scheduleSalePostProcessing({
+    saleId: sale.id,
+    actorId,
+    issueFiscal: true,
   });
 
   const receiptCashReceived = resolveCashReceivedForReceipt({

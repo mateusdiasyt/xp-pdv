@@ -198,6 +198,106 @@ function buildReleaseDraft(
   };
 }
 
+export async function prepareGameplayReleaseForSale(
+  saleId: string,
+  actorId?: string,
+): Promise<GameplayReleaseOutcome> {
+  try {
+    const sale = await getSaleGameplaySnapshot(saleId);
+
+    if (!sale) {
+      return {
+        status: "SKIPPED",
+        message: "Venda nao encontrada para preparar liberacao de gameplay.",
+      };
+    }
+
+    if (sale.gameplayRelease?.status === GameplayReleaseStatus.LIBERADA) {
+      return {
+        status: GameplayReleaseStatus.LIBERADA,
+        message: formatPreparationMessage(
+          sale.gameplayRelease.stationId,
+          sale.gameplayRelease.serviceStartsAt,
+          sale.gameplayRelease.releasedUntil,
+        ),
+        releasedUntil: sale.gameplayRelease.releasedUntil,
+        serviceStartsAt: sale.gameplayRelease.serviceStartsAt,
+        stationId: sale.gameplayRelease.stationId,
+      };
+    }
+
+    const draft = buildReleaseDraft(sale);
+
+    if (draft.type === "none") {
+      return {
+        status: "SKIPPED",
+        message: "Venda sem item de gameplay.",
+      };
+    }
+
+    if (draft.type === "invalid") {
+      await markGameplayReleaseFailureWithoutRequest({
+        saleId: sale.id,
+        requestPayload: toJsonValue(draft.payload),
+        stationId: draft.payload.stationId,
+        planCode: draft.payload.planCode,
+        durationMinutes: draft.payload.durationMinutes,
+        amount: draft.amount,
+        paidAt: draft.paidAt,
+        operator: draft.payload.operator,
+        customerId: draft.payload.customerId,
+        lastError: draft.error ?? "Dados de gameplay invalidos. Contate o Mateus.",
+      });
+
+      return {
+        status: GameplayReleaseStatus.FALHA_ENVIO,
+        message: draft.error ?? "Dados de gameplay invalidos. Contate o Mateus.",
+        stationId: draft.payload.stationId,
+      };
+    }
+
+    const release = await upsertPendingGameplayRelease({
+      saleId: sale.id,
+      integrationId: draft.payload.integrationId,
+      stationId: draft.payload.stationId,
+      planCode: draft.payload.planCode,
+      durationMinutes: draft.payload.durationMinutes,
+      amount: draft.amount,
+      paidAt: draft.paidAt,
+      operator: draft.payload.operator,
+      customerId: draft.payload.customerId,
+      requestPayload: toJsonValue(draft.payload),
+    });
+
+    await createAuditLog({
+      userId: actorId,
+      action: "pdv.gameplay.release.queue",
+      entity: "GameplayRelease",
+      entityId: release.id,
+      metadata: {
+        saleId: sale.id,
+        saleNumber: sale.saleNumber,
+        stationId: draft.payload.stationId,
+        planCode: draft.payload.planCode,
+        durationMinutes: draft.payload.durationMinutes,
+      },
+    });
+
+    return {
+      status: GameplayReleaseStatus.PENDENTE_ENVIO,
+      message: `Liberacao da ${draft.payload.stationId.toUpperCase()} enfileirada em segundo plano.`,
+      stationId: draft.payload.stationId,
+    };
+  } catch (error) {
+    console.error("[GAMEPLAY] Falha ao preparar liberacao:", error);
+    return {
+      status: GameplayReleaseStatus.FALHA_ENVIO,
+      message:
+        "A venda foi concluida, mas a preparacao da liberacao falhou. Reenvie pela aba Servicos. Contate o Mateus.",
+    };
+  }
+}
+
 export async function triggerGameplayReleaseForSale(
   saleId: string,
   actorId?: string,
@@ -368,6 +468,12 @@ export async function releaseManualGameplayStation(data: {
   }
 
   const busyRelease = (await getBusyGameplayReleasesByStationIds([stationId]))[0];
+
+  if (busyRelease?.status === GameplayReleaseStatus.PENDENTE_ENVIO) {
+    throw new Error(
+      `${stationId.toUpperCase()} tem uma liberacao pendente. Aguarde alguns segundos ou reenvie pela aba Servicos.`,
+    );
+  }
 
   if (busyRelease?.releasedUntil) {
     throw new Error(

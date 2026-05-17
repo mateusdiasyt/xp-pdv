@@ -28,10 +28,6 @@ export async function createSaleAction(
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await createSaleRecord(formData, session.user.id);
     revalidatePath("/admin/pdv");
-    revalidatePath("/admin/stock");
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/cash");
-    revalidatePath("/admin");
     return { status: "success", message: "Venda registrada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -47,10 +43,6 @@ export async function closeQuickSaleAction(
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     result = await createSaleRecord(formData, session.user.id);
     revalidatePath("/admin/pdv");
-    revalidatePath("/admin/stock");
-    revalidatePath("/admin/products");
-    revalidatePath("/admin/cash");
-    revalidatePath("/admin");
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
   }

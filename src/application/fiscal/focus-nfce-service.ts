@@ -14,6 +14,7 @@ type FiscalSaleStatus =
   | "REJECTED"
   | "PROCESSING"
   | "CANCELLED"
+  | "SERVICE_ONLY"
   | "ERROR"
   | "DISABLED";
 
@@ -502,6 +503,48 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
   return {
     status: derivedStatus,
     message: fiscalMessage,
+  };
+}
+
+export async function queueSaleNfceIssue(data: { saleId: string; actorId: string }) {
+  const config = await getFocusNfceConfig();
+  const snapshot = await getSaleFiscalSnapshot(data.saleId);
+
+  if (!snapshot) {
+    return {
+      status: "ERROR" as const,
+      message: "Venda nao encontrada para enfileirar emissao fiscal.",
+    };
+  }
+
+  const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
+  const message = "NFC-e enfileirada para emissao em segundo plano.";
+
+  await updateSaleFiscalData(snapshot.id, {
+    fiscalReference,
+    fiscalDocumentType: "NFCE",
+    fiscalEnvironment: config.environment,
+    fiscalStatus: "PROCESSING",
+    fiscalMessage: message,
+    fiscalErrorAt: null,
+    fiscalUpdatedAt: new Date(),
+  });
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "pdv.sale.nfce.queue",
+    entity: "Sale",
+    entityId: snapshot.id,
+    metadata: {
+      saleNumber: snapshot.saleNumber,
+      reference: fiscalReference,
+      environment: config.environment,
+    },
+  });
+
+  return {
+    status: "PROCESSING" as const,
+    message,
   };
 }
 

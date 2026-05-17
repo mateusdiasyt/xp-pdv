@@ -181,11 +181,22 @@ export async function getBusyGameplayReleasesByStationIds(stationIds: string[], 
       stationId: {
         in: normalizedStationIds,
       },
-      status: GameplayReleaseStatus.LIBERADA,
-      releasedUntil: {
-        gt: now,
-      },
-      ...completedSaleOrManualReleaseWhere,
+      AND: [
+        completedSaleOrManualReleaseWhere,
+        {
+          OR: [
+            {
+              status: GameplayReleaseStatus.LIBERADA,
+              releasedUntil: {
+                gt: now,
+              },
+            },
+            {
+              status: GameplayReleaseStatus.PENDENTE_ENVIO,
+            },
+          ],
+        },
+      ],
     },
     include: {
       sale: {
