@@ -175,10 +175,16 @@ type ImportStockInvoiceItemInput = {
   lineNumber: number;
   supplierProductCode?: string;
   supplierEan?: string;
+  supplierCommercialEan?: string;
   description: string;
   ncm?: string;
+  cfop?: string;
   quantity: number;
   unitCost: Prisma.Decimal;
+  commercialUnit?: string;
+  commercialQuantity?: number;
+  taxableUnit?: string;
+  taxableQuantity?: number;
 };
 
 type ImportStockInvoiceItemsInput = {
@@ -339,9 +345,11 @@ export async function importStockInvoiceItems(data: ImportStockInvoiceItemsInput
     let skippedItems = 0;
 
     for (const item of data.items) {
-      const skuCandidates = [toSafeSkuToken(item.supplierProductCode), toSafeSkuToken(item.supplierEan)].filter(
-        (value): value is string => Boolean(value),
-      );
+      const skuCandidates = [
+        toSafeSkuToken(item.supplierEan),
+        toSafeSkuToken(item.supplierCommercialEan),
+        toSafeSkuToken(item.supplierProductCode),
+      ].filter((value): value is string => Boolean(value));
 
       let product = await tx.product.findFirst({
         where: skuCandidates.length
@@ -432,6 +440,11 @@ export async function importStockInvoiceItems(data: ImportStockInvoiceItemsInput
 
       const currentStock = productStockMap.get(product.id) ?? product.currentStock;
       const resultingStock = currentStock + item.quantity;
+      const xmlUnitDetails = [
+        item.commercialQuantity && item.commercialUnit ? `compra ${item.commercialQuantity} ${item.commercialUnit}` : null,
+        item.taxableQuantity && item.taxableUnit ? `vendavel ${item.taxableQuantity} ${item.taxableUnit}` : null,
+        item.cfop ? `CFOP ${item.cfop}` : null,
+      ].filter(Boolean);
 
       await tx.stockMovement.create({
         data: {
@@ -441,7 +454,7 @@ export async function importStockInvoiceItems(data: ImportStockInvoiceItemsInput
           unitCost: item.unitCost,
           previousStock: currentStock,
           resultingStock,
-          note: `Entrada via XML ${data.invoiceNumber ? `N${data.invoiceNumber}` : ""}${data.invoiceSeries ? ` serie ${data.invoiceSeries}` : ""} (${data.accessKey}).`,
+          note: `Entrada via XML ${data.invoiceNumber ? `N${data.invoiceNumber}` : ""}${data.invoiceSeries ? ` serie ${data.invoiceSeries}` : ""} (${data.accessKey})${xmlUnitDetails.length ? ` - ${xmlUnitDetails.join(" | ")}` : ""}.`,
           operatorId: data.actorId,
         },
       });

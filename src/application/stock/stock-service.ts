@@ -23,10 +23,16 @@ type ParsedStockInvoiceItem = {
   lineNumber: number;
   supplierProductCode?: string;
   supplierEan?: string;
+  supplierCommercialEan?: string;
   description: string;
   ncm?: string;
+  cfop?: string;
   quantity: number;
   unitCost: Prisma.Decimal;
+  commercialUnit?: string;
+  commercialQuantity?: number;
+  taxableUnit?: string;
+  taxableQuantity?: number;
 };
 
 type ParsedStockInvoiceXml = {
@@ -35,6 +41,8 @@ type ParsedStockInvoiceXml = {
   invoiceSeries?: string;
   supplierName?: string;
   supplierDocument?: string;
+  recipientName?: string;
+  recipientDocument?: string;
   issuedAt?: Date;
   totalAmount?: Prisma.Decimal;
   itemCount: number;
@@ -75,6 +83,20 @@ function parseXmlDecimal(rawValue?: string, maxPrecision = 2) {
   }
 
   return new Prisma.Decimal(parsedValue.toFixed(maxPrecision));
+}
+
+function normalizeXmlDocument(rawValue?: string) {
+  const digits = rawValue?.replace(/\D/g, "");
+  return digits || undefined;
+}
+
+function normalizeXmlCode(rawValue?: string) {
+  const normalized = normalizeXmlText(rawValue);
+  if (!normalized || /^sem gtin$/i.test(normalized) || normalized === "0") {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 function parseXmlNumber(rawValue?: string) {
@@ -132,29 +154,30 @@ function parseStockInvoiceItems(rawXml: string) {
       continue;
     }
 
-    const rawQuantity = parseXmlNumber(extractTagValue(productBlock, "qCom"));
-    if (!rawQuantity || rawQuantity <= 0) {
+    const commercialQuantity = parseXmlNumber(extractTagValue(productBlock, "qCom"));
+    const taxableQuantity = parseXmlNumber(extractTagValue(productBlock, "qTrib"));
+    const commercialUnit = normalizeXmlText(extractTagValue(productBlock, "uCom"));
+    const taxableUnit = normalizeXmlText(extractTagValue(productBlock, "uTrib"));
+    const preferredRawQuantity = taxableQuantity && taxableQuantity > 0 ? taxableQuantity : commercialQuantity;
+    if (!preferredRawQuantity || preferredRawQuantity <= 0) {
       continue;
     }
 
-    if (!Number.isInteger(rawQuantity)) {
-      throw new Error(
-        `O item "${description}" possui quantidade fracionada (${rawQuantity}). Ajuste manualmente antes de importar.`,
-      );
-    }
-
-    const sellableUnitMultiplier = inferSellableUnitMultiplier(description);
-    const quantity = rawQuantity * sellableUnitMultiplier;
+    const quantityUsesTaxableUnit = Boolean(taxableQuantity && taxableQuantity > 0);
+    const sellableUnitMultiplier = quantityUsesTaxableUnit ? 1 : inferSellableUnitMultiplier(description);
+    const quantity = preferredRawQuantity * sellableUnitMultiplier;
 
     if (!Number.isInteger(quantity)) {
       throw new Error(
-        `O item "${description}" resultou em quantidade fracionada (${quantity}). Ajuste manualmente antes de importar.`,
+        `O item "${description}" possui quantidade vendavel fracionada (${quantity}). Ajuste manualmente antes de importar.`,
       );
     }
 
     const lineTotal = parseXmlDecimal(extractTagValue(productBlock, "vProd"), 2);
-    const commercialUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 2);
+    const commercialUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 6);
+    const taxableUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnTrib"), 6);
     const unitCost =
+      (quantityUsesTaxableUnit && taxableUnitCost ? taxableUnitCost.toDecimalPlaces(2) : undefined) ??
       (commercialUnitCost
         ? commercialUnitCost.dividedBy(sellableUnitMultiplier).toDecimalPlaces(2)
         : undefined) ?? (lineTotal ? lineTotal.dividedBy(quantity).toDecimalPlaces(2) : undefined);
@@ -164,15 +187,24 @@ function parseStockInvoiceItems(rawXml: string) {
     }
 
     const normalizedNcm = (extractTagValue(productBlock, "NCM") ?? "").replace(/\D/g, "");
+    const taxableEan = normalizeXmlCode(extractTagValue(productBlock, "cEANTrib"));
+    const commercialEan = normalizeXmlCode(extractTagValue(productBlock, "cEAN"));
+    const supplierEan = taxableEan ?? commercialEan;
 
     items.push({
       lineNumber: index + 1,
       supplierProductCode: normalizeXmlText(extractTagValue(productBlock, "cProd")),
-      supplierEan: normalizeXmlText(extractTagValue(productBlock, "cEAN")),
+      supplierEan,
+      supplierCommercialEan: commercialEan && commercialEan !== supplierEan ? commercialEan : undefined,
       description,
       ncm: normalizedNcm.length === 8 ? normalizedNcm : undefined,
+      cfop: normalizeXmlText(extractTagValue(productBlock, "CFOP")),
       quantity,
       unitCost,
+      commercialUnit,
+      commercialQuantity,
+      taxableUnit,
+      taxableQuantity,
     });
   }
 
@@ -190,12 +222,17 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
 
   const ideBlock = extractTagBlock(rawXml, "ide") ?? rawXml;
   const issuerBlock = extractTagBlock(rawXml, "emit") ?? rawXml;
+  const recipientBlock = extractTagBlock(rawXml, "dest") ?? rawXml;
   const totalBlock = extractTagBlock(rawXml, "ICMSTot") ?? rawXml;
 
   const invoiceNumber = extractTagValue(ideBlock, "nNF");
   const invoiceSeries = extractTagValue(ideBlock, "serie");
   const supplierName = extractTagValue(issuerBlock, "xNome");
-  const supplierDocument = extractTagValue(issuerBlock, "CNPJ") ?? extractTagValue(issuerBlock, "CPF");
+  const supplierDocument = normalizeXmlDocument(extractTagValue(issuerBlock, "CNPJ") ?? extractTagValue(issuerBlock, "CPF"));
+  const recipientName = extractTagValue(recipientBlock, "xNome");
+  const recipientDocument = normalizeXmlDocument(
+    extractTagValue(recipientBlock, "CNPJ") ?? extractTagValue(recipientBlock, "CPF"),
+  );
   const issuedAt = parseXmlDate(extractTagValue(ideBlock, "dhEmi") ?? extractTagValue(ideBlock, "dEmi"));
   const totalAmount = parseXmlDecimal(extractTagValue(totalBlock, "vNF"));
   const items = parseStockInvoiceItems(rawXml);
@@ -207,11 +244,30 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
     invoiceSeries,
     supplierName,
     supplierDocument,
+    recipientName,
+    recipientDocument,
     issuedAt,
     totalAmount,
     itemCount,
     items,
   };
+}
+
+function getConfiguredCompanyDocument() {
+  return normalizeXmlDocument(process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE);
+}
+
+function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceXml) {
+  const configuredDocument = getConfiguredCompanyDocument();
+  if (!configuredDocument || !parsedInvoice.recipientDocument) {
+    return;
+  }
+
+  if (configuredDocument !== parsedInvoice.recipientDocument) {
+    throw new Error(
+      `XML pertence ao destinatario ${parsedInvoice.recipientDocument}, mas a empresa configurada e ${configuredDocument}. Confira o CNPJ antes de importar. Contate o Mateus.`,
+    );
+  }
 }
 
 function readBooleanFormFlag(input: FormData, key: string) {
@@ -376,6 +432,7 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
   }
 
   const parsedInvoice = parseStockInvoiceXml(rawXml);
+  assertInvoiceRecipientMatchesCompany(parsedInvoice);
   const applyStockImport = readBooleanFormFlag(input, "applyStockImport");
   const allowCreateProducts = readBooleanFormFlag(input, "allowCreateProducts");
 
@@ -436,6 +493,8 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
       invoiceNumber: created.invoiceNumber,
       invoiceSeries: created.invoiceSeries,
       supplierName: created.supplierName,
+      recipientName: parsedInvoice.recipientName,
+      recipientDocument: parsedInvoice.recipientDocument,
       itemCount: created.itemCount,
       sourceFileName: created.sourceFileName,
       sourceFileSize: created.sourceFileSize,
@@ -454,6 +513,7 @@ export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actor
   }
 
   const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
+  assertInvoiceRecipientMatchesCompany(parsedInvoice);
 
   const summary = await runStockXmlImport({
     xmlRecordId: xmlRecord.id,

@@ -28,8 +28,8 @@ export function UploadStockInvoiceXmlForm() {
         <Label htmlFor="xmlFile">Arquivo XML da NF-e</Label>
         <Input id="xmlFile" name="xmlFile" type="file" accept=".xml,text/xml,application/xml" required />
         <p className="text-xs text-muted-foreground">
-          O sistema sempre guarda o XML com metadados para auditoria e contador. Voce escolhe se quer importar os itens
-          agora.
+          O sistema valida o CNPJ destinatario, guarda o XML para auditoria e usa a unidade tributavel do XML para
+          calcular quantidade/custo vendavel.
         </p>
       </div>
 
@@ -45,7 +45,7 @@ export function UploadStockInvoiceXmlForm() {
           <span>
             <span className="block font-medium text-foreground">Importar itens no estoque agora</span>
             <span className="block text-xs text-muted-foreground">
-              Atualiza custo/NCM dos produtos encontrados e registra entrada de estoque automaticamente.
+              Atualiza custo/NCM dos produtos encontrados e registra a entrada com base em qTrib/uTrib/vUnTrib.
             </span>
           </span>
         </label>
