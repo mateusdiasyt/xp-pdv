@@ -22,7 +22,7 @@ import {
   Tv,
   Wallet,
 } from "lucide-react";
-import { useActionState, useDeferredValue, useState } from "react";
+import { useActionState, useDeferredValue, useEffect, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -94,6 +94,8 @@ type CartLine = {
   productId: string;
   quantity: number;
 };
+
+type QuickSaleStep = "items" | "payment";
 
 type CategoryFilterOption = {
   id: string;
@@ -274,6 +276,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
+  const [quickSaleStep, setQuickSaleStep] = useState<QuickSaleStep>("items");
 
   const hasOpenSessions = openSessions.length > 0;
   const hasProducts = products.length > 0;
@@ -347,6 +350,13 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     })
     .slice(0, 8);
   const customerNameValue = selectedCustomer?.fullName ?? customerQuery.trim();
+  const canProceedToPayment = cartItems.length > 0;
+
+  useEffect(() => {
+    if (cartItems.length === 0 && quickSaleStep === "payment") {
+      setQuickSaleStep("items");
+    }
+  }, [cartItems.length, quickSaleStep]);
 
   function addToCart(productId: string, quantityRaw: string) {
     const quantity = Number(quantityRaw);
@@ -443,13 +453,67 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
     setIsCustomerSearchOpen(false);
   }
 
+  function goToPaymentStep() {
+    if (!canProceedToPayment) {
+      return;
+    }
+
+    setPaymentLines((currentLines) => {
+      const shouldAutofillSingleLine =
+        currentLines.length === 1 && parseMoneyToCents(currentLines[0]?.amount ?? "0") === 0;
+
+      if (!shouldAutofillSingleLine) {
+        return currentLines;
+      }
+
+      return [
+        {
+          ...currentLines[0],
+          amount: (totalInCents / 100).toFixed(2),
+        },
+      ];
+    });
+    setQuickSaleStep("payment");
+  }
+
   return (
     <div className="space-y-4">
-      <header className="rounded-[1.4rem] border border-border/75 bg-background/38 px-4 py-3.5">
-        <p className="text-base font-semibold text-foreground">Venda rapida com ticket</p>
-        <p className="text-xs text-muted-foreground">
-          Pedido agil de balcao com impressao do ticket do cliente e via interna.
-        </p>
+      <header className="overflow-hidden rounded-[1.4rem] border border-border/75 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),rgba(18,17,17,0.72)] px-4 py-3.5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-base font-semibold text-foreground">Venda rapida com ticket</p>
+            <p className="text-xs text-muted-foreground">
+              Monte o pedido primeiro. A finalizacao abre em uma etapa limpa logo depois.
+            </p>
+          </div>
+          {canManage && hasOpenSessions ? (
+            <div className="inline-flex w-fit rounded-full border border-border/70 bg-background/60 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setQuickSaleStep("items")}
+                className={`rounded-full px-3 py-1.5 transition-all ${
+                  quickSaleStep === "items"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                1. Pedido
+              </button>
+              <button
+                type="button"
+                onClick={goToPaymentStep}
+                disabled={!canProceedToPayment}
+                className={`rounded-full px-3 py-1.5 transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+                  quickSaleStep === "payment"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                2. Pagamento
+              </button>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {!canManage ? (
@@ -488,7 +552,8 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
             ))}
           </fieldset>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+          {quickSaleStep === "items" ? (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
             <div className="space-y-4">
               <section className="admin-form-section space-y-4">
                 <div className="space-y-2">
@@ -815,13 +880,153 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                         </div>
                       </div>
                     ))}
+                    <div className="rounded-[1.35rem] border border-primary/20 bg-primary/8 p-3">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(subtotalInCents / 100)}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Desconto</span>
+                        <span>{formatCurrency(discountInCents / 100)}</span>
+                      </div>
+                      <div className="mt-3 border-t border-primary/20 pt-3">
+                        <div className="flex items-center justify-between text-base font-semibold text-foreground">
+                          <span>Total</span>
+                          <span>{formatCurrency(totalInCents / 100)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      className="w-full rounded-2xl"
+                      onClick={goToPaymentStep}
+                      disabled={!canProceedToPayment}
+                    >
+                      Ir para pagamento
+                    </Button>
                   </div>
                 )}
               </section>
             </aside>
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
+              <section className="admin-form-section space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Conferencia do pedido</p>
+                  <p className="text-xs text-muted-foreground">
+                    Revise os itens, estacao de gameplay e total antes de finalizar o pagamento.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setQuickSaleStep("items")}>
+                  Voltar para produtos
+                </Button>
+              </div>
 
-          <section className="admin-form-section space-y-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="space-y-2.5">
+                  {cartItems.map((item) => (
+                    <div
+                      key={`quick-checkout-item-${item.productId}`}
+                      className="rounded-[1.25rem] border border-border/75 bg-background/30 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{item.product.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {item.quantity}x {formatCurrency(item.product.salePrice)}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold text-foreground">
+                          {formatCurrency(item.lineTotal)}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-end gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor={`quick-checkout-quantity-${item.productId}`}>Qtd</Label>
+                          <Input
+                            id={`quick-checkout-quantity-${item.productId}`}
+                            value={String(item.quantity)}
+                            onChange={(event) => updateCartQuantity(item.productId, event.target.value)}
+                            type="number"
+                            min={1}
+                            step={1}
+                            inputMode="numeric"
+                            className={`w-24 ${quantityInputClassName}`}
+                            required
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          className="rounded-2xl"
+                          onClick={() => removeFromCart(item.productId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Remover item do ticket</span>
+                        </Button>
+
+                        {item.product.kind === ProductKind.GAMEPLAY ? (
+                          <div className="min-w-[180px] flex-1 space-y-1">
+                            <Label htmlFor={`quick-checkout-gameplay-station-${item.productId}`}>TV/estacao</Label>
+                            <div className="relative">
+                              <Tv className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200" />
+                              <select
+                                id={`quick-checkout-gameplay-station-${item.productId}`}
+                                className="admin-native-select pl-9"
+                                value={stationByProduct[item.productId] ?? inferGameplayStationId(item.product)}
+                                onChange={(event) =>
+                                  setStationByProduct((currentMap) => ({
+                                    ...currentMap,
+                                    [item.productId]: event.target.value,
+                                  }))
+                                }
+                                required
+                              >
+                                {gameplayStations.map((station) => (
+                                  <option key={station.id} value={station.id}>
+                                    {station.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-[1.35rem] border border-primary/25 bg-primary/8 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resumo</p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Itens</span>
+                      <span>{cartItems.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>{formatCurrency(subtotalInCents / 100)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Desconto</span>
+                      <span>{formatCurrency(discountInCents / 100)}</span>
+                    </div>
+                    <div className="border-t border-primary/20 pt-3">
+                      <div className="flex items-center justify-between text-lg font-semibold text-foreground">
+                        <span>Total</span>
+                        <span>{formatCurrency(totalInCents / 100)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </section>
+
+              <section className="admin-form-section space-y-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Wallet className="h-4 w-4 text-primary" />
               Fechamento rapido
@@ -893,11 +1098,11 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                       </div>
 
                       {traceablePayment ? (
-                        <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        <details className="mt-3 rounded-[1rem] border border-border/60 bg-background/24 p-3">
+                          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground">
                             Auditoria da transacao
-                          </p>
-                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          </summary>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                             <div className="space-y-2">
                               <Label htmlFor={`quick-payment-approved-${paymentLine.id}`}>Valor aprovado (R$)</Label>
                               <Input
@@ -1005,7 +1210,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                               />
                             </div>
                           </div>
-                        </div>
+                        </details>
                       ) : (
                         <>
                           <input type="hidden" name="paymentApprovedAmount" value="" />
@@ -1065,7 +1270,9 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
               {cartItems.length === 0 ? "Selecione itens para fechar" : "Finalizar e gerar ticket"}
             </FormSubmitButton>
             <ActionFeedback state={saleState} />
-          </section>
+              </section>
+            </div>
+          )}
         </form>
       )}
     </div>
