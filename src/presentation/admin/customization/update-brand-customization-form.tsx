@@ -110,7 +110,7 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
   }
 
   function restoreDefaults() {
-    setBrowserTitle("Painel Maia | Sistema Administrativo");
+    setBrowserTitle("PDV - XP Arcade e Bar");
     setPrimaryColor(defaultBrandColors.primaryColor);
     setAccentColor(defaultBrandColors.accentColor);
     setBackgroundColor(defaultBrandColors.backgroundColor);

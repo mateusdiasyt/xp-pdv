@@ -19,7 +19,7 @@ export async function ensureBrandCustomizationTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "BrandCustomization" (
       "id" TEXT NOT NULL,
-      "browserTitle" TEXT NOT NULL DEFAULT 'Painel Maia | Sistema Administrativo',
+      "browserTitle" TEXT NOT NULL DEFAULT 'PDV - XP Arcade e Bar',
       "primaryColor" TEXT NOT NULL DEFAULT '#d4a62a',
       "accentColor" TEXT NOT NULL DEFAULT '#b9882a',
       "backgroundColor" TEXT NOT NULL DEFAULT '#0a0a0a',
@@ -36,7 +36,7 @@ export async function ensureBrandCustomizationTable() {
 
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "BrandCustomization"
-    ADD COLUMN IF NOT EXISTS "browserTitle" TEXT NOT NULL DEFAULT 'Painel Maia | Sistema Administrativo';
+    ADD COLUMN IF NOT EXISTS "browserTitle" TEXT NOT NULL DEFAULT 'PDV - XP Arcade e Bar';
   `);
 
   await prisma.$executeRawUnsafe(`

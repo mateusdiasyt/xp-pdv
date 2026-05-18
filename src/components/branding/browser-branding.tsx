@@ -7,16 +7,22 @@ type BrandingMetadataResponse = {
   faviconHref?: string;
 };
 
-function upsertIconLink(rel: string, href: string) {
-  let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+function removeCurrentIconLinks() {
+  document
+    .querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
+    .forEach((link) => link.remove());
+}
 
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = rel;
-    document.head.appendChild(link);
+function upsertIconLink(rel: string, href: string) {
+  const link = document.createElement("link");
+  link.rel = rel;
+  link.href = href;
+
+  if (rel.includes("icon")) {
+    link.type = "image/png";
   }
 
-  link.href = href;
+  document.head.appendChild(link);
 }
 
 export function BrowserBranding() {
@@ -43,6 +49,7 @@ export function BrowserBranding() {
         }
 
         if (payload.faviconHref) {
+          removeCurrentIconLinks();
           upsertIconLink("icon", payload.faviconHref);
           upsertIconLink("shortcut icon", payload.faviconHref);
           upsertIconLink("apple-touch-icon", payload.faviconHref);
