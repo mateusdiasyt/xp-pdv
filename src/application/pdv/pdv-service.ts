@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { GameplayReleaseStatus, PaymentMethod, Prisma, SaleStatus } from "@prisma/client";
+import { GameplayReleaseStatus, PaymentMethod, Prisma, RefundStatus, SaleStatus } from "@prisma/client";
 
 import {
   addComandaItemSchema,
@@ -42,6 +42,7 @@ import {
   listPdvProductOptions,
   listRecentSales,
   resolveGameplayStationIdsForSelections,
+  updateSaleCancellationFiscalData,
 } from "@/infrastructure/db/repositories/sale-repository";
 
 function createSaleNumber() {
@@ -607,13 +608,42 @@ export async function cancelSaleRecord(input: FormData, actorId: string) {
   const parsed = cancelSaleSchema.parse({
     saleId: input.get("saleId"),
     cancelReason: input.get("cancelReason"),
+    refundStatus: input.get("refundStatus") || undefined,
+    refundMethod: input.get("refundMethod") || undefined,
+    refundAmount: input.get("refundAmount") || undefined,
+    refundNsu: input.get("refundNsu"),
+    refundAuthorizationCode: input.get("refundAuthorizationCode"),
+    refundTerminalId: input.get("refundTerminalId"),
+    refundExternalTransactionId: input.get("refundExternalTransactionId"),
+    refundReceiptText: input.get("refundReceiptText"),
   });
+  const refundMethod =
+    parsed.refundStatus === RefundStatus.NOT_REQUIRED
+      ? undefined
+      : parsed.refundMethod
+        ? parsed.refundMethod
+        : undefined;
+  const refundAmount =
+    parsed.refundStatus === RefundStatus.NOT_REQUIRED
+      ? undefined
+      : parsed.refundAmount
+        ? parseDecimalInput(parsed.refundAmount)
+        : undefined;
 
-  const cancelled = await cancelSaleAndRestock({
+  const cancellationResult = await cancelSaleAndRestock({
     saleId: parsed.saleId,
     cancelReason: parsed.cancelReason.trim(),
     cancelledById: actorId,
+    refundStatus: parsed.refundStatus,
+    refundMethod,
+    refundAmount,
+    refundNsu: emptyToUndefined(parsed.refundNsu),
+    refundAuthorizationCode: emptyToUndefined(parsed.refundAuthorizationCode),
+    refundTerminalId: emptyToUndefined(parsed.refundTerminalId),
+    refundExternalTransactionId: emptyToUndefined(parsed.refundExternalTransactionId),
+    refundReceiptText: emptyToUndefined(parsed.refundReceiptText),
   });
+  const cancelled = cancellationResult.sale;
 
   if (cancelled.status !== SaleStatus.CANCELLED) {
     throw new Error("Nao foi possivel cancelar a venda.");
@@ -627,6 +657,11 @@ export async function cancelSaleRecord(input: FormData, actorId: string) {
     metadata: {
       saleNumber: cancelled.saleNumber,
       cancelReason: parsed.cancelReason,
+      refundStatus: parsed.refundStatus,
+      refundMethod,
+      refundAmount: refundAmount?.toString(),
+      refundNsu: emptyToUndefined(parsed.refundNsu),
+      restoredQuantity: cancellationResult.restoredQuantity,
     },
   });
 
@@ -634,6 +669,10 @@ export async function cancelSaleRecord(input: FormData, actorId: string) {
     saleId: cancelled.id,
     reason: parsed.cancelReason,
     actorId,
+  });
+  await updateSaleCancellationFiscalData(cancelled.id, {
+    fiscalStatus: fiscalCancellation.status,
+    fiscalMessage: fiscalCancellation.message,
   });
 
   const baseMessage = "Venda cancelada com sucesso.";

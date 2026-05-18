@@ -41,6 +41,13 @@ enum PaymentStatus {
   DIVERGENT
 }
 
+enum RefundStatus {
+  NOT_REQUIRED
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
 enum ProductKind {
   STANDARD
   GAMEPLAY
@@ -158,6 +165,7 @@ model User {
   cashMovements  CashMovement[]  @relation("CashMovementOperator")
   sales          Sale[]          @relation("SaleOperator")
   cancelledSales Sale[]          @relation("SaleCancelledBy")
+  saleCancellations SaleCancellation[] @relation("SaleCancellationCreatedBy")
   directPermissions UserPermission[]
   createdGoals   DailyGoal[]     @relation("GoalCreatedBy")
   createdMonthlyGoalPlans MonthlyGoalPlan[] @relation("MonthlyGoalPlanCreatedBy")
@@ -419,6 +427,7 @@ model Sale {
   payments    Payment[]
   closedComanda Comanda? @relation("ComandaClosedSale")
   gameplayRelease GameplayRelease?
+  cancellation SaleCancellation?
 
   @@index([cashSessionId, createdAt])
   @@index([operatorId])
@@ -606,6 +615,34 @@ model Payment {
   @@index([authorizationCode])
   @@index([externalTransactionId])
   @@index([terminalId, createdAt])
+}
+
+model SaleCancellation {
+  id                          String       @id @default(cuid())
+  saleId                      String       @unique
+  reason                      String
+  refundStatus                RefundStatus @default(PENDING)
+  refundMethod                PaymentMethod?
+  refundAmount                Decimal      @default(0) @db.Decimal(12, 2)
+  refundNsu                   String?
+  refundAuthorizationCode     String?
+  refundTerminalId            String?
+  refundExternalTransactionId String?
+  refundReceiptText           String?
+  fiscalStatus                String?
+  fiscalMessage               String?
+  stockRestored               Boolean      @default(false)
+  createdById                 String?
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
+
+  sale      Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("SaleCancellationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([refundStatus])
+  @@index([refundMethod])
+  @@index([createdAt])
+  @@index([createdById])
 }
 
 model DailyGoal {

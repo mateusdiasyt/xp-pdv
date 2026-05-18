@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { PaymentMethod, PaymentStatus, SaleStatus } from "@prisma/client";
+import { PaymentMethod, PaymentStatus, RefundStatus, SaleStatus } from "@prisma/client";
 
 import { requirePermission } from "@/application/auth/guards";
 import { getPdvData, getSaleReceiptData } from "@/application/pdv/pdv-service";
@@ -131,6 +131,41 @@ function getGameplayStatusPresentation(status?: string | null) {
   if (normalized === "FALHA_ENVIO") {
     return {
       label: "Falha",
+      className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
+    };
+  }
+
+  return {
+    label: "-",
+    className: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
+  };
+}
+
+function getRefundStatusPresentation(status?: RefundStatus | null) {
+  if (status === RefundStatus.CONFIRMED) {
+    return {
+      label: "Estornado",
+      className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+    };
+  }
+
+  if (status === RefundStatus.PENDING) {
+    return {
+      label: "Estorno pendente",
+      className: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+    };
+  }
+
+  if (status === RefundStatus.NOT_REQUIRED) {
+    return {
+      label: "Sem devolucao",
+      className: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
+    };
+  }
+
+  if (status === RefundStatus.FAILED) {
+    return {
+      label: "Falha no estorno",
       className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
     };
   }
@@ -306,6 +341,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                   <TableHead>Caixa</TableHead>
                   <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Estorno</TableHead>
                   <TableHead>Fiscal</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead>Gameplay</TableHead>
@@ -317,7 +353,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
               <TableBody>
                 {sales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center text-sm text-muted-foreground">
                       Nenhuma venda registrada.
                     </TableCell>
                   </TableRow>
@@ -325,7 +361,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                 {groupedSales.map((group) => (
                   <Fragment key={`group-fragment-${group.dateKey}`}>
                     <TableRow key={`group-${group.dateKey}`} className="bg-muted/20">
-                      <TableCell colSpan={11} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <TableCell colSpan={12} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {group.dateLabel}
                       </TableCell>
                     </TableRow>
@@ -348,6 +384,20 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                           >
                             {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {sale.cancellation ? (
+                            <div className="space-y-1">
+                              <Badge className={getRefundStatusPresentation(sale.cancellation.refundStatus).className}>
+                                {getRefundStatusPresentation(sale.cancellation.refundStatus).label}
+                              </Badge>
+                              <p className="text-[11px] text-muted-foreground">
+                                {sale.cancellation.stockRestored ? "Estoque retornado" : "Sem retorno de estoque"}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
@@ -426,7 +476,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                               </form>
                             ) : null}
                             {canCancel && sale.status === SaleStatus.COMPLETED ? (
-                              <CancelSaleForm saleId={sale.id} />
+                              <CancelSaleForm saleId={sale.id} totalAmount={Number(sale.totalAmount)} />
                             ) : (
                               <span className="text-xs text-muted-foreground">-</span>
                             )}

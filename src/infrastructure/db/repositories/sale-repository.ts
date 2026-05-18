@@ -5,6 +5,7 @@ import {
   Prisma,
   ProductKind,
   RecordStatus,
+  RefundStatus,
   SaleStatus,
   StockMovementType,
 } from "@prisma/client";
@@ -45,6 +46,20 @@ type CreateSaleWithStockAdjustmentInput = {
   items: SaleItemInput[];
   payments: SalePaymentInput[];
   gameplaySelections?: GameplaySelectionInput[];
+};
+
+type CancelSaleAndRestockInput = {
+  saleId: string;
+  cancelReason: string;
+  cancelledById: string;
+  refundStatus: RefundStatus;
+  refundMethod?: PaymentMethod;
+  refundAmount?: Prisma.Decimal;
+  refundNsu?: string;
+  refundAuthorizationCode?: string;
+  refundTerminalId?: string;
+  refundExternalTransactionId?: string;
+  refundReceiptText?: string;
 };
 
 type PrismaTx = Prisma.TransactionClient;
@@ -370,6 +385,7 @@ export async function listRecentSales() {
       },
       payments: true,
       gameplayRelease: true,
+      cancellation: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -414,6 +430,7 @@ export async function getSaleReceiptById(saleId: string) {
         },
       },
       gameplayRelease: true,
+      cancellation: true,
     },
   });
 }
@@ -690,11 +707,7 @@ export async function createSaleWithStockAdjustmentInTransaction(
   return runCreateSaleWithStockAdjustment(tx, data);
 }
 
-export async function cancelSaleAndRestock(data: {
-  saleId: string;
-  cancelReason: string;
-  cancelledById: string;
-}) {
+export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
   return runWithTransactionRetry(() =>
     prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUniqueOrThrow({
@@ -707,6 +720,11 @@ export async function cancelSaleAndRestock(data: {
       if (sale.status === SaleStatus.CANCELLED) {
         throw new Error("A venda selecionada ja foi cancelada.");
       }
+
+      const refundAmount =
+        data.refundStatus === RefundStatus.NOT_REQUIRED
+          ? new Prisma.Decimal(0)
+          : data.refundAmount ?? sale.totalAmount;
 
       const productIds = [...new Set(sale.items.map((item) => item.productId))];
       const products = await tx.product.findMany({
@@ -730,6 +748,35 @@ export async function cancelSaleAndRestock(data: {
           cancelledAt: new Date(),
         },
       });
+
+      if (data.refundStatus === RefundStatus.CONFIRMED) {
+        await tx.payment.updateMany({
+          where: {
+            saleId: sale.id,
+          },
+          data: {
+            status: PaymentStatus.REFUNDED,
+          },
+        });
+      }
+
+      const cancellation = await tx.saleCancellation.create({
+        data: {
+          saleId: sale.id,
+          reason: data.cancelReason,
+          refundStatus: data.refundStatus,
+          refundMethod: data.refundMethod,
+          refundAmount,
+          refundNsu: normalizeOptionalPaymentText(data.refundNsu),
+          refundAuthorizationCode: normalizeOptionalPaymentText(data.refundAuthorizationCode),
+          refundTerminalId: normalizeOptionalPaymentText(data.refundTerminalId),
+          refundExternalTransactionId: normalizeOptionalPaymentText(data.refundExternalTransactionId),
+          refundReceiptText: normalizeOptionalPaymentText(data.refundReceiptText),
+          createdById: data.cancelledById,
+        },
+      });
+
+      let restoredQuantity = 0;
 
       for (const item of sale.items) {
         const product = productMap.get(item.productId);
@@ -762,13 +809,39 @@ export async function cancelSaleAndRestock(data: {
             unitCost: product.costPrice,
             previousStock: product.currentStock,
             resultingStock,
-            note: `Retorno por cancelamento da venda ${sale.saleNumber}`,
+            note: `Retorno por cancelamento da venda ${sale.saleNumber}: ${data.cancelReason}`,
             operatorId: data.cancelledById,
           },
         });
+        restoredQuantity += item.quantity;
       }
 
-      return cancelledSale;
+      const updatedCancellation = await tx.saleCancellation.update({
+        where: {
+          id: cancellation.id,
+        },
+        data: {
+          stockRestored: restoredQuantity > 0,
+        },
+      });
+
+      return {
+        sale: cancelledSale,
+        cancellation: updatedCancellation,
+        restoredQuantity,
+      };
     }, PDV_TRANSACTION_OPTIONS),
   );
+}
+
+export async function updateSaleCancellationFiscalData(
+  saleId: string,
+  data: Pick<Prisma.SaleCancellationUncheckedUpdateInput, "fiscalStatus" | "fiscalMessage">,
+) {
+  return prisma.saleCancellation.update({
+    where: {
+      saleId,
+    },
+    data,
+  });
 }

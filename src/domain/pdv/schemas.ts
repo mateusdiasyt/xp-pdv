@@ -1,4 +1,4 @@
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, RefundStatus } from "@prisma/client";
 import { z } from "zod";
 
 const decimalRegex = /^\d+([.,]\d{1,2})?$/;
@@ -127,6 +127,14 @@ export const salePaymentSchema = z.object({
 export const cancelSaleSchema = z.object({
   saleId: z.string().min(1, "Venda obrigatoria"),
   cancelReason: z.string().min(3, "Informe o motivo do cancelamento").max(280, "Motivo muito longo"),
+  refundStatus: z.nativeEnum(RefundStatus).default(RefundStatus.PENDING),
+  refundMethod: z.nativeEnum(PaymentMethod).optional().or(z.literal("")),
+  refundAmount: z.string().regex(decimalRegex, "Valor de estorno invalido").optional().or(z.literal("")),
+  refundNsu: z.string().trim().max(80, "NSU muito longo").optional().or(z.literal("")),
+  refundAuthorizationCode: z.string().trim().max(80, "Codigo de autorizacao muito longo").optional().or(z.literal("")),
+  refundTerminalId: z.string().trim().max(80, "Identificacao da maquininha muito longa").optional().or(z.literal("")),
+  refundExternalTransactionId: z.string().trim().max(120, "ID da transacao muito longo").optional().or(z.literal("")),
+  refundReceiptText: z.string().trim().max(1000, "Comprovante muito longo").optional().or(z.literal("")),
 });
 
 export const cancelComandaSchema = z.object({
