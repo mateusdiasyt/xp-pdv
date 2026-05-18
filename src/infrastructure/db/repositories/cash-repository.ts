@@ -1,4 +1,4 @@
-import { CashMovementType, CashSessionStatus, Prisma, RecordStatus } from "@prisma/client";
+import { CashMovementType, CashSessionStatus, PaymentStatus, Prisma, RecordStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -26,13 +26,13 @@ export async function listCashSessions() {
       },
       movements: true,
       sales: {
-        where: {
-          status: "COMPLETED",
-        },
         select: {
           id: true,
           totalAmount: true,
           payments: {
+            where: {
+              status: PaymentStatus.APPROVED,
+            },
             select: {
               method: true,
               amount: true,
@@ -74,11 +74,12 @@ export async function getCashSessionForClosing(cashSessionId: string) {
     include: {
       movements: true,
       sales: {
-        where: {
-          status: "COMPLETED",
-        },
         include: {
-          payments: true,
+          payments: {
+            where: {
+              status: PaymentStatus.APPROVED,
+            },
+          },
         },
       },
     },

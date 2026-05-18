@@ -72,6 +72,7 @@ export async function cancelSaleAction(
     const session = await requirePermission(PERMISSIONS.PDV_CANCEL);
     const result = await cancelSaleRecord(formData, session.user.id);
     revalidatePath("/admin/pdv");
+    revalidatePath("/admin/cash");
     revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
     revalidatePath("/admin");

@@ -1,4 +1,5 @@
 import {
+  CashMovementType,
   CashSessionStatus,
   PaymentMethod,
   PaymentStatus,
@@ -714,6 +715,7 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
         where: { id: data.saleId },
         include: {
           items: true,
+          payments: true,
         },
       });
 
@@ -725,6 +727,15 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
         data.refundStatus === RefundStatus.NOT_REQUIRED
           ? new Prisma.Decimal(0)
           : data.refundAmount ?? sale.totalAmount;
+      const refundDifference = refundAmount.minus(sale.totalAmount).abs();
+
+      if (data.refundStatus === RefundStatus.CONFIRMED && !data.refundMethod) {
+        throw new Error("Informe a forma usada para o estorno confirmado. Contate o Mateus.");
+      }
+
+      if (data.refundStatus === RefundStatus.CONFIRMED && refundDifference.greaterThan(new Prisma.Decimal("0.01"))) {
+        throw new Error("O valor do estorno confirmado precisa bater com o total da venda. Contate o Mateus.");
+      }
 
       const productIds = [...new Set(sale.items.map((item) => item.productId))];
       const products = await tx.product.findMany({
@@ -758,6 +769,25 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
             status: PaymentStatus.REFUNDED,
           },
         });
+      }
+
+      if (data.refundStatus === RefundStatus.CONFIRMED && data.refundMethod === PaymentMethod.CASH) {
+        const originalCashAmount = sale.payments
+          .filter((payment) => payment.method === PaymentMethod.CASH)
+          .reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0));
+        const cashOutflowAmount = refundAmount.minus(originalCashAmount);
+
+        if (cashOutflowAmount.greaterThan(0)) {
+          await tx.cashMovement.create({
+            data: {
+              cashSessionId: sale.cashSessionId,
+              operatorId: data.cancelledById,
+              type: CashMovementType.WITHDRAWAL,
+              amount: cashOutflowAmount,
+              reason: `Estorno em dinheiro da venda ${sale.saleNumber}: ${data.cancelReason}`,
+            },
+          });
+        }
       }
 
       const cancellation = await tx.saleCancellation.create({
