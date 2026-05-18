@@ -1,7 +1,7 @@
 "use client";
 
 import { PencilLine } from "lucide-react";
-import { ProductKind, RecordStatus } from "@prisma/client";
+import type { ProductKind, RecordStatus } from "@prisma/client";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,31 +25,66 @@ type EditProductDialogProps = {
   product: {
     id: string;
     name: string;
-    sku: string;
-    ncm?: string | null;
-    description?: string | null;
-    imageUrl?: string | null;
-    kind: ProductKind;
-    serviceCnae?: string | null;
-    serviceDescription?: string | null;
-    gameplayPlanCode?: string | null;
-    gameplayDurationMinutes?: number | null;
-    tracksStock: boolean;
-    categoryId: string;
-    supplierId?: string | null;
-    costPrice: string;
-    salePrice: string;
-    minStock: number;
-    currentStock: number;
-    status: RecordStatus;
   };
+};
+
+type ProductEditPayload = {
+  id: string;
+  name: string;
+  sku: string;
+  ncm?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  kind: ProductKind;
+  serviceCnae?: string | null;
+  serviceDescription?: string | null;
+  gameplayPlanCode?: string | null;
+  gameplayDurationMinutes?: number | null;
+  tracksStock: boolean;
+  categoryId: string;
+  supplierId?: string | null;
+  costPrice: string;
+  salePrice: string;
+  minStock: number;
+  currentStock: number;
+  status: RecordStatus;
 };
 
 export function EditProductDialog({ categories, suppliers, product }: EditProductDialogProps) {
   const [open, setOpen] = useState(false);
+  const [productPayload, setProductPayload] = useState<ProductEditPayload | null>(null);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  async function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+
+    if (!nextOpen || productPayload || isLoadingProduct) {
+      return;
+    }
+
+    try {
+      setIsLoadingProduct(true);
+      setLoadError(null);
+      const response = await fetch(`/api/admin/products/${product.id}`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Nao foi possivel carregar os dados do produto.");
+      }
+
+      const payload = (await response.json()) as ProductEditPayload;
+      setProductPayload(payload);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Nao foi possivel carregar o produto.");
+    } finally {
+      setIsLoadingProduct(false);
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button size="sm" variant="outline" className="gap-1.5" type="button" />}>
         <PencilLine className="h-4 w-4" />
         Editar
@@ -60,34 +95,48 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
           <DialogDescription>Ajuste imagem, precificacao, estoque e dados de catalogo.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[78vh] overflow-y-auto p-5">
-          <CreateProductForm
-            action={updateProductAction}
-            categories={categories}
-            suppliers={suppliers}
-            submitLabel="Salvar alteracoes"
-            initialData={{
-              productId: product.id,
-              name: product.name,
-              sku: product.sku,
-              ncm: product.ncm ?? "",
-              description: product.description,
-              imageUrl: product.imageUrl,
-              kind: product.kind,
-              serviceCnae: product.serviceCnae,
-              serviceDescription: product.serviceDescription,
-              gameplayPlanCode: product.gameplayPlanCode,
-              gameplayDurationMinutes: product.gameplayDurationMinutes,
-              tracksStock: product.tracksStock,
-              categoryId: product.categoryId,
-              supplierId: product.supplierId,
-              costPrice: product.costPrice,
-              salePrice: product.salePrice,
-              minStock: product.minStock,
-              currentStock: product.currentStock,
-              status: product.status,
-            }}
-            onSuccess={() => setOpen(false)}
-          />
+          {isLoadingProduct ? (
+            <div className="rounded-2xl border border-border/70 bg-background/35 p-6 text-sm text-muted-foreground">
+              Carregando dados completos do produto...
+            </div>
+          ) : null}
+
+          {loadError ? (
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-destructive">
+              {loadError} Contate o Mateus.
+            </div>
+          ) : null}
+
+          {productPayload ? (
+            <CreateProductForm
+              action={updateProductAction}
+              categories={categories}
+              suppliers={suppliers}
+              submitLabel="Salvar alteracoes"
+              initialData={{
+                productId: productPayload.id,
+                name: productPayload.name,
+                sku: productPayload.sku,
+                ncm: productPayload.ncm ?? "",
+                description: productPayload.description,
+                imageUrl: productPayload.imageUrl,
+                kind: productPayload.kind,
+                serviceCnae: productPayload.serviceCnae,
+                serviceDescription: productPayload.serviceDescription,
+                gameplayPlanCode: productPayload.gameplayPlanCode,
+                gameplayDurationMinutes: productPayload.gameplayDurationMinutes,
+                tracksStock: productPayload.tracksStock,
+                categoryId: productPayload.categoryId,
+                supplierId: productPayload.supplierId,
+                costPrice: productPayload.costPrice,
+                salePrice: productPayload.salePrice,
+                minStock: productPayload.minStock,
+                currentStock: productPayload.currentStock,
+                status: productPayload.status,
+              }}
+              onSuccess={() => setOpen(false)}
+            />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

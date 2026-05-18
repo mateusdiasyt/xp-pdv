@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ProductKind, RecordStatus } from "@prisma/client";
 import { Download, Search, SlidersHorizontal } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
-import { getProductFormOptions, getProducts } from "@/application/catalog/product-service";
+import { getProductFormOptions, getProducts, getProductsCount } from "@/application/catalog/product-service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +22,7 @@ type ProductsPageProps = {
     q?: string;
     status?: string;
     categoryId?: string;
+    page?: string;
   }>;
 };
 
@@ -33,6 +35,8 @@ const statusFilterOptions: Array<{ label: string; value: string }> = [
 const headerOutlineLinkClass =
   "inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70";
 
+const PRODUCT_PAGE_SIZE = 25;
+
 function productAvatarLabel(name: string) {
   return name
     .split(" ")
@@ -44,13 +48,17 @@ function productAvatarLabel(name: string) {
 }
 
 function ProductImageCard({
+  id,
   name,
-  imageUrl,
+  hasImage,
+  updatedAt,
 }: {
+  id: string;
   name: string;
-  imageUrl?: string | null;
+  hasImage: boolean;
+  updatedAt: Date;
 }) {
-  if (!imageUrl) {
+  if (!hasImage) {
     return (
       <div className="flex aspect-[4/3] items-center justify-center rounded-2xl border border-dashed border-border/75 bg-background/35">
         <span className="text-2xl font-semibold tracking-[-0.04em] text-muted-foreground">
@@ -62,7 +70,14 @@ function ProductImageCard({
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border/75 bg-background/35">
-      <Image src={imageUrl} alt={name} fill className="object-cover" unoptimized />
+      <Image
+        src={`/api/admin/products/${id}/image?v=${updatedAt.getTime()}`}
+        alt={name}
+        fill
+        className="object-cover"
+        sizes="(min-width: 1750px) 18vw, (min-width: 1280px) 24vw, (min-width: 768px) 44vw, 90vw"
+        unoptimized
+      />
     </div>
   );
 }
@@ -79,25 +94,86 @@ function getProductKindLabel(kind: ProductKind) {
   return "Produto";
 }
 
+function normalizePage(value?: string) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+
+  return Math.floor(parsed);
+}
+
+function productsPageHref(input: {
+  q?: string;
+  status?: string;
+  categoryId?: string;
+  page: number;
+}) {
+  const params = new URLSearchParams();
+
+  if (input.q) {
+    params.set("q", input.q);
+  }
+
+  if (input.status) {
+    params.set("status", input.status);
+  }
+
+  if (input.categoryId) {
+    params.set("categoryId", input.categoryId);
+  }
+
+  if (input.page > 1) {
+    params.set("page", String(input.page));
+  }
+
+  const queryString = params.toString();
+  return queryString ? `/admin/products?${queryString}` : "/admin/products";
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const session = await requirePermission(PERMISSIONS.PRODUCTS_VIEW);
-  const { q, status, categoryId } = await searchParams;
+  const { q, status, categoryId, page } = await searchParams;
   const search = q?.trim() || undefined;
   const statusFilter =
     status === RecordStatus.ACTIVE || status === RecordStatus.INACTIVE ? (status as RecordStatus) : undefined;
   const categoryFilter =
     categoryId && categoryId !== "all" ? categoryId.trim() || undefined : undefined;
+  const requestedPage = normalizePage(page);
+  const baseFilters = {
+    search,
+    status: statusFilter,
+    categoryId: categoryFilter,
+  };
 
-  const [products, options] = await Promise.all([
+  const [products, totalProducts, options] = await Promise.all([
     getProducts({
-      search,
-      status: statusFilter,
-      categoryId: categoryFilter,
+      ...baseFilters,
+      take: PRODUCT_PAGE_SIZE,
+      skip: (requestedPage - 1) * PRODUCT_PAGE_SIZE,
     }),
+    getProductsCount(baseFilters),
     getProductFormOptions(),
   ]);
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.PRODUCTS_MANAGE);
   const hasFilters = Boolean(search || statusFilter || categoryFilter);
+  const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCT_PAGE_SIZE));
+
+  if (totalProducts > 0 && requestedPage > totalPages) {
+    redirect(
+      productsPageHref({
+        q: search,
+        status: statusFilter,
+        categoryId: categoryFilter,
+        page: totalPages,
+      }),
+    );
+  }
+
+  const currentPage = Math.min(requestedPage, totalPages);
+  const firstVisibleProduct = totalProducts === 0 ? 0 : (currentPage - 1) * PRODUCT_PAGE_SIZE + 1;
+  const lastVisibleProduct = Math.min(currentPage * PRODUCT_PAGE_SIZE, totalProducts);
 
   const groupedProducts = options.categories
     .map((category) => ({
@@ -181,9 +257,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
             <p>
-              {products.length} produto(s) encontrado(s)
+              {totalProducts} produto(s) encontrado(s)
             </p>
-            <p>Filtros ativos: {hasFilters ? "sim" : "nao"}</p>
+            <p>
+              Mostrando {firstVisibleProduct}-{lastVisibleProduct} de {totalProducts} · filtros ativos:{" "}
+              {hasFilters ? "sim" : "nao"}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -221,7 +300,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               return (
                 <Card key={product.id} className="overflow-hidden">
                   <CardContent className="space-y-4 pt-4">
-                    <ProductImageCard name={product.name} imageUrl={product.imageUrl} />
+                    <ProductImageCard
+                      id={product.id}
+                      name={product.name}
+                      hasImage={product.hasImage}
+                      updatedAt={product.updatedAt}
+                    />
 
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
@@ -310,23 +394,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                             product={{
                               id: product.id,
                               name: product.name,
-                              sku: product.sku,
-                              ncm: product.ncm,
-                              description: product.description,
-                              imageUrl: product.imageUrl,
-                              kind: product.kind,
-                              serviceCnae: product.serviceCnae,
-                              serviceDescription: product.serviceDescription,
-                              gameplayPlanCode: product.gameplayPlanCode,
-                              gameplayDurationMinutes: product.gameplayDurationMinutes,
-                              tracksStock: product.tracksStock,
-                              categoryId: product.categoryId,
-                              supplierId: product.supplierId,
-                              costPrice: Number(product.costPrice).toFixed(2),
-                              salePrice: Number(product.salePrice).toFixed(2),
-                              minStock: product.minStock,
-                              currentStock: product.currentStock,
-                              status: product.status,
                             }}
                           />
 
@@ -353,6 +420,36 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </div>
         </section>
       ))}
+
+      {totalPages > 1 ? (
+        <nav className="flex flex-wrap items-center justify-center gap-2 rounded-3xl border border-border/70 bg-card/80 p-3 text-sm">
+          <Link
+            href={productsPageHref({
+              q: search,
+              status: statusFilter,
+              categoryId: categoryFilter,
+              page: Math.max(1, currentPage - 1),
+            })}
+            className={cn(headerOutlineLinkClass, currentPage === 1 && "pointer-events-none opacity-45")}
+          >
+            Anterior
+          </Link>
+          <span className="px-3 text-muted-foreground">
+            Pagina {currentPage} de {totalPages}
+          </span>
+          <Link
+            href={productsPageHref({
+              q: search,
+              status: statusFilter,
+              categoryId: categoryFilter,
+              page: Math.min(totalPages, currentPage + 1),
+            })}
+            className={cn(headerOutlineLinkClass, currentPage >= totalPages && "pointer-events-none opacity-45")}
+          >
+            Proxima
+          </Link>
+        </nav>
+      ) : null}
     </div>
   );
 }

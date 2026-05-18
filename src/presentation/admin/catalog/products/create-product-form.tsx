@@ -110,8 +110,8 @@ async function buildImagePreviewDataUrl(file: File) {
       nextImage.src = imageBitmapUrl;
     });
 
-    const maxWidth = 1200;
-    const maxHeight = 1200;
+    const maxWidth = 520;
+    const maxHeight = 520;
     const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
     const targetWidth = Math.max(1, Math.round(image.width * ratio));
     const targetHeight = Math.max(1, Math.round(image.height * ratio));
@@ -126,7 +126,7 @@ async function buildImagePreviewDataUrl(file: File) {
     }
 
     context.drawImage(image, 0, 0, targetWidth, targetHeight);
-    return canvas.toDataURL("image/webp", 0.82);
+    return canvas.toDataURL("image/webp", 0.74);
   } finally {
     URL.revokeObjectURL(imageBitmapUrl);
   }
@@ -176,7 +176,7 @@ export function CreateProductForm({
       setImageError(null);
       const previewUrl = await buildImagePreviewDataUrl(file);
 
-      if (previewUrl.length > 900_000) {
+      if (previewUrl.length > 350_000) {
         throw new Error("A imagem ficou muito grande. Use um arquivo menor para continuar.");
       }
 

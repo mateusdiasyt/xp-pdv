@@ -6,22 +6,11 @@ type ListProductsFilters = {
   search?: string;
   status?: RecordStatus;
   categoryId?: string;
+  take?: number;
+  skip?: number;
 };
 
-function isMissingProductImageColumnError(error: unknown) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return error.code === "P2022" && String(error.meta?.column ?? "").toLowerCase().includes("imageurl");
-  }
-
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    return message.includes("imageurl") && (message.includes("column") || message.includes("does not exist"));
-  }
-
-  return false;
-}
-
-export async function listProducts(filters?: ListProductsFilters) {
+function buildProductWhere(filters?: ListProductsFilters) {
   const where: Prisma.ProductWhereInput = {};
 
   if (filters?.search) {
@@ -39,40 +28,124 @@ export async function listProducts(filters?: ListProductsFilters) {
     where.categoryId = filters.categoryId;
   }
 
-  try {
-    return await prisma.product.findMany({
+  return where;
+}
+
+function appendSqlCondition(current: Prisma.Sql, next: Prisma.Sql) {
+  if (current === Prisma.empty) {
+    return next;
+  }
+
+  return Prisma.sql`${current} AND ${next}`;
+}
+
+function buildProductWhereSql(filters?: ListProductsFilters) {
+  let where = Prisma.empty;
+
+  if (filters?.search) {
+    const searchTerm = `%${filters.search}%`;
+    where = appendSqlCondition(
       where,
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-        ncm: true,
-        description: true,
-        imageUrl: true,
-        kind: true,
-        serviceCnae: true,
-        serviceDescription: true,
-        gameplayPlanCode: true,
-        gameplayDurationMinutes: true,
-        tracksStock: true,
-        costPrice: true,
-        salePrice: true,
-        marginPercent: true,
-        minStock: true,
-        currentStock: true,
-        status: true,
-        categoryId: true,
-        supplierId: true,
-        unitId: true,
-        createdAt: true,
-        updatedAt: true,
-        category: true,
-        supplier: true,
+      Prisma.sql`(p."name" ILIKE ${searchTerm} OR p."sku" ILIKE ${searchTerm})`,
+    );
+  }
+
+  if (filters?.status) {
+    where = appendSqlCondition(where, Prisma.sql`p."status" = ${filters.status}::"RecordStatus"`);
+  }
+
+  if (filters?.categoryId) {
+    where = appendSqlCondition(where, Prisma.sql`p."categoryId" = ${filters.categoryId}`);
+  }
+
+  return where === Prisma.empty ? Prisma.empty : Prisma.sql`WHERE ${where}`;
+}
+
+function isMissingProductImageColumnError(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === "P2022" && String(error.meta?.column ?? "").toLowerCase().includes("imageurl");
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return message.includes("imageurl") && (message.includes("column") || message.includes("does not exist"));
+  }
+
+  return false;
+}
+
+export async function listProducts(filters?: ListProductsFilters) {
+  const where = buildProductWhere(filters);
+
+  try {
+    const products = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        sku: string;
+        ncm: string | null;
+        description: string | null;
+        hasImage: boolean;
+        kind: ProductKind;
+        serviceCnae: string | null;
+        serviceDescription: string | null;
+        gameplayPlanCode: string | null;
+        gameplayDurationMinutes: number | null;
+        tracksStock: boolean;
+        costPrice: Prisma.Decimal;
+        salePrice: Prisma.Decimal;
+        marginPercent: Prisma.Decimal;
+        minStock: number;
+        currentStock: number;
+        status: RecordStatus;
+        categoryId: string;
+        supplierId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        categoryName: string;
+        categorySlug: string;
+      }>
+    >`
+      SELECT
+        p."id",
+        p."name",
+        p."sku",
+        p."ncm",
+        p."description",
+        COALESCE(length(p."imageUrl"), 0) > 0 AS "hasImage",
+        p."kind",
+        p."serviceCnae",
+        p."serviceDescription",
+        p."gameplayPlanCode",
+        p."gameplayDurationMinutes",
+        p."tracksStock",
+        p."costPrice",
+        p."salePrice",
+        p."marginPercent",
+        p."minStock",
+        p."currentStock",
+        p."status",
+        p."categoryId",
+        p."supplierId",
+        p."createdAt",
+        p."updatedAt",
+        c."name" AS "categoryName",
+        c."slug" AS "categorySlug"
+      FROM "Product" p
+      INNER JOIN "ProductCategory" c ON c."id" = p."categoryId"
+      ${buildProductWhereSql(filters)}
+      ORDER BY p."createdAt" DESC
+      ${filters?.take ? Prisma.sql`LIMIT ${filters.take} OFFSET ${filters.skip ?? 0}` : Prisma.empty}
+    `;
+
+    return products.map(({ categoryName, categorySlug, ...product }) => ({
+      ...product,
+      category: {
+        id: product.categoryId,
+        name: categoryName,
+        slug: categorySlug,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    }));
   } catch (error) {
     if (!isMissingProductImageColumnError(error)) {
       throw error;
@@ -100,20 +173,26 @@ export async function listProducts(filters?: ListProductsFilters) {
         status: true,
         categoryId: true,
         supplierId: true,
-        unitId: true,
         createdAt: true,
         updatedAt: true,
-        category: true,
-        supplier: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
       },
+      take: filters?.take,
+      skip: filters?.skip,
     });
 
     return products.map((product) => ({
       ...product,
-      imageUrl: null,
+      hasImage: false,
     }));
   }
 }
@@ -192,8 +271,48 @@ export async function updateProduct(data: {
   });
 }
 
-export async function countProducts() {
-  return prisma.product.count();
+export async function countProducts(filters?: ListProductsFilters) {
+  return prisma.product.count({
+    where: buildProductWhere(filters),
+  });
+}
+
+export async function getProductForEdit(productId: string) {
+  return prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      ncm: true,
+      description: true,
+      imageUrl: true,
+      kind: true,
+      serviceCnae: true,
+      serviceDescription: true,
+      gameplayPlanCode: true,
+      gameplayDurationMinutes: true,
+      tracksStock: true,
+      costPrice: true,
+      salePrice: true,
+      minStock: true,
+      currentStock: true,
+      status: true,
+      categoryId: true,
+      supplierId: true,
+    },
+  });
+}
+
+export async function getProductImageById(productId: string) {
+  return prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      imageUrl: true,
+      updatedAt: true,
+    },
+  });
 }
 
 export async function listProductOptions() {

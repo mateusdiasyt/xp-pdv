@@ -6,6 +6,9 @@ import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repos
 import { listCategoryOptions } from "@/infrastructure/db/repositories/category-repository";
 import {
   createProduct,
+  countProducts,
+  getProductForEdit,
+  getProductImageById,
   listProductOptions,
   listProducts,
   updateProduct,
@@ -25,8 +28,26 @@ export async function getProducts(filters?: {
   search?: string;
   status?: RecordStatus;
   categoryId?: string;
+  take?: number;
+  skip?: number;
 }) {
   return listProducts(filters);
+}
+
+export async function getProductsCount(filters?: {
+  search?: string;
+  status?: RecordStatus;
+  categoryId?: string;
+}) {
+  return countProducts(filters);
+}
+
+export async function getProductEditPayload(productId: string) {
+  return getProductForEdit(productId);
+}
+
+export async function getProductImagePayload(productId: string) {
+  return getProductImageById(productId);
 }
 
 export async function getProductOptions() {
