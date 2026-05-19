@@ -94,6 +94,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         tracksStock: boolean;
         costPrice: Prisma.Decimal;
         salePrice: Prisma.Decimal;
+        happyHourPrice: Prisma.Decimal | null;
         marginPercent: Prisma.Decimal;
         minStock: number;
         currentStock: number;
@@ -121,6 +122,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         p."tracksStock",
         p."costPrice",
         p."salePrice",
+        p."happyHourPrice",
         p."marginPercent",
         p."minStock",
         p."currentStock",
@@ -167,6 +169,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         tracksStock: true,
         costPrice: true,
         salePrice: true,
+        happyHourPrice: true,
         marginPercent: true,
         minStock: true,
         currentStock: true,
@@ -213,6 +216,7 @@ export async function createProduct(data: {
   supplierId?: string | null;
   costPrice: Prisma.Decimal;
   salePrice: Prisma.Decimal;
+  happyHourPrice?: Prisma.Decimal | null;
   marginPercent: Prisma.Decimal;
   minStock: number;
   currentStock: number;
@@ -240,6 +244,7 @@ export async function updateProduct(data: {
   supplierId?: string | null;
   costPrice: Prisma.Decimal;
   salePrice: Prisma.Decimal;
+  happyHourPrice?: Prisma.Decimal | null;
   marginPercent: Prisma.Decimal;
   minStock: number;
   currentStock: number;
@@ -263,6 +268,7 @@ export async function updateProduct(data: {
       supplierId: data.supplierId,
       costPrice: data.costPrice,
       salePrice: data.salePrice,
+      happyHourPrice: data.happyHourPrice,
       marginPercent: data.marginPercent,
       minStock: data.minStock,
       currentStock: data.currentStock,
@@ -295,6 +301,7 @@ export async function getProductForEdit(productId: string) {
       tracksStock: true,
       costPrice: true,
       salePrice: true,
+      happyHourPrice: true,
       minStock: true,
       currentStock: true,
       status: true,
@@ -332,6 +339,7 @@ export async function listProductOptions() {
         currentStock: true,
         status: true,
         salePrice: true,
+        happyHourPrice: true,
         category: {
           select: {
             id: true,
@@ -363,6 +371,7 @@ export async function listProductOptions() {
         currentStock: true,
         status: true,
         salePrice: true,
+        happyHourPrice: true,
         category: {
           select: {
             id: true,

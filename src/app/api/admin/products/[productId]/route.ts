@@ -50,6 +50,7 @@ export async function GET(
       supplierId: product.supplierId,
       costPrice: product.costPrice.toString(),
       salePrice: product.salePrice.toString(),
+      happyHourPrice: product.happyHourPrice?.toString() ?? "",
       minStock: product.minStock,
       currentStock: product.currentStock,
       status: product.status,

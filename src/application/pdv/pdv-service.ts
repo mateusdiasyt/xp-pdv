@@ -44,6 +44,10 @@ import {
   resolveGameplayStationIdsForSelections,
   updateSaleCancellationFiscalData,
 } from "@/infrastructure/db/repositories/sale-repository";
+import {
+  getPdvConfiguration,
+  updatePdvHappyHourState,
+} from "@/infrastructure/db/repositories/pdv-configuration-repository";
 
 function createSaleNumber() {
   const now = new Date();
@@ -288,12 +292,23 @@ async function settlePdvSection<T>(label: string, loader: () => Promise<T>, fall
 }
 
 export async function getPdvData() {
-  const [openSessionsResult, productsResult, salesResult, customersResult, openComandasResult] = await Promise.all([
+  const [
+    openSessionsResult,
+    productsResult,
+    salesResult,
+    customersResult,
+    openComandasResult,
+    pdvConfigurationResult,
+  ] = await Promise.all([
     settlePdvSection("sessoes de caixa", () => listPdvOpenSessions(), []),
     settlePdvSection("produtos", () => listPdvProductOptions(), []),
     settlePdvSection("vendas recentes", () => listRecentSales(), []),
     settlePdvSection("clientes", () => listCustomerOptions(), []),
     settlePdvSection("comandas abertas", () => listOpenComandas(), []),
+    settlePdvSection("configuracao do PDV", () => getPdvConfiguration(), {
+      happyHourActive: false,
+      happyHourUpdatedAt: null,
+    }),
   ]);
 
   return {
@@ -302,14 +317,38 @@ export async function getPdvData() {
     sales: salesResult.data,
     customers: customersResult.data,
     openComandas: openComandasResult.data,
+    pdvConfiguration: pdvConfigurationResult.data,
     issues: [
       openSessionsResult.issue,
       productsResult.issue,
       salesResult.issue,
       customersResult.issue,
       openComandasResult.issue,
+      pdvConfigurationResult.issue,
     ].filter(Boolean) as string[],
   };
+}
+
+export async function updatePdvHappyHourRecord(input: FormData, actor: { id: string; name?: string | null }) {
+  const active = String(input.get("active") ?? "") === "true";
+
+  const updated = await updatePdvHappyHourState({
+    active,
+    updatedById: actor.id,
+    updatedByName: actor.name ?? undefined,
+  });
+
+  await createAuditLog({
+    userId: actor.id,
+    action: active ? "pdv.happy_hour.activate" : "pdv.happy_hour.deactivate",
+    entity: "PdvConfiguration",
+    entityId: updated.id,
+    metadata: {
+      happyHourActive: updated.happyHourActive,
+    },
+  });
+
+  return updated;
 }
 
 export async function getSaleReceiptData(saleId: string) {
@@ -332,6 +371,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
   const items = parseItems(input);
   const payments = parsePayments(input);
   const gameplaySelections = parseGameplaySelections(input);
+  const pdvConfiguration = await getPdvConfiguration();
   const discountAmount = parseDecimalInput(parsed.discountAmount || "0");
 
   if (discountAmount.lessThan(0)) {
@@ -364,6 +404,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     items,
     payments,
     gameplaySelections,
+    happyHourActive: pdvConfiguration.happyHourActive,
   });
 
   await createAuditLog({

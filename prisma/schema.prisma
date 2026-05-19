@@ -243,6 +243,7 @@ model Product {
     serviceDescription String?
     costPrice     Decimal      @db.Decimal(12, 2)
   salePrice     Decimal      @db.Decimal(12, 2)
+  happyHourPrice Decimal?     @db.Decimal(12, 2)
   marginPercent Decimal      @default(0) @db.Decimal(5, 2)
   minStock      Int          @default(0)
   currentStock  Int          @default(0)
@@ -724,6 +725,19 @@ model FiscalConfiguration {
   updatedByName String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model PdvConfiguration {
+  id                 String    @id @default(cuid())
+  scope              String    @unique @default("GLOBAL")
+  happyHourActive    Boolean   @default(false)
+  happyHourUpdatedAt DateTime?
+  updatedById        String?
+  updatedByName      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([updatedAt])
 }

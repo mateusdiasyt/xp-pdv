@@ -12,6 +12,7 @@ import {
   createComandaRecord,
   createSaleRecord,
   removeComandaItemRecord,
+  updatePdvHappyHourRecord,
   updateComandaCustomerRecord,
   updateComandaItemRecord,
 } from "@/application/pdv/pdv-service";
@@ -126,6 +127,28 @@ export async function retrySaleNfceRequest(formData: FormData): Promise<void> {
     revalidatePath("/admin");
   } catch {
     // Mantem o fluxo da tela sem travar, a situacao fiscal fica registrada na venda.
+  }
+}
+
+export async function updatePdvHappyHourAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  try {
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const updated = await updatePdvHappyHourRecord(formData, {
+      id: session.user.id,
+      name: session.user.name,
+    });
+    revalidatePath("/admin/pdv");
+
+    return {
+      status: "success",
+      message: updated.happyHourActive ? "Happy Hour ativado." : "Happy Hour desativado.",
+    };
+  } catch (error) {
+    return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };
   }
 }
 

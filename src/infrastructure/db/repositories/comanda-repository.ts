@@ -11,6 +11,8 @@ const PDV_TRANSACTION_OPTIONS = {
   timeout: 40_000,
 };
 
+const PDV_CONFIGURATION_SCOPE = "GLOBAL";
+
 function isRetryableTransactionError(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return error.code === "P2028";
@@ -69,6 +71,30 @@ async function recalculateComandaSubtotal(tx: Prisma.TransactionClient, comandaI
       subtotalAmount,
     },
   });
+}
+
+async function getHappyHourActiveInTransaction(tx: Prisma.TransactionClient) {
+  const configuration = await tx.pdvConfiguration.findUnique({
+    where: {
+      scope: PDV_CONFIGURATION_SCOPE,
+    },
+    select: {
+      happyHourActive: true,
+    },
+  });
+
+  return configuration?.happyHourActive ?? false;
+}
+
+function resolveComandaUnitPrice(product: {
+  salePrice: Prisma.Decimal;
+  happyHourPrice?: Prisma.Decimal | null;
+}, happyHourActive: boolean) {
+  if (happyHourActive && product.happyHourPrice?.greaterThan(0)) {
+    return product.happyHourPrice;
+  }
+
+  return product.salePrice;
 }
 
 export async function listOpenComandas() {
@@ -269,6 +295,7 @@ export async function addItemToComanda(data: {
         id: true,
         name: true,
         salePrice: true,
+        happyHourPrice: true,
         status: true,
       },
     });
@@ -294,14 +321,17 @@ export async function addItemToComanda(data: {
       },
     });
 
+    const happyHourActive = await getHappyHourActiveInTransaction(tx);
+    const unitPrice = resolveComandaUnitPrice(product, happyHourActive);
+
     if (!existingItem) {
       await tx.comandaItem.create({
         data: {
           comandaId: data.comandaId,
           productId: data.productId,
           quantity: data.quantity,
-          unitPrice: product.salePrice,
-          lineTotal: product.salePrice.times(data.quantity),
+          unitPrice,
+          lineTotal: unitPrice.times(data.quantity),
         },
       });
     } else {
@@ -312,8 +342,8 @@ export async function addItemToComanda(data: {
         },
         data: {
           quantity: nextQuantity,
-          unitPrice: product.salePrice,
-          lineTotal: product.salePrice.times(nextQuantity),
+          unitPrice,
+          lineTotal: unitPrice.times(nextQuantity),
         },
       });
     }
@@ -355,6 +385,7 @@ export async function updateComandaItemQuantity(data: {
             id: true,
             status: true,
             salePrice: true,
+            happyHourPrice: true,
             name: true,
           },
         },
@@ -369,14 +400,17 @@ export async function updateComandaItemQuantity(data: {
       throw new Error(`Produto ${item.product.name} inativo para venda.`);
     }
 
+    const happyHourActive = await getHappyHourActiveInTransaction(tx);
+    const unitPrice = resolveComandaUnitPrice(item.product, happyHourActive);
+
     await tx.comandaItem.update({
       where: {
         id: item.id,
       },
       data: {
         quantity: data.quantity,
-        unitPrice: item.product.salePrice,
-        lineTotal: item.product.salePrice.times(data.quantity),
+        unitPrice,
+        lineTotal: unitPrice.times(data.quantity),
       },
     });
 
@@ -527,6 +561,7 @@ export async function closeComandaWithSale(data: {
             select: {
               productId: true,
               quantity: true,
+              unitPrice: true,
             },
           },
         },
@@ -549,6 +584,7 @@ export async function closeComandaWithSale(data: {
         items: comanda.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
+          unitPrice: item.unitPrice,
         })),
         payments: data.payments,
       });

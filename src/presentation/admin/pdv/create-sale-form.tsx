@@ -63,6 +63,7 @@ type ProductOption = {
   sku: string;
   imageUrl?: string | null;
   salePrice: number;
+  happyHourPrice?: number | null;
   tracksStock: boolean;
   currentStock: number;
   category: {
@@ -107,6 +108,7 @@ type CreateSaleFormProps = {
   products: ProductOption[];
   selectedComanda: SelectedComanda;
   canManage: boolean;
+  happyHourActive: boolean;
   onClose: () => void;
 };
 
@@ -194,6 +196,18 @@ function productAvatarLabel(name: string) {
     .toUpperCase();
 }
 
+function getEffectiveSalePrice(product: ProductOption, happyHourActive: boolean) {
+  if (happyHourActive && product.happyHourPrice && product.happyHourPrice > 0) {
+    return product.happyHourPrice;
+  }
+
+  return product.salePrice;
+}
+
+function hasHappyHourPrice(product: ProductOption) {
+  return Boolean(product.happyHourPrice && product.happyHourPrice > 0);
+}
+
 function getCategoryIcon(slug: string, name: string) {
   const normalized = `${slug} ${name}`.toLowerCase();
 
@@ -270,6 +284,7 @@ export function CreateSaleForm({
   products,
   selectedComanda,
   canManage,
+  happyHourActive,
   onClose,
 }: CreateSaleFormProps) {
   const selectedCustomerInputValue = selectedComanda.customerId ? (selectedComanda.customerName ?? "") : "";
@@ -422,7 +437,7 @@ export function CreateSaleForm({
             ? {
                 ...item,
                 quantity: item.quantity + quantity,
-                lineTotal: item.lineTotal + product.salePrice * quantity,
+                lineTotal: item.lineTotal + getEffectiveSalePrice(product, happyHourActive) * quantity,
               }
             : item,
         );
@@ -434,7 +449,7 @@ export function CreateSaleForm({
           id: `optimistic-${product.id}`,
           productId: product.id,
           quantity,
-          lineTotal: product.salePrice * quantity,
+          lineTotal: getEffectiveSalePrice(product, happyHourActive) * quantity,
           product: {
             name: product.name,
             sku: product.sku,
@@ -693,7 +708,23 @@ export function CreateSaleForm({
                               {product.name}
                             </p>
                             <div className="space-y-0.5 text-xs text-muted-foreground">
-                              <p className="font-medium text-foreground/88">{formatCurrency(product.salePrice)}</p>
+                              <p className="font-medium text-foreground/88">
+                                {happyHourActive && hasHappyHourPrice(product) ? (
+                                  <>
+                                    <span className="text-primary">{formatCurrency(product.happyHourPrice ?? product.salePrice)}</span>
+                                    <span className="ml-1 text-[0.68rem] text-muted-foreground line-through">
+                                      {formatCurrency(product.salePrice)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  formatCurrency(product.salePrice)
+                                )}
+                              </p>
+                              {happyHourActive && hasHappyHourPrice(product) ? (
+                                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-orange-300">
+                                  Happy Hour
+                                </p>
+                              ) : null}
                               <p>{product.tracksStock ? `${product.currentStock} em estoque` : "Sem controle de estoque"}</p>
                             </div>
                           </div>

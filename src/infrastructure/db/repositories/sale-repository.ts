@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 type SaleItemInput = {
   productId: string;
   quantity: number;
+  unitPrice?: Prisma.Decimal;
 };
 
 export type SalePaymentInput = {
@@ -47,6 +48,7 @@ type CreateSaleWithStockAdjustmentInput = {
   items: SaleItemInput[];
   payments: SalePaymentInput[];
   gameplaySelections?: GameplaySelectionInput[];
+  happyHourActive?: boolean;
 };
 
 type CancelSaleAndRestockInput = {
@@ -104,6 +106,21 @@ function inferGameplayStationIdFromProduct(product: GameplayStationProductData) 
 
 function resolveGameplayStationId(product: GameplayStationProductData, selectedStationId?: string | null) {
   return inferGameplayStationIdFromProduct(product) ?? selectedStationId?.trim().toLowerCase() ?? null;
+}
+
+function resolveEffectiveSalePrice(
+  product: { salePrice: Prisma.Decimal; happyHourPrice?: Prisma.Decimal | null },
+  options?: { happyHourActive?: boolean; unitPriceOverride?: Prisma.Decimal },
+) {
+  if (options?.unitPriceOverride) {
+    return options.unitPriceOverride;
+  }
+
+  if (options?.happyHourActive && product.happyHourPrice?.greaterThan(0)) {
+    return product.happyHourPrice;
+  }
+
+  return product.salePrice;
 }
 
 function normalizeOptionalPaymentText(value?: string) {
@@ -285,6 +302,7 @@ export async function listPdvProductOptions() {
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         salePrice: true,
+        happyHourPrice: true,
         currentStock: true,
         status: true,
         category: {
@@ -319,6 +337,7 @@ export async function listPdvProductOptions() {
         gameplayPlanCode: true,
         gameplayDurationMinutes: true,
         salePrice: true,
+        happyHourPrice: true,
         currentStock: true,
         status: true,
         category: {
@@ -497,6 +516,7 @@ async function runCreateSaleWithStockAdjustment(
       gameplayPlanCode: true,
       gameplayDurationMinutes: true,
       salePrice: true,
+      happyHourPrice: true,
       costPrice: true,
       currentStock: true,
       status: true,
@@ -531,7 +551,12 @@ async function runCreateSaleWithStockAdjustment(
       throw new Error(`Estoque insuficiente para ${product.name}.`);
     }
 
-    return acc.plus(product.salePrice.times(item.quantity));
+    const unitPrice = resolveEffectiveSalePrice(product, {
+      happyHourActive: data.happyHourActive,
+      unitPriceOverride: item.unitPrice,
+    });
+
+    return acc.plus(unitPrice.times(item.quantity));
   }, new Prisma.Decimal(0));
 
   if (data.discountAmount.lessThan(0)) {
@@ -606,6 +631,11 @@ async function runCreateSaleWithStockAdjustment(
             throw new Error("Produto invalido na venda.");
           }
 
+          const unitPrice = resolveEffectiveSalePrice(product, {
+            happyHourActive: data.happyHourActive,
+            unitPriceOverride: item.unitPrice,
+          });
+
           return {
             productId: product.id,
             productNameSnapshot: product.name,
@@ -625,9 +655,9 @@ async function runCreateSaleWithStockAdjustment(
             gameplayDurationMinutes:
               product.kind === ProductKind.GAMEPLAY ? product.gameplayDurationMinutes : null,
             quantity: item.quantity,
-            unitPrice: product.salePrice,
+            unitPrice,
             unitCost: product.costPrice,
-            lineTotal: product.salePrice.times(item.quantity),
+            lineTotal: unitPrice.times(item.quantity),
             lineCostTotal: product.costPrice.times(item.quantity),
           };
         }),

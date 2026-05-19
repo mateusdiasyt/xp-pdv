@@ -45,6 +45,7 @@ type ProductEditPayload = {
   supplierId?: string | null;
   costPrice: string;
   salePrice: string;
+  happyHourPrice?: string | null;
   minStock: number;
   currentStock: number;
   status: RecordStatus;
@@ -130,6 +131,7 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
                 supplierId: productPayload.supplierId,
                 costPrice: productPayload.costPrice,
                 salePrice: productPayload.salePrice,
+                happyHourPrice: productPayload.happyHourPrice,
                 minStock: productPayload.minStock,
                 currentStock: productPayload.currentStock,
                 status: productPayload.status,

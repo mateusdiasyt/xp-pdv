@@ -340,15 +340,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       </p>
                     </div>
 
-                    <div className="grid gap-3 rounded-2xl border border-border/75 bg-background/32 p-4 sm:grid-cols-3">
+                    <div className="grid gap-3 rounded-2xl border border-border/75 bg-background/32 p-4 sm:grid-cols-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Categoria</p>
                         <p className="mt-1 text-sm font-medium text-foreground">{product.category.name}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Preco</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Principal</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
                           {formatCurrency(Number(product.salePrice))}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Happy Hour</p>
+                        <p className="mt-1 text-sm font-medium text-primary">
+                          {product.happyHourPrice ? formatCurrency(Number(product.happyHourPrice)) : "-"}
                         </p>
                       </div>
                       <div>

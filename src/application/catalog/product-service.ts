@@ -76,6 +76,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
     salePrice: input.get("salePrice"),
+    happyHourPrice: input.get("happyHourPrice"),
     minStock: input.get("minStock"),
     currentStock: input.get("currentStock"),
     status: input.get("status"),
@@ -86,6 +87,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
   const tracksStock = !isServiceLike && parsed.tracksStock;
   const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
+  const happyHourPrice = parsed.happyHourPrice ? new Prisma.Decimal(parsed.happyHourPrice) : null;
   const marginPercent = calculateMargin(costPrice, salePrice);
 
   const created = await createProduct({
@@ -104,6 +106,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
+    happyHourPrice,
     marginPercent,
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
@@ -125,6 +128,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
       serviceDescription: created.serviceDescription,
       gameplayPlanCode: created.gameplayPlanCode,
       gameplayDurationMinutes: created.gameplayDurationMinutes,
+      happyHourPrice: created.happyHourPrice?.toString(),
       categoryId: created.categoryId,
       supplierId: created.supplierId,
     },
@@ -149,6 +153,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     gameplayDurationMinutes: input.get("gameplayDurationMinutes"),
     costPrice: input.get("costPrice"),
     salePrice: input.get("salePrice"),
+    happyHourPrice: input.get("happyHourPrice"),
     minStock: input.get("minStock"),
     currentStock: input.get("currentStock"),
     status: input.get("status"),
@@ -159,6 +164,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
   const tracksStock = !isServiceLike && parsed.tracksStock;
   const costPrice = new Prisma.Decimal(isServiceLike ? "0.00" : parsed.costPrice);
   const salePrice = new Prisma.Decimal(parsed.salePrice);
+  const happyHourPrice = parsed.happyHourPrice ? new Prisma.Decimal(parsed.happyHourPrice) : null;
   const marginPercent = calculateMargin(costPrice, salePrice);
 
   const updated = await updateProduct({
@@ -178,6 +184,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     gameplayDurationMinutes: isGameplay ? parsed.gameplayDurationMinutes : null,
     costPrice,
     salePrice,
+    happyHourPrice,
     marginPercent,
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
@@ -199,6 +206,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
       serviceDescription: updated.serviceDescription,
       gameplayPlanCode: updated.gameplayPlanCode,
       gameplayDurationMinutes: updated.gameplayDurationMinutes,
+      happyHourPrice: updated.happyHourPrice?.toString(),
       categoryId: updated.categoryId,
       supplierId: updated.supplierId,
     },

@@ -42,6 +42,7 @@ type ProductFormInitialData = {
   supplierId?: string | null;
   costPrice?: string;
   salePrice?: string;
+  happyHourPrice?: string | null;
   minStock?: number;
   currentStock?: number;
   status?: RecordStatus;
@@ -443,6 +444,19 @@ export function CreateProductForm({
               <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="happyHourPrice">Valor Happy Hour (R$)</Label>
+              <Input
+                id="happyHourPrice"
+                name="happyHourPrice"
+                placeholder="Opcional"
+                defaultValue={initialData?.happyHourPrice ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Quando o Happy Hour estiver ativo no PDV, este valor substitui o preco principal.
+              </p>
+            </div>
+
             {usesStockControls ? (
               <>
                 <div className="space-y-2">
@@ -485,10 +499,24 @@ export function CreateProductForm({
             )}
           </>
         ) : (
-          <div className="space-y-2">
-            <Label htmlFor="salePrice">{isGameplay ? "Valor do plano (R$)" : "Valor do servico (R$)"}</Label>
-            <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="salePrice">{isGameplay ? "Valor do plano (R$)" : "Valor do servico (R$)"}</Label>
+              <Input id="salePrice" name="salePrice" placeholder="15.00" defaultValue={initialData?.salePrice ?? ""} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="happyHourPrice">Valor Happy Hour (R$)</Label>
+              <Input
+                id="happyHourPrice"
+                name="happyHourPrice"
+                placeholder="Opcional"
+                defaultValue={initialData?.happyHourPrice ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional para promocoes temporarias no PDV.
+              </p>
+            </div>
+          </>
         )}
 
         <div className="space-y-2">

@@ -216,7 +216,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     );
   }
 
-  const { openSessions, products, sales, customers, openComandas, issues } = await getPdvData();
+  const { openSessions, products, sales, customers, openComandas, pdvConfiguration, issues } = await getPdvData();
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.PDV_MANAGE);
   const canCancel = hasPermission(session.user.permissions, PERMISSIONS.PDV_CANCEL);
 
@@ -245,6 +245,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     gameplayDurationMinutes: product.gameplayDurationMinutes,
     tracksStock: product.tracksStock,
     salePrice: Number(product.salePrice),
+    happyHourPrice: product.happyHourPrice ? Number(product.happyHourPrice) : null,
     currentStock: product.currentStock,
     category: {
       id: product.category.id,
@@ -321,6 +322,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
           openSessions={openSessionOptions}
           openComandas={openComandasView}
           products={productOptions}
+          happyHourActive={pdvConfiguration.happyHourActive}
         />
       </div>
 

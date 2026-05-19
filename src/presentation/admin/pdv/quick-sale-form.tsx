@@ -59,6 +59,7 @@ type ProductOption = {
   gameplayDurationMinutes?: number | null;
   tracksStock: boolean;
   salePrice: number;
+  happyHourPrice?: number | null;
   currentStock: number;
   category: {
     id: string;
@@ -72,6 +73,7 @@ type QuickSaleFormProps = {
   openSessions: OpenSessionOption[];
   products: ProductOption[];
   canManage: boolean;
+  happyHourActive: boolean;
 };
 
 type PaymentLine = {
@@ -161,6 +163,18 @@ function productAvatarLabel(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function getEffectiveSalePrice(product: ProductOption, happyHourActive: boolean) {
+  if (happyHourActive && product.happyHourPrice && product.happyHourPrice > 0) {
+    return product.happyHourPrice;
+  }
+
+  return product.salePrice;
+}
+
+function hasHappyHourPrice(product: ProductOption) {
+  return Boolean(product.happyHourPrice && product.happyHourPrice > 0);
 }
 
 function getCategoryIcon(slug: string, name: string) {
@@ -260,7 +274,13 @@ function ProductCardMedia({
   );
 }
 
-export function QuickSaleForm({ customers, openSessions, products, canManage }: QuickSaleFormProps) {
+export function QuickSaleForm({
+  customers,
+  openSessions,
+  products,
+  canManage,
+  happyHourActive,
+}: QuickSaleFormProps) {
   const [saleState, saleFormAction] = useActionState(closeQuickSaleAction, initialActionState);
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
@@ -319,7 +339,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
       return {
         ...line,
         product,
-        lineTotal: product.salePrice * line.quantity,
+        lineTotal: getEffectiveSalePrice(product, happyHourActive) * line.quantity,
       };
     })
     .filter(Boolean) as Array<{ productId: string; quantity: number; product: ProductOption; lineTotal: number }>;
@@ -731,7 +751,23 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                                 {product.name}
                               </p>
                               <div className="space-y-0.5 text-xs text-muted-foreground">
-                                <p className="font-medium text-foreground/88">{formatCurrency(product.salePrice)}</p>
+                              <p className="font-medium text-foreground/88">
+                                {happyHourActive && hasHappyHourPrice(product) ? (
+                                  <>
+                                    <span className="text-primary">{formatCurrency(product.happyHourPrice ?? product.salePrice)}</span>
+                                    <span className="ml-1 text-[0.68rem] text-muted-foreground line-through">
+                                      {formatCurrency(product.salePrice)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  formatCurrency(product.salePrice)
+                                )}
+                              </p>
+                              {happyHourActive && hasHappyHourPrice(product) ? (
+                                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-orange-300">
+                                  Happy Hour
+                                </p>
+                              ) : null}
                                 {product.kind === ProductKind.GAMEPLAY ? (
                                   <p className="inline-flex items-center gap-1 text-sky-200">
                                     <Gamepad2 className="h-3.5 w-3.5" />
@@ -935,7 +971,7 @@ export function QuickSaleForm({ customers, openSessions, products, canManage }: 
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-foreground">{item.product.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {item.quantity}x {formatCurrency(item.product.salePrice)}
+                            {item.quantity}x {formatCurrency(getEffectiveSalePrice(item.product, happyHourActive))}
                           </p>
                         </div>
                         <p className="shrink-0 text-sm font-semibold text-foreground">

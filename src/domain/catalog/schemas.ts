@@ -134,6 +134,7 @@ const productSchemaBase = z.object({
   ),
   costPrice: z.string().regex(decimalRegex, "Custo invalido"),
   salePrice: z.string().regex(decimalRegex, "Preco invalido"),
+  happyHourPrice: z.string().regex(decimalRegex, "Preco Happy Hour invalido").optional().or(z.literal("")),
   minStock: z.coerce.number().int().min(0, "Estoque minimo invalido"),
   currentStock: z.coerce.number().int().min(0, "Estoque atual invalido"),
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),

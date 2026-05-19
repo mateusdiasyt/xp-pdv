@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { LayoutGrid, Plus, Receipt } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import { ProductKind } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ActionFeedback } from "@/components/admin/action-feedback";
+import { initialActionState } from "@/presentation/admin/common/action-state";
 import { CreateComandaDialog } from "@/presentation/admin/pdv/create-comanda-dialog";
 import { CreateSaleForm } from "@/presentation/admin/pdv/create-sale-form";
 import { OpenComandasBoard } from "@/presentation/admin/pdv/open-comandas-board";
 import { QuickSaleForm } from "@/presentation/admin/pdv/quick-sale-form";
+import { updatePdvHappyHourAction } from "@/presentation/admin/pdv/actions";
 
 type CustomerOption = {
   id: string;
@@ -37,6 +40,7 @@ type ProductOption = {
   gameplayDurationMinutes?: number | null;
   tracksStock: boolean;
   salePrice: number;
+  happyHourPrice?: number | null;
   currentStock: number;
   category: {
     id: string;
@@ -80,9 +84,50 @@ type PdvWorkspaceProps = {
   products: ProductOption[];
   openComandas: OpenComandaView[];
   canManage: boolean;
+  happyHourActive: boolean;
 };
 
 const DEFAULT_SLOT_COUNT = 50;
+
+function HappyHourToggle({
+  active,
+  canManage,
+}: {
+  active: boolean;
+  canManage: boolean;
+}) {
+  const [state, action, isPending] = useActionState(updatePdvHappyHourAction, initialActionState);
+
+  if (!canManage) {
+    return active ? (
+      <div className="inline-flex h-10 items-center gap-2 rounded-full border border-orange-400/40 bg-orange-500/10 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
+        <Flame className="h-4 w-4 text-orange-300" />
+        Happy Hour ativo
+      </div>
+    ) : null;
+  }
+
+  return (
+    <form action={action} className="flex flex-col items-start gap-2 sm:items-end">
+      <input type="hidden" name="active" value={active ? "false" : "true"} />
+      <button
+        type="submit"
+        disabled={isPending}
+        className={cn(
+          "group relative inline-flex h-10 items-center gap-2 overflow-hidden rounded-full border px-4 text-xs font-black uppercase tracking-[0.14em] transition-all disabled:cursor-wait disabled:opacity-70",
+          active
+            ? "border-orange-300/55 bg-[linear-gradient(135deg,#ff4d00,#ffb000_52%,#ff0066)] text-white shadow-[0_0_30px_-8px_rgba(255,92,0,0.8)]"
+            : "border-border/80 bg-card/88 text-muted-foreground hover:border-orange-300/45 hover:text-orange-100",
+        )}
+      >
+        {active ? <span className="happy-hour-fire" aria-hidden="true" /> : <Flame className="h-4 w-4" />}
+        <span className="relative z-10">{active ? "Happy Hour ativo" : "Ativar Happy Hour"}</span>
+        {active ? <span className="happy-hour-heat" aria-hidden="true" /> : null}
+      </button>
+      <ActionFeedback state={state} />
+    </form>
+  );
+}
 
 export function PdvWorkspace({
   customers,
@@ -90,6 +135,7 @@ export function PdvWorkspace({
   products,
   openComandas,
   canManage,
+  happyHourActive,
 }: PdvWorkspaceProps) {
   const [workspaceMode, setWorkspaceMode] = useState<"comanda" | "quick">("comanda");
   const [selectedComandaId, setSelectedComandaId] = useState<string | null>(null);
@@ -129,28 +175,37 @@ export function PdvWorkspace({
   if (workspaceMode === "quick") {
     return (
       <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
-          <button
-            type="button"
-            className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => setWorkspaceMode("comanda")}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Comandas
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-primary/50 bg-primary/15 px-3 text-sm font-medium text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
-            onClick={() => setWorkspaceMode("quick")}
-          >
-            <Receipt className="h-4 w-4" />
-            Venda rapida
-          </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => setWorkspaceMode("comanda")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Comandas
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-primary/50 bg-primary/15 px-3 text-sm font-medium text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
+              onClick={() => setWorkspaceMode("quick")}
+            >
+              <Receipt className="h-4 w-4" />
+              Venda rapida
+            </button>
+          </div>
+          <HappyHourToggle active={happyHourActive} canManage={canManage} />
         </div>
 
         <Card className="border-border/80 bg-card/86">
           <CardContent className="pt-5">
-            <QuickSaleForm canManage={canManage} customers={customers} openSessions={openSessions} products={products} />
+            <QuickSaleForm
+              canManage={canManage}
+              customers={customers}
+              openSessions={openSessions}
+              products={products}
+              happyHourActive={happyHourActive}
+            />
           </CardContent>
         </Card>
       </div>
@@ -159,23 +214,26 @@ export function PdvWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-primary/50 bg-primary/15 px-3 text-sm font-medium text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
-          onClick={() => setWorkspaceMode("comanda")}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          Comandas
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          onClick={() => setWorkspaceMode("quick")}
-        >
-          <Receipt className="h-4 w-4" />
-          Venda rapida
-        </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-primary/50 bg-primary/15 px-3 text-sm font-medium text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
+            onClick={() => setWorkspaceMode("comanda")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Comandas
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-2 rounded-[0.7rem] border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            onClick={() => setWorkspaceMode("quick")}
+          >
+            <Receipt className="h-4 w-4" />
+            Venda rapida
+          </button>
+        </div>
+        <HappyHourToggle active={happyHourActive} canManage={canManage} />
       </div>
 
       <section
@@ -222,6 +280,7 @@ export function PdvWorkspace({
                 customers={customers}
                 openSessions={openSessions}
                 products={comandaProducts}
+                happyHourActive={happyHourActive}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}
               />
