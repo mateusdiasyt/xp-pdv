@@ -18,6 +18,7 @@ import {
 } from "@/infrastructure/db/repositories/stock-repository";
 
 const MAX_XML_FILE_SIZE_BYTES = 2_000_000;
+const FOCUS_NFE_RECEIVED_BASE_URL = "https://api.focusnfe.com.br";
 
 type ParsedStockInvoiceItem = {
   lineNumber: number;
@@ -257,6 +258,76 @@ function getConfiguredCompanyDocument() {
   return normalizeXmlDocument(process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE);
 }
 
+function getFocusReceivedNfeToken() {
+  return process.env.FOCUS_NFE_TOKEN_PROD?.trim() || process.env.FOCUS_NFE_TOKEN?.trim();
+}
+
+function normalizeAccessKey(rawValue?: string | null) {
+  const digits = rawValue?.replace(/\D/g, "");
+  return digits && digits.length === 44 ? digits : undefined;
+}
+
+async function extractFocusErrorMessage(response: Response) {
+  const fallback = `Focus NFe respondeu ${response.status}.`;
+
+  try {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as Record<string, unknown>;
+      for (const candidate of [payload.mensagem, payload.message, payload.erro, payload.codigo]) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+    }
+
+    const text = await response.text();
+    return normalizeXmlText(text)?.slice(0, 240) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
+  const token = getFocusReceivedNfeToken();
+  const companyDocument = getConfiguredCompanyDocument();
+
+  if (!token || !companyDocument) {
+    throw new Error(
+      "Recebimento de NF-e nao configurado. Configure FOCUS_NFE_TOKEN_PROD e FOCUS_NFCE_CNPJ_EMITENTE/FOCUS_NFE_CNPJ_EMITENTE.",
+    );
+  }
+
+  const url = new URL(`/v2/nfes_recebidas/${accessKey}.xml`, FOCUS_NFE_RECEIVED_BASE_URL);
+  url.searchParams.set("cnpj", companyDocument);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${token}:`).toString("base64")}`,
+      Accept: "application/xml, text/xml, */*",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await extractFocusErrorMessage(response);
+    if (response.status === 404) {
+      throw new Error(
+        `NF-e nao encontrada na Focus para esta chave. Confirme se o recebimento de NF-e esta ativo, se a nota foi emitida contra este CNPJ e tente novamente. Detalhe: ${detail}`,
+      );
+    }
+
+    throw new Error(`Nao foi possivel baixar o XML da NF-e recebida na Focus. Detalhe: ${detail}`);
+  }
+
+  const rawXml = await response.text();
+  if (!rawXml.includes("<") || !rawXml.toLowerCase().includes("infnfe")) {
+    throw new Error("A Focus respondeu, mas o conteudo baixado nao parece ser um XML valido de NF-e.");
+  }
+
+  return rawXml;
+}
+
 function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceXml) {
   const configuredDocument = getConfiguredCompanyDocument();
   if (!configuredDocument || !parsedInvoice.recipientDocument) {
@@ -431,6 +502,27 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
     throw new Error("O arquivo enviado nao parece ser um XML valido de NF-e.");
   }
 
+  return storeRawStockInvoiceXmlRecord({
+    input,
+    actorId,
+    rawXml,
+    sourceFileName: maybeXmlFile.name,
+    sourceFileSize: maybeXmlFile.size,
+  });
+}
+
+async function storeRawStockInvoiceXmlRecord(params: {
+  input: FormData;
+  actorId?: string;
+  rawXml: string;
+  sourceFileName: string;
+  sourceFileSize: number;
+}): Promise<StockXmlImportSummary> {
+  if (params.sourceFileSize > MAX_XML_FILE_SIZE_BYTES) {
+    throw new Error("XML muito grande. Limite de 2 MB por nota.");
+  }
+
+  const { input, actorId, rawXml } = params;
   const parsedInvoice = parseStockInvoiceXml(rawXml);
   assertInvoiceRecipientMatchesCompany(parsedInvoice);
   const applyStockImport = readBooleanFormFlag(input, "applyStockImport");
@@ -448,9 +540,9 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
       totalAmount: parsedInvoice.totalAmount,
       itemCount: parsedInvoice.itemCount,
       rawXml,
-      sourceFileName: maybeXmlFile.name,
-      sourceFileSize: maybeXmlFile.size,
-      uploadedById: actorId,
+      sourceFileName: params.sourceFileName,
+      sourceFileSize: params.sourceFileSize,
+      uploadedById: params.actorId,
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -504,6 +596,28 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
   });
 
   return importSummary;
+}
+
+export async function fetchAndStoreStockInvoiceXmlByAccessKey(
+  input: FormData,
+  actorId?: string,
+): Promise<StockXmlImportSummary> {
+  const accessKey = normalizeAccessKey(String(input.get("accessKey") ?? ""));
+  if (!accessKey) {
+    throw new Error("Informe ou escaneie uma chave de acesso valida com 44 numeros.");
+  }
+
+  const rawXml = await fetchReceivedNfeXmlByAccessKey(accessKey);
+  const sourceFileName = `${accessKey}-focus-recebida.xml`;
+  const sourceFileSize = Buffer.byteLength(rawXml, "utf8");
+
+  return storeRawStockInvoiceXmlRecord({
+    input,
+    actorId,
+    rawXml,
+    sourceFileName,
+    sourceFileSize,
+  });
 }
 
 export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actorId?: string): Promise<StockXmlImportSummary> {

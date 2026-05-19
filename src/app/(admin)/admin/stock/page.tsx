@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { CreateStockMovementForm } from "@/presentation/admin/stock/create-stock-movement-form";
+import { FetchStockInvoiceXmlByKeyForm } from "@/presentation/admin/stock/fetch-stock-invoice-xml-by-key-form";
 import { ImportStockInvoiceXmlButton } from "@/presentation/admin/stock/import-stock-invoice-xml-button";
 import { UploadStockInvoiceXmlForm } from "@/presentation/admin/stock/upload-stock-invoice-xml-form";
 
@@ -69,14 +70,31 @@ export default async function StockPage() {
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle>XML de notas de compra</CardTitle>
+            <CardTitle>Entrada por NF-e de compra</CardTitle>
             <CardDescription>
-              Fluxo ideal: carregue o XML recebido do fornecedor, guarde para auditoria e opcionalmente importe os itens
-              para atualizar cadastro e estoque.
+              Escaneie a chave do DANFE para buscar na Focus ou envie o XML recebido do fornecedor.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <UploadStockInvoiceXmlForm />
+          <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-foreground">Buscar pela chave da nota</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ideal para leitor de barras: leia a chave do DANFE, baixe o XML recebido e importe a entrada.
+                </p>
+              </div>
+              <FetchStockInvoiceXmlByKeyForm />
+            </div>
+
+            <div className="rounded-2xl border border-border/75 bg-card/45 p-4">
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-foreground">Enviar arquivo XML</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Use quando o fornecedor enviar o XML por e-mail, WhatsApp ou download.
+                </p>
+              </div>
+              <UploadStockInvoiceXmlForm />
+            </div>
           </CardContent>
         </Card>
       ) : null}

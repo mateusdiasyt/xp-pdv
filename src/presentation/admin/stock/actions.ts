@@ -4,12 +4,34 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
+  fetchAndStoreStockInvoiceXmlByAccessKey,
   importStockInvoiceXmlById,
   registerStockMovementRecord,
   storeStockInvoiceXmlRecord,
 } from "@/application/stock/stock-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
+
+function buildStockXmlSummaryMessage(
+  prefixes: { stored: string; imported: string },
+  result: Awaited<ReturnType<typeof storeStockInvoiceXmlRecord>>,
+) {
+  if (!result.imported) {
+    return `${prefixes.stored} Agora voce pode importar os itens pela lista de XMLs guardados.`;
+  }
+
+  const summaryParts = [
+    `${result.stockMovements} entrada(s)`,
+    `${result.updatedProducts} produto(s) atualizado(s)`,
+    `${result.createdProducts} produto(s) criado(s)`,
+  ];
+
+  if (result.skippedItems > 0) {
+    summaryParts.push(`${result.skippedItems} item(ns) ignorado(s)`);
+  }
+
+  return `${prefixes.imported}: ${summaryParts.join(" | ")}.`;
+}
 
 export async function createStockMovementAction(
   prevState: ActionState = initialActionState,
@@ -40,26 +62,43 @@ export async function uploadStockInvoiceXmlAction(
       revalidatePath("/admin/products");
     }
 
-    if (!result.imported) {
-      return {
-        status: "success",
-        message: "XML salvo com sucesso. Agora voce pode importar os itens pela lista de XMLs guardados.",
-      };
-    }
+    return {
+      status: "success",
+      message: buildStockXmlSummaryMessage(
+        {
+          stored: "XML salvo com sucesso.",
+          imported: "XML salvo e importado com sucesso",
+        },
+        result,
+      ),
+    };
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
+  }
+}
 
-    const summaryParts = [
-      `${result.stockMovements} entrada(s)`,
-      `${result.updatedProducts} produto(s) atualizado(s)`,
-      `${result.createdProducts} produto(s) criado(s)`,
-    ];
-
-    if (result.skippedItems > 0) {
-      summaryParts.push(`${result.skippedItems} item(ns) ignorado(s)`);
+export async function fetchStockInvoiceXmlByAccessKeyAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  try {
+    const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
+    const result = await fetchAndStoreStockInvoiceXmlByAccessKey(formData, session.user.id);
+    revalidatePath("/admin/stock");
+    if (result.imported) {
+      revalidatePath("/admin/products");
     }
 
     return {
       status: "success",
-      message: `XML salvo e importado com sucesso: ${summaryParts.join(" | ")}.`,
+      message: buildStockXmlSummaryMessage(
+        {
+          stored: "NF-e recebida baixada e guardada com sucesso.",
+          imported: "NF-e recebida baixada e importada com sucesso",
+        },
+        result,
+      ),
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
