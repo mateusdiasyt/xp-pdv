@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Menu } from "lucide-react";
 
 import { BrandLogo } from "@/components/admin/brand-logo";
@@ -17,11 +17,12 @@ type AdminMobileNavProps = {
 
 export function AdminMobileNav({ roleSlug, permissions }: AdminMobileNavProps) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const isAdmin = roleSlug === "administrador";
   const items = adminNavigation.filter((item) => isAdmin || permissions.includes(item.permission));
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger render={<Button variant="outline" size="icon-sm" className="rounded-full" />}>
         <Menu className="h-5 w-5" />
         <span className="sr-only">Abrir menu</span>
@@ -40,9 +41,10 @@ export function AdminMobileNav({ roleSlug, permissions }: AdminMobileNavProps) {
                 : pathname?.startsWith(item.href.replace("#novo-registro", ""));
 
             return (
-              <Link
+              <a
                 key={item.href}
                 href={item.href}
+                onClick={() => setOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
@@ -52,7 +54,7 @@ export function AdminMobileNav({ roleSlug, permissions }: AdminMobileNavProps) {
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
-              </Link>
+              </a>
             );
           })}
         </div>

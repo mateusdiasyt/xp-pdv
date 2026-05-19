@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { BrandLogo } from "@/components/admin/brand-logo";
@@ -35,10 +34,9 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
               : pathname?.startsWith(item.href.replace("#novo-registro", ""));
 
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
-              prefetch={item.href === "/admin/support" ? false : undefined}
               className={cn(
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                 isActive
@@ -57,7 +55,7 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
                 <Icon className="h-4 w-4" />
               </span>
               <span>{item.label}</span>
-            </Link>
+            </a>
           );
         })}
       </nav>

@@ -2,7 +2,6 @@
 
 import { LogOut, Megaphone, UserRound } from "lucide-react";
 import { signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,6 @@ type AdminUserMenuProps = {
 };
 
 export function AdminUserMenu({ userName, userEmail }: AdminUserMenuProps) {
-  const router = useRouter();
   const [isPendingSignOut, startSignOutTransition] = useTransition();
 
   function handleSignOut() {
@@ -52,11 +50,11 @@ export function AdminUserMenu({ userName, userEmail }: AdminUserMenuProps) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/admin/profile")}>
+        <DropdownMenuItem onClick={() => window.location.assign("/admin/profile")}>
           <UserRound className="h-4 w-4" />
           Perfil
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/admin/updates")}>
+        <DropdownMenuItem onClick={() => window.location.assign("/admin/updates")}>
           <Megaphone className="h-4 w-4" />
           Atualizacoes
         </DropdownMenuItem>
