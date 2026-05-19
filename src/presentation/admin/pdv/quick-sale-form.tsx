@@ -11,7 +11,6 @@ import {
   Coffee,
   Gamepad2,
   GlassWater,
-  Grid2x2,
   Package2,
   Pizza,
   Plus,
@@ -283,7 +282,7 @@ export function QuickSaleForm({
 }: QuickSaleFormProps) {
   const [saleState, saleFormAction] = useActionState(closeQuickSaleAction, initialActionState);
   const [productSearch, setProductSearch] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
@@ -315,9 +314,23 @@ export function QuickSaleForm({
     return categories;
   }, []);
   categoryFilters.sort((firstCategory, secondCategory) => firstCategory.name.localeCompare(secondCategory.name));
+  const firstCategoryId = categoryFilters[0]?.id ?? "";
+  const selectedCategoryIsAvailable = categoryFilters.some((category) => category.id === selectedCategoryId);
+  const selectedCategoryName =
+    categoryFilters.find((category) => category.id === selectedCategoryId)?.name ?? "Categoria";
+
+  useEffect(() => {
+    if (!firstCategoryId) {
+      return;
+    }
+
+    if (!selectedCategoryId || !selectedCategoryIsAvailable) {
+      setSelectedCategoryId(firstCategoryId);
+    }
+  }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
 
   const filteredProducts = products.filter((product) => {
-    if (selectedCategoryId !== "all" && product.category.id !== selectedCategoryId) {
+    if (!selectedCategoryId || product.category.id !== selectedCategoryId) {
       return false;
     }
 
@@ -676,7 +689,7 @@ export function QuickSaleForm({
 
               <section className="admin-form-section space-y-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-foreground">Produtos</p>
+                  <p className="text-sm font-semibold text-foreground">Produtos - {selectedCategoryName}</p>
                   <span className="text-xs text-muted-foreground">{filteredProducts.length} item(ns)</span>
                 </div>
 
@@ -691,19 +704,6 @@ export function QuickSaleForm({
                 </div>
 
                 <div className="admin-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategoryId("all")}
-                    className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 text-sm font-medium transition-all duration-200 ${
-                      selectedCategoryId === "all"
-                        ? "border-primary/60 bg-primary/12 text-foreground shadow-[0_10px_20px_-18px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
-                        : "border-border/75 bg-background/26 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                    }`}
-                  >
-                    <Grid2x2 className="h-4 w-4" />
-                    <span className="uppercase tracking-[0.12em]">Todos</span>
-                  </button>
-
                   {categoryFilters.map((category) => {
                     const CategoryIcon = getCategoryIcon(category.slug, category.name);
 

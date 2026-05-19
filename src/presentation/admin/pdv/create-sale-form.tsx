@@ -21,9 +21,8 @@ import {
   X,
   Coffee,
   GlassWater,
-  Grid2x2,
 } from "lucide-react";
-import { useActionState, useDeferredValue, useRef, useState, useTransition } from "react";
+import { useActionState, useDeferredValue, useEffect, useRef, useState, useTransition } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -301,7 +300,7 @@ export function CreateSaleForm({
   const [cancelState, cancelFormAction] = useActionState(cancelComandaAction, initialActionState);
   const [isAddingItem, startAddTransition] = useTransition();
   const [productSearch, setProductSearch] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [discountAmount, setDiscountAmount] = useState("0.00");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
@@ -347,9 +346,24 @@ export function CreateSaleForm({
     return categories;
   }, []);
   categoryFilters.sort((firstCategory, secondCategory) => firstCategory.name.localeCompare(secondCategory.name));
+  const firstCategoryId = categoryFilters[0]?.id ?? "";
+  const selectedCategoryIsAvailable = categoryFilters.some((category) => category.id === selectedCategoryId);
+  const selectedCategoryName =
+    categoryFilters.find((category) => category.id === selectedCategoryId)?.name ?? "Categoria";
+
+  useEffect(() => {
+    if (!firstCategoryId) {
+      return;
+    }
+
+    if (!selectedCategoryId || !selectedCategoryIsAvailable) {
+      setSelectedCategoryId(firstCategoryId);
+    }
+  }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
+
   const normalizedSearch = deferredProductSearch.trim().toLowerCase();
   const filteredProducts = products.filter((product) => {
-    if (selectedCategoryId !== "all" && product.category.id !== selectedCategoryId) {
+    if (!selectedCategoryId || product.category.id !== selectedCategoryId) {
       return false;
     }
 
@@ -632,19 +646,6 @@ export function CreateSaleForm({
             </div>
 
             <div className="admin-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              <button
-                type="button"
-                onClick={() => setSelectedCategoryId("all")}
-                className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 text-sm font-medium transition-all duration-200 ${
-                  selectedCategoryId === "all"
-                    ? "border-primary/60 bg-primary/12 text-foreground shadow-[0_10px_20px_-18px_color-mix(in_oklab,var(--primary)_80%,transparent)]"
-                    : "border-border/75 bg-background/26 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                }`}
-              >
-                <Grid2x2 className="h-4 w-4" />
-                <span className="uppercase tracking-[0.12em]">Todos</span>
-              </button>
-
               {categoryFilters.map((category) => {
                 const CategoryIcon = getCategoryIcon(category.slug, category.name);
 
@@ -674,9 +675,7 @@ export function CreateSaleForm({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {selectedCategoryId === "all"
-                      ? "Catalogo completo"
-                      : categoryFilters.find((category) => category.id === selectedCategoryId)?.name ?? "Categoria"}
+                    {selectedCategoryName}
                   </p>
                   <span className="text-xs text-muted-foreground">{filteredProducts.length} item(ns)</span>
                 </div>
