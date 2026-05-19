@@ -406,7 +406,6 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     local_destino: config.localDestino,
     presenca_comprador: config.presencaComprador,
     natureza_operacao: config.naturezaOperacao,
-    nome_destinatario: snapshot.customerName ?? undefined,
     informacoes_adicionais_contribuinte: config.infoAdicional,
     valor_produtos: toDecimal(productSubtotal, 2),
     valor_desconto: toDecimal(productDiscount, 2),
