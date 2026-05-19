@@ -6,7 +6,7 @@ import { PaymentMethod, PaymentStatus, RefundStatus, SaleStatus } from "@prisma/
 import { requirePermission } from "@/application/auth/guards";
 import { getPdvData, getSaleReceiptData } from "@/application/pdv/pdv-service";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
@@ -325,15 +325,31 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
       </div>
 
       <div>
-        <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
-            <CardTitle>Vendas recentes</CardTitle>
-            <CardDescription>
-              Exibindo as ultimas {sales.length} venda(s), agrupadas por data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
+        <details className="group overflow-hidden rounded-[1.4rem] border border-border/75 bg-card/82 shadow-[0_22px_70px_-48px_rgba(0,0,0,0.85)]">
+          <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 transition-colors hover:bg-background/28 sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-sm font-bold text-primary">
+                {sales.length}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Vendas recentes</p>
+                <p className="text-xs text-muted-foreground">
+                  Clique para abrir as ultimas vendas agrupadas por data.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="group-open:hidden">Abrir historico</span>
+              <span className="hidden group-open:inline">Ocultar historico</span>
+              <span className="grid h-8 w-8 place-items-center rounded-full border border-border/75 bg-background/60 text-base leading-none text-foreground transition-transform group-open:rotate-45">
+                +
+              </span>
+            </div>
+          </summary>
+
+          <div className="border-t border-border/70 p-3">
+            <div className="admin-scrollbar overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Venda</TableHead>
@@ -487,9 +503,10 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                   </Fragment>
                 ))}
               </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </Table>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   );
