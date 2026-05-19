@@ -353,23 +353,16 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Venda</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Caixa</TableHead>
-                  <TableHead>Operador</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Estorno</TableHead>
-                  <TableHead>Fiscal</TableHead>
                   <TableHead>Pagamento</TableHead>
-                  <TableHead>Gameplay</TableHead>
-                  <TableHead className="text-right">Itens</TableHead>
                   <TableHead className="text-right">Total (R$)</TableHead>
-                  <TableHead>Acoes</TableHead>
+                  <TableHead className="w-[17rem] text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       Nenhuma venda registrada.
                     </TableCell>
                   </TableRow>
@@ -377,7 +370,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                 {groupedSales.map((group) => (
                   <Fragment key={`group-fragment-${group.dateKey}`}>
                     <TableRow key={`group-${group.dateKey}`} className="bg-muted/20">
-                      <TableCell colSpan={12} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <TableCell colSpan={5} className="py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {group.dateLabel}
                       </TableCell>
                     </TableRow>
@@ -386,24 +379,37 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                         <TableCell className="font-medium text-foreground">
                           {sale.saleNumber}
                           {sale.customerName ? <p className="text-xs text-muted-foreground">{sale.customerName}</p> : null}
-                        </TableCell>
-                        <TableCell>{timeFormatter.format(sale.createdAt)}</TableCell>
-                        <TableCell>{sale.cashSession.cashRegister.name}</TableCell>
-                        <TableCell>{sale.operator.name}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              sale.status === SaleStatus.COMPLETED
-                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                                : "bg-rose-100 text-rose-700 hover:bg-rose-100"
-                            }
-                          >
-                            {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
-                          </Badge>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {timeFormatter.format(sale.createdAt)} - {sale.cashSession.cashRegister.name} - {sale.operator.name}
+                          </p>
+                          {sale.fiscalAccessKey ? (
+                            <p className="mt-1 max-w-[21rem] truncate text-[11px] text-muted-foreground">
+                              {sale.fiscalAccessKey}
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
+                          <div className="flex max-w-[16rem] flex-wrap gap-1.5">
+                            <Badge
+                              className={
+                                sale.status === SaleStatus.COMPLETED
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                                  : "bg-rose-100 text-rose-700 hover:bg-rose-100"
+                              }
+                            >
+                              {sale.status === SaleStatus.COMPLETED ? "Concluida" : "Cancelada"}
+                            </Badge>
+                            <Badge className={getFiscalStatusPresentation(sale.fiscalStatus).className}>
+                              {getFiscalStatusPresentation(sale.fiscalStatus).label}
+                            </Badge>
+                            {sale.gameplayRelease ? (
+                              <Badge className={getGameplayStatusPresentation(sale.gameplayRelease.status).className}>
+                                {sale.gameplayRelease.stationId.toUpperCase()}
+                              </Badge>
+                            ) : null}
+                          </div>
                           {sale.cancellation ? (
-                            <div className="space-y-1">
+                            <div className="mt-2 space-y-1">
                               <Badge className={getRefundStatusPresentation(sale.cancellation.refundStatus).className}>
                                 {getRefundStatusPresentation(sale.cancellation.refundStatus).label}
                               </Badge>
@@ -412,20 +418,8 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                               </p>
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            <p className="mt-2 text-[11px] text-muted-foreground">{sale.items.length} item(ns)</p>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <Badge className={getFiscalStatusPresentation(sale.fiscalStatus).className}>
-                              {getFiscalStatusPresentation(sale.fiscalStatus).label}
-                            </Badge>
-                            {sale.fiscalAccessKey ? (
-                              <p className="max-w-[19rem] truncate text-[11px] text-muted-foreground">
-                                {sale.fiscalAccessKey}
-                              </p>
-                            ) : null}
-                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
@@ -443,24 +437,9 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {sale.gameplayRelease ? (
-                            <div className="space-y-1">
-                              <Badge className={getGameplayStatusPresentation(sale.gameplayRelease.status).className}>
-                                {getGameplayStatusPresentation(sale.gameplayRelease.status).label}
-                              </Badge>
-                              <p className="text-[11px] text-muted-foreground">
-                                {sale.gameplayRelease.stationId.toUpperCase()}
-                              </p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{sale.items.length}</TableCell>
                         <TableCell className="text-right">{formatCurrency(Number(sale.totalAmount))}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap items-center gap-2">
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <Link
                               href={`/admin/pdv?receipt=${sale.id}`}
                               className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
@@ -475,6 +454,14 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                                 className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
                               >
                                 DANFE
+                              </a>
+                            ) : null}
+                            {sale.fiscalReference || sale.fiscalXmlUrl ? (
+                              <a
+                                href={`/api/fiscal/sales/${sale.id}/xml`}
+                                className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
+                              >
+                                XML
                               </a>
                             ) : null}
                             {canManage &&
