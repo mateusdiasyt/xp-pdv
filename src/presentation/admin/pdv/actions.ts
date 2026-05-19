@@ -146,6 +146,9 @@ export async function updatePdvHappyHourAction(
     return {
       status: "success",
       message: updated.happyHourActive ? "Happy Hour ativado." : "Happy Hour desativado.",
+      data: {
+        happyHourActive: updated.happyHourActive,
+      },
     };
   } catch (error) {
     return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };

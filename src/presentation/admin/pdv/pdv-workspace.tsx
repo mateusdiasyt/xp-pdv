@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import { ProductKind } from "@prisma/client";
 
@@ -92,11 +93,24 @@ const DEFAULT_SLOT_COUNT = 50;
 function HappyHourToggle({
   active,
   canManage,
+  onStateChange,
 }: {
   active: boolean;
   canManage: boolean;
+  onStateChange: (active: boolean) => void;
 }) {
+  const router = useRouter();
   const [state, action, isPending] = useActionState(updatePdvHappyHourAction, initialActionState);
+
+  useEffect(() => {
+    if (state.status !== "success" || !state.data || typeof state.data !== "object") {
+      return;
+    }
+
+    const nextActive = Boolean((state.data as { happyHourActive?: boolean }).happyHourActive);
+    onStateChange(nextActive);
+    router.refresh();
+  }, [onStateChange, router, state]);
 
   if (!canManage) {
     return active ? (
@@ -143,6 +157,11 @@ export function PdvWorkspace({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createDialogPresetNumber, setCreateDialogPresetNumber] = useState<number | undefined>(undefined);
   const [lockCreateDialogNumber, setLockCreateDialogNumber] = useState(false);
+  const [isHappyHourActive, setIsHappyHourActive] = useState(happyHourActive);
+
+  useEffect(() => {
+    setIsHappyHourActive(happyHourActive);
+  }, [happyHourActive]);
 
   const selectedComanda = openComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
   const comandaProducts = products.filter((product) => product.kind === ProductKind.STANDARD);
@@ -194,7 +213,7 @@ export function PdvWorkspace({
               Venda rapida
             </button>
           </div>
-          <HappyHourToggle active={happyHourActive} canManage={canManage} />
+          <HappyHourToggle active={isHappyHourActive} canManage={canManage} onStateChange={setIsHappyHourActive} />
         </div>
 
         <Card className="border-border/80 bg-card/86">
@@ -204,7 +223,7 @@ export function PdvWorkspace({
               customers={customers}
               openSessions={openSessions}
               products={products}
-              happyHourActive={happyHourActive}
+              happyHourActive={isHappyHourActive}
             />
           </CardContent>
         </Card>
@@ -233,7 +252,7 @@ export function PdvWorkspace({
             Venda rapida
           </button>
         </div>
-        <HappyHourToggle active={happyHourActive} canManage={canManage} />
+        <HappyHourToggle active={isHappyHourActive} canManage={canManage} onStateChange={setIsHappyHourActive} />
       </div>
 
       <section
@@ -280,7 +299,7 @@ export function PdvWorkspace({
                 customers={customers}
                 openSessions={openSessions}
                 products={comandaProducts}
-                happyHourActive={happyHourActive}
+                happyHourActive={isHappyHourActive}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}
               />
