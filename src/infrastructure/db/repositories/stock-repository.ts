@@ -115,6 +115,7 @@ export async function listStockInvoiceXmls() {
       issuedAt: true,
       totalAmount: true,
       itemCount: true,
+      rawXml: true,
       sourceFileName: true,
       createdAt: true,
       uploadedBy: {

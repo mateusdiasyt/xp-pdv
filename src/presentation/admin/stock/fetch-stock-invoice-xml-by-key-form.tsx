@@ -36,46 +36,20 @@ export function FetchStockInvoiceXmlByKeyForm() {
         />
         <p className="text-xs text-muted-foreground">
           O leitor de barras funciona como teclado: ao escanear o DANFE, a chave entra aqui e o sistema busca o XML na
-          Focus.
+          Focus sem movimentar o estoque automaticamente.
         </p>
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-border/70 bg-card/40 p-3">
-        <label htmlFor="fetchApplyStockImport" className="flex items-start gap-3 text-sm">
-          <input
-            id="fetchApplyStockImport"
-            name="applyStockImport"
-            type="checkbox"
-            defaultChecked
-            className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
-          />
-          <span>
-            <span className="block font-medium text-foreground">Importar itens no estoque agora</span>
-            <span className="block text-xs text-muted-foreground">
-              Se ativo, a entrada atualiza custo, NCM, fornecedor e saldo dos produtos encontrados.
-            </span>
-          </span>
-        </label>
-
-        <label htmlFor="fetchAllowCreateProducts" className="flex items-start gap-3 text-sm">
-          <input
-            id="fetchAllowCreateProducts"
-            name="allowCreateProducts"
-            type="checkbox"
-            defaultChecked
-            className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-primary focus:ring-primary"
-          />
-          <span>
-            <span className="block font-medium text-foreground">Criar produto quando nao existir</span>
-            <span className="block text-xs text-muted-foreground">
-              Produtos novos entram com custo do XML e preco inicial igual ao custo para ajuste posterior.
-            </span>
-          </span>
-        </label>
+      <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-foreground">
+        <p className="font-medium">Fluxo seguro de conferencia</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Primeiro o sistema baixa e guarda o XML. Depois voce confere a previa dos itens e confirma a importacao na
+          lista de XMLs guardados.
+        </p>
       </div>
 
       <div className="flex flex-col items-start gap-3">
-        <FormSubmitButton>Buscar NF-e na Focus</FormSubmitButton>
+        <FormSubmitButton>Buscar XML e gerar previa</FormSubmitButton>
         <ActionFeedback state={state} />
       </div>
     </form>

@@ -58,6 +58,8 @@ type StockXmlImportSummary = {
   skippedItems: number;
 };
 
+const STOCK_XML_PREVIEW_ITEM_LIMIT = 8;
+
 function normalizeXmlText(rawValue?: string) {
   return rawValue?.replace(/\s+/g, " ").trim() || undefined;
 }
@@ -341,15 +343,6 @@ function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceX
   }
 }
 
-function readBooleanFormFlag(input: FormData, key: string) {
-  const value = input.get(key);
-  if (typeof value !== "string") {
-    return false;
-  }
-
-  return value === "on" || value === "true" || value === "1";
-}
-
 function ensureXmlStorageAvailable(error: unknown): never {
   if (isMissingStockInvoiceXmlTableError(error)) {
     throw new Error("Modulo de XML de estoque aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
@@ -409,6 +402,29 @@ async function runStockXmlImport(params: {
   return summary;
 }
 
+function buildStockInvoiceXmlPreview(rawXml: string) {
+  const parsedInvoice = parseStockInvoiceXml(rawXml);
+
+  return {
+    recipientName: parsedInvoice.recipientName,
+    recipientDocument: parsedInvoice.recipientDocument,
+    itemLines: parsedInvoice.items.length,
+    shownItems: parsedInvoice.items.slice(0, STOCK_XML_PREVIEW_ITEM_LIMIT).map((item) => ({
+      lineNumber: item.lineNumber,
+      description: item.description,
+      ncm: item.ncm,
+      cfop: item.cfop,
+      quantity: item.quantity,
+      unitCost: Number(item.unitCost),
+      totalCost: Number(item.unitCost) * item.quantity,
+      commercialUnit: item.commercialUnit,
+      commercialQuantity: item.commercialQuantity,
+      taxableUnit: item.taxableUnit,
+      taxableQuantity: item.taxableQuantity,
+    })),
+  };
+}
+
 export async function getStockMovements() {
   return listStockMovements();
 }
@@ -432,10 +448,25 @@ export async function getStockInvoiceXmlHistory() {
     }
 
     return {
-      entries: entries.map((entry) => ({
-        ...entry,
-        importedAt: importedAtByXmlId.get(entry.id),
-      })),
+      entries: entries.map((entry) => {
+        const { rawXml, ...safeEntry } = entry;
+
+        try {
+          return {
+            ...safeEntry,
+            importedAt: importedAtByXmlId.get(entry.id),
+            preview: buildStockInvoiceXmlPreview(rawXml),
+            previewError: undefined,
+          };
+        } catch {
+          return {
+            ...safeEntry,
+            importedAt: importedAtByXmlId.get(entry.id),
+            preview: undefined,
+            previewError: "Nao foi possivel montar a previa dos itens deste XML.",
+          };
+        }
+      }),
       setupPending: false,
     };
   } catch (error) {
@@ -525,8 +556,6 @@ async function storeRawStockInvoiceXmlRecord(params: {
   const { input, actorId, rawXml } = params;
   const parsedInvoice = parseStockInvoiceXml(rawXml);
   assertInvoiceRecipientMatchesCompany(parsedInvoice);
-  const applyStockImport = readBooleanFormFlag(input, "applyStockImport");
-  const allowCreateProducts = readBooleanFormFlag(input, "allowCreateProducts");
 
   let created: Awaited<ReturnType<typeof createStockInvoiceXmlRecord>>;
   try {
@@ -560,21 +589,6 @@ async function storeRawStockInvoiceXmlRecord(params: {
     skippedItems: 0,
   };
 
-  if (applyStockImport) {
-    const summary = await runStockXmlImport({
-      xmlRecordId: created.id,
-      parsedInvoice,
-      actorId,
-      allowCreateProducts,
-    });
-
-    importSummary.imported = true;
-    importSummary.createdProducts = summary.createdProducts;
-    importSummary.updatedProducts = summary.updatedProducts;
-    importSummary.stockMovements = summary.stockMovements;
-    importSummary.skippedItems = summary.skippedItems;
-  }
-
   await createAuditLog({
     userId: actorId,
     action: "stock.xml.store",
@@ -590,7 +604,8 @@ async function storeRawStockInvoiceXmlRecord(params: {
       itemCount: created.itemCount,
       sourceFileName: created.sourceFileName,
       sourceFileSize: created.sourceFileSize,
-      importedProducts: importSummary.imported,
+      importedProducts: false,
+      importRequiresManualConfirmation: true,
       importSummary,
     },
   });

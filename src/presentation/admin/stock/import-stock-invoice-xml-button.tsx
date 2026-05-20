@@ -24,14 +24,26 @@ export function ImportStockInvoiceXmlButton({ stockInvoiceXmlId, compact = false
   }, [router, state.status]);
 
   return (
-    <form action={formAction} className="flex flex-col items-start gap-2">
+    <form
+      action={formAction}
+      className="flex flex-col items-start gap-2"
+      onSubmit={(event) => {
+        const confirmed = window.confirm(
+          "Confirmar importacao deste XML? Esta acao pode criar produtos e registrar entradas no estoque.",
+        );
+
+        if (!confirmed) {
+          event.preventDefault();
+        }
+      }}
+    >
       <input type="hidden" name="stockInvoiceXmlId" value={stockInvoiceXmlId} />
       {compact ? (
         <div className="scale-90 origin-right">
-          <FormSubmitButton>Importar itens</FormSubmitButton>
+          <FormSubmitButton>Confirmar importacao</FormSubmitButton>
         </div>
       ) : (
-        <FormSubmitButton>Importar itens</FormSubmitButton>
+        <FormSubmitButton>Confirmar importacao</FormSubmitButton>
       )}
       {!compact || state.status === "error" ? <ActionFeedback state={state} /> : null}
     </form>

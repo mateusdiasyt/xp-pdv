@@ -1,4 +1,5 @@
 import { StockMovementType } from "@prisma/client";
+import { Fragment } from "react";
 
 import { requirePermission } from "@/application/auth/guards";
 import { getStockFormOptions, getStockInvoiceXmlHistory, getStockMovements } from "@/application/stock/stock-service";
@@ -72,7 +73,7 @@ export default async function StockPage() {
           <CardHeader>
             <CardTitle>Entrada por NF-e de compra</CardTitle>
             <CardDescription>
-              Escaneie a chave do DANFE para buscar na Focus ou envie o XML recebido do fornecedor.
+              Escaneie a chave do DANFE ou envie o XML recebido. O estoque so muda depois da conferencia dos itens.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
@@ -80,7 +81,7 @@ export default async function StockPage() {
               <div className="mb-4">
                 <p className="text-sm font-semibold text-foreground">Buscar pela chave da nota</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Ideal para leitor de barras: leia a chave do DANFE, baixe o XML recebido e importe a entrada.
+                  Ideal para leitor de barras: leia a chave do DANFE, baixe o XML recebido e confira antes de importar.
                 </p>
               </div>
               <FetchStockInvoiceXmlByKeyForm />
@@ -103,7 +104,7 @@ export default async function StockPage() {
         <CardHeader>
           <CardTitle>XMLs guardados</CardTitle>
           <CardDescription>
-            Ultimos XMLs enviados para o estoque. Use como base de conferencia, contador e auditoria.
+            Ultimos XMLs enviados para conferencia. A importacao so acontece pelo botao de confirmacao.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -136,43 +137,103 @@ export default async function StockPage() {
                 ) : null}
 
                 {xmlHistory.entries.map((xmlEntry) => (
-                  <TableRow key={xmlEntry.id}>
-                    <TableCell className="font-mono text-xs text-zinc-700">{xmlEntry.accessKey}</TableCell>
-                    <TableCell>{xmlEntry.supplierName ?? "-"}</TableCell>
-                    <TableCell>
-                      {xmlEntry.invoiceNumber ? `N${xmlEntry.invoiceNumber}` : "-"}
-                      {xmlEntry.invoiceSeries ? (
-                        <p className="text-xs text-zinc-500">Serie {xmlEntry.invoiceSeries}</p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{xmlEntry.issuedAt ? dateOnlyFormatter.format(xmlEntry.issuedAt) : "-"}</TableCell>
-                    <TableCell className="text-right">{xmlEntry.itemCount}</TableCell>
-                    <TableCell className="text-right">
-                      {xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {xmlEntry.importedAt ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                          Importado em {dateFormatter.format(xmlEntry.importedAt)}
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Somente guardado</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <p className="max-w-[14rem] truncate text-sm">{xmlEntry.sourceFileName}</p>
-                      <p className="text-xs text-zinc-500">Upload em {dateFormatter.format(xmlEntry.createdAt)}</p>
-                    </TableCell>
-                    {canManage ? (
+                  <Fragment key={xmlEntry.id}>
+                    <TableRow>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{xmlEntry.accessKey}</TableCell>
+                      <TableCell>{xmlEntry.supplierName ?? "-"}</TableCell>
+                      <TableCell>
+                        {xmlEntry.invoiceNumber ? `N${xmlEntry.invoiceNumber}` : "-"}
+                        {xmlEntry.invoiceSeries ? (
+                          <p className="text-xs text-muted-foreground">Serie {xmlEntry.invoiceSeries}</p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{xmlEntry.issuedAt ? dateOnlyFormatter.format(xmlEntry.issuedAt) : "-"}</TableCell>
+                      <TableCell className="text-right">{xmlEntry.itemCount}</TableCell>
                       <TableCell className="text-right">
+                        {xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}
+                      </TableCell>
+                      <TableCell>
                         {xmlEntry.importedAt ? (
-                          <span className="text-xs text-muted-foreground">Importacao concluida</span>
+                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                            Importado em {dateFormatter.format(xmlEntry.importedAt)}
+                          </Badge>
                         ) : (
-                          <ImportStockInvoiceXmlButton stockInvoiceXmlId={xmlEntry.id} compact />
+                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Aguardando conferencia</Badge>
                         )}
                       </TableCell>
-                    ) : null}
-                  </TableRow>
+                      <TableCell>
+                        <p className="max-w-[14rem] truncate text-sm">{xmlEntry.sourceFileName}</p>
+                        <p className="text-xs text-muted-foreground">Upload em {dateFormatter.format(xmlEntry.createdAt)}</p>
+                      </TableCell>
+                      {canManage ? (
+                        <TableCell className="text-right">
+                          {xmlEntry.importedAt ? (
+                            <span className="text-xs text-muted-foreground">Importacao concluida</span>
+                          ) : (
+                            <ImportStockInvoiceXmlButton stockInvoiceXmlId={xmlEntry.id} compact />
+                          )}
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                    <TableRow className="bg-card/25">
+                      <TableCell colSpan={canManage ? 9 : 8}>
+                        <details className="group rounded-xl border border-border/70 bg-background/45 p-3">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                            <span>Previa dos itens antes de importar</span>
+                            <span className="text-xs font-medium text-muted-foreground group-open:hidden">Abrir</span>
+                            <span className="hidden text-xs font-medium text-muted-foreground group-open:inline">Fechar</span>
+                          </summary>
+
+                          {xmlEntry.previewError ? (
+                            <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                              {xmlEntry.previewError} Contate o Mateus.
+                            </p>
+                          ) : xmlEntry.preview ? (
+                            <div className="mt-3 space-y-3">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                {xmlEntry.preview.recipientName ? <span>Destinatario: {xmlEntry.preview.recipientName}</span> : null}
+                                {xmlEntry.preview.recipientDocument ? <span>CNPJ/CPF: {xmlEntry.preview.recipientDocument}</span> : null}
+                                <span>
+                                  Mostrando {xmlEntry.preview.shownItems.length} de {xmlEntry.preview.itemLines} linha(s) da NF-e.
+                                </span>
+                              </div>
+
+                              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                                {xmlEntry.preview.shownItems.map((item) => (
+                                  <div key={`${xmlEntry.id}-${item.lineNumber}`} className="rounded-xl border border-border/70 bg-card/50 p-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <p className="line-clamp-2 text-sm font-semibold text-foreground">{item.description}</p>
+                                      <span className="rounded-full border border-primary/35 px-2 py-0.5 text-xs font-semibold text-primary">
+                                        {item.quantity} un
+                                      </span>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                      <span>NCM {item.ncm ?? "-"}</span>
+                                      <span>CFOP {item.cfop ?? "-"}</span>
+                                      <span>Custo {currencyFormatter.format(item.unitCost)}</span>
+                                      <span>Total {currencyFormatter.format(item.totalCost)}</span>
+                                    </div>
+                                    {item.commercialUnit || item.taxableUnit ? (
+                                      <p className="mt-2 text-[11px] text-muted-foreground">
+                                        XML: {item.commercialQuantity ?? "-"} {item.commercialUnit ?? "uCom"} /{" "}
+                                        {item.taxableQuantity ?? "-"} {item.taxableUnit ?? "uTrib"}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+
+                              {!xmlEntry.importedAt ? (
+                                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
+                                  Conferiu quantidades, custos e fornecedor? Use o botao Confirmar importacao na linha acima para criar produtos e dar entrada no estoque.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </details>
+                      </TableCell>
+                    </TableRow>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
