@@ -307,7 +307,7 @@ export function CreateProductForm({
             <option value={ProductKind.SERVICE}>Servico manual</option>
           </select>
           <p className="text-xs text-muted-foreground">
-            Produto comum gera NFC-e. Gameplay e servico manual entram na apuracao de NFS-e municipal.
+            Drink e item preparado continuam como Produto comum para NFC-e. Gameplay e servico manual entram na apuracao de NFS-e municipal.
           </p>
         </div>
 
@@ -442,10 +442,10 @@ export function CreateProductForm({
                 onChange={(event) => setTracksStock(event.target.value === "true")}
               >
                 <option value="true">Controlar saldo</option>
-                <option value="false">Vender sem controlar estoque</option>
+                <option value="false">Produto preparado / sem saldo proprio</option>
               </select>
               <p className="text-xs text-muted-foreground">
-                Use sem controle para drinks, chopp e itens preparados que continuam emitindo NFC-e.
+                Use sem saldo proprio para drinks, chopp e itens preparados. A baixa do ingrediente e configurada abaixo.
               </p>
             </div>
           </>
@@ -528,22 +528,22 @@ export function CreateProductForm({
                 <input type="hidden" name="currentStock" value="0" />
                 <input type="hidden" name="stockUnit" value={StockUnit.UNIT} />
                 <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
-                  <strong className="mb-1 block text-foreground">Venda sem bloqueio por estoque.</strong>
-                  O item continua como produto fiscal para NFC-e, mas nao bloqueia venda nem gera baixa automatica de estoque.
+                  <strong className="mb-1 block text-foreground">Produto preparado para o PDV.</strong>
+                  O drink ou item pronto continua como produto fiscal para NFC-e. Se ele usar uma lata, garrafa ou insumo rastreado, selecione abaixo para baixar na venda.
                 </div>
               </>
             )}
 
             <div className="space-y-3 rounded-2xl border border-border/75 bg-background/35 p-4 md:col-span-2">
               <div>
-                <p className="text-sm font-semibold text-foreground">Consumo de insumo fracionado</p>
+                <p className="text-sm font-semibold text-foreground">Receita e baixa automatica do estoque</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Para um copo de chopp, selecione o barril e informe quanto sai do saldo a cada item vendido.
+                  Para drinks, selecione a lata usada. Para chopp ou outro insumo fracionado, selecione o insumo e informe o consumo por venda.
                 </p>
               </div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
                 <div className="space-y-2">
-                  <Label htmlFor="recipeIngredientProductId">Insumo baixado na venda</Label>
+                  <Label htmlFor="recipeIngredientProductId">Item do estoque consumido na venda</Label>
                   <select
                     id="recipeIngredientProductId"
                     name="recipeIngredientProductId"
@@ -569,9 +569,12 @@ export function CreateProductForm({
                     type="number"
                     min={1}
                     step={1}
-                    placeholder="Ex.: 500"
+                    placeholder="Ex.: 1 ou 500"
                     defaultValue={initialData?.recipeQuantity ?? ""}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Use 1 para uma lata inteira ou a quantidade da unidade do insumo.
+                  </p>
                 </div>
               </div>
             </div>
