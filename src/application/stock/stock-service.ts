@@ -301,6 +301,10 @@ function normalizeAccessKey(rawValue?: string | null) {
   return digits && digits.length === 44 ? digits : undefined;
 }
 
+function getFocusReceivedNfeAuthorization(token: string) {
+  return `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
+}
+
 async function extractFocusErrorMessage(response: Response) {
   const fallback = `Focus NFe respondeu ${response.status}.`;
 
@@ -322,22 +326,22 @@ async function extractFocusErrorMessage(response: Response) {
   }
 }
 
-async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
-  const token = getFocusReceivedNfeToken();
-  const companyDocument = getConfiguredCompanyDocument();
+function hasCompleteReceivedNfeXml(rawXml: string) {
+  return rawXml.includes("<") && rawXml.toLowerCase().includes("infnfe");
+}
 
-  if (!token || !companyDocument) {
-    throw new Error(
-      "Recebimento de NF-e nao configurado. Configure FOCUS_NFE_TOKEN_PROD e FOCUS_NFCE_CNPJ_EMITENTE/FOCUS_NFE_CNPJ_EMITENTE.",
-    );
-  }
-
+async function downloadFocusReceivedNfeXml(params: {
+  accessKey: string;
+  companyDocument: string;
+  token: string;
+}) {
+  const { accessKey, companyDocument, token } = params;
   const url = new URL(`/v2/nfes_recebidas/${accessKey}.xml`, FOCUS_NFE_RECEIVED_BASE_URL);
   url.searchParams.set("cnpj", companyDocument);
 
   const response = await fetch(url, {
     headers: {
-      Authorization: `Basic ${Buffer.from(`${token}:`).toString("base64")}`,
+      Authorization: getFocusReceivedNfeAuthorization(token),
       Accept: "application/xml, text/xml, */*",
     },
     cache: "no-store",
@@ -354,14 +358,70 @@ async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
     throw new Error(`Nao foi possivel baixar o XML da NF-e recebida na Focus. Detalhe: ${detail}`);
   }
 
-  const rawXml = await response.text();
-  if (!rawXml.includes("<") || !rawXml.toLowerCase().includes("infnfe")) {
+  return response.text();
+}
+
+function isDuplicateFocusManifestation(detail: string) {
+  const normalizedDetail = detail
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return normalizedDetail.includes("duplicidade") || normalizedDetail.includes("ja existe");
+}
+
+async function requestFocusReceivedNfeScience(accessKey: string, token: string) {
+  const url = new URL(`/v2/nfes_recebidas/${accessKey}/manifesto`, FOCUS_NFE_RECEIVED_BASE_URL);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: getFocusReceivedNfeAuthorization(token),
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ tipo: "ciencia" }),
+    cache: "no-store",
+  });
+
+  if (response.ok) {
+    return;
+  }
+
+  const detail = await extractFocusErrorMessage(response);
+  if (isDuplicateFocusManifestation(detail)) {
+    return;
+  }
+
+  throw new Error(
+    `A Focus ainda so tem o resumo desta NF-e e nao conseguiu registrar a Ciencia da Operacao automaticamente. Detalhe: ${detail}`,
+  );
+}
+
+async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
+  const token = getFocusReceivedNfeToken();
+  const companyDocument = getConfiguredCompanyDocument();
+
+  if (!token || !companyDocument) {
     throw new Error(
-      "A Focus ainda nao devolveu o XML completo desta NF-e. Se ela acabou de chegar, conclua a Ciencia da Operacao no fluxo fiscal e tente novamente. Se tiver o XML do fornecedor, envie o arquivo diretamente.",
+      "Recebimento de NF-e nao configurado. Configure FOCUS_NFE_TOKEN_PROD e FOCUS_NFCE_CNPJ_EMITENTE/FOCUS_NFE_CNPJ_EMITENTE.",
     );
   }
 
-  return rawXml;
+  const rawXml = await downloadFocusReceivedNfeXml({ accessKey, companyDocument, token });
+  if (hasCompleteReceivedNfeXml(rawXml)) {
+    return rawXml;
+  }
+
+  await requestFocusReceivedNfeScience(accessKey, token);
+
+  const manifestedXml = await downloadFocusReceivedNfeXml({ accessKey, companyDocument, token });
+  if (hasCompleteReceivedNfeXml(manifestedXml)) {
+    return manifestedXml;
+  }
+
+  throw new Error(
+    "A Ciencia da Operacao foi solicitada na Focus, mas o XML completo ainda nao foi liberado por ela. Aguarde alguns instantes e busque pela chave novamente. Se tiver o XML do fornecedor, envie o arquivo diretamente.",
+  );
 }
 
 function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceXml) {

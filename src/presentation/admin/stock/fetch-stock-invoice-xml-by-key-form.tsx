@@ -33,7 +33,8 @@ export function FetchStockInvoiceXmlByKeyForm() {
         />
         <p className="text-xs text-muted-foreground">
           O leitor de barras funciona como teclado: ao escanear o DANFE, a chave entra aqui e o sistema busca o XML na
-          Focus sem movimentar o estoque automaticamente.
+          Focus sem movimentar o estoque automaticamente. Se a Focus ainda tiver so o resumo da nota, esta busca
+          solicita a Ciencia da Operacao para liberar o XML completo.
         </p>
       </div>
 
