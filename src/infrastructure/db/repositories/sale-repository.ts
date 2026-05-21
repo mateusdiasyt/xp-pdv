@@ -363,6 +363,7 @@ export async function listPdvProductOptions() {
     return await prisma.product.findMany({
       where: {
         status: RecordStatus.ACTIVE,
+        pdvVisible: true,
         NOT: {
           kind: ProductKind.STANDARD,
           tracksStock: true,
@@ -404,6 +405,7 @@ export async function listPdvProductOptions() {
     const products = await prisma.product.findMany({
       where: {
         status: RecordStatus.ACTIVE,
+        pdvVisible: true,
         NOT: {
           kind: ProductKind.STANDARD,
           tracksStock: true,

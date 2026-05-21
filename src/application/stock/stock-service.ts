@@ -610,6 +610,7 @@ function buildStockInvoiceReviewItem(
       happyHourPrice: matchedProduct?.happyHourPrice ? toDecimalInputValue(matchedProduct.happyHourPrice) : "",
       minStock: matchedProduct?.minStock ?? 0,
       stockUnit: suggestedStockUnit,
+      pdvVisible: matchedProduct?.pdvVisible ?? !fractionalSuggestion,
     },
     fractionalSaleProduct:
       fractionalSuggestion && suggestedStockUnit === StockUnit.MILLILITER
@@ -618,6 +619,7 @@ function buildStockInvoiceReviewItem(
             sku: buildFractionalSaleProductSku(item),
             ncm: item.ncm ?? "",
             categoryId: fallbackCategoryId,
+            imageUrl: "",
             salePrice: toDecimalInputValue(suggestedUnitCost.times(500)),
             happyHourPrice: "",
             consumptionQuantity: 500,
@@ -711,6 +713,7 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
         ...item,
         decision,
         stockUnit: StockUnit.UNIT,
+        pdvVisible: false,
       };
     }
 
@@ -740,6 +743,10 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
         sku: getReviewField(input, item.lineNumber, "fractionalSaleProduct.sku") || undefined,
         ncm: parseReviewedNcm(getReviewField(input, item.lineNumber, "fractionalSaleProduct.ncm"), item.lineNumber),
         categoryId: fractionalSaleCategoryId,
+        imageUrl: parseReviewedImageUrl(
+          getReviewField(input, item.lineNumber, "fractionalSaleProduct.imageUrl"),
+          item.lineNumber,
+        ),
         salePrice: parseReviewedDecimal(
           getReviewField(input, item.lineNumber, "fractionalSaleProduct.salePrice"),
           item.lineNumber,
@@ -788,6 +795,7 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
         "Estoque minimo",
       ),
       stockUnit,
+      pdvVisible: getReviewField(input, item.lineNumber, "pdvVisible") === "on",
       fractionalSaleProduct,
     };
   });

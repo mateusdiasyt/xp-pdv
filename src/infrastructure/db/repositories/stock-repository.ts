@@ -231,11 +231,13 @@ export type ReviewedStockInvoiceItemInput = {
   happyHourPrice?: Prisma.Decimal | null;
   minStock?: number;
   stockUnit: StockUnit;
+  pdvVisible: boolean;
   fractionalSaleProduct?: {
     name: string;
     sku?: string;
     ncm: string;
     categoryId: string;
+    imageUrl?: string;
     salePrice: Prisma.Decimal;
     happyHourPrice?: Prisma.Decimal | null;
     consumptionQuantity: number;
@@ -548,6 +550,7 @@ export async function listStockInvoiceReviewProducts() {
       minStock: true,
       currentStock: true,
       stockUnit: true,
+      pdvVisible: true,
       categoryId: true,
       supplierId: true,
     },
@@ -690,6 +693,7 @@ export async function importReviewedStockInvoiceItems(
             kind: ProductKind.STANDARD,
             tracksStock: true,
             stockUnit: item.stockUnit,
+            pdvVisible: item.pdvVisible,
             costPrice: item.unitCost,
             salePrice: item.salePrice,
             happyHourPrice: item.happyHourPrice,
@@ -742,6 +746,7 @@ export async function importReviewedStockInvoiceItems(
           minStock: item.minStock ?? 0,
           currentStock: resultingStock,
           stockUnit: item.stockUnit,
+          pdvVisible: item.pdvVisible,
           costPrice: item.unitCost,
           ncm: item.ncm ?? product.ncm ?? undefined,
           supplierId: supplierId ?? product.supplierId ?? undefined,
@@ -767,8 +772,10 @@ export async function importReviewedStockInvoiceItems(
             sku: fractionalSaleSku,
             ncm: item.fractionalSaleProduct.ncm,
             description: `Item vendavel criado na conferencia XML ${data.accessKey}. Consome ${item.fractionalSaleProduct.consumptionQuantity} do insumo ${product.name}.`,
+            imageUrl: item.fractionalSaleProduct.imageUrl,
             kind: ProductKind.STANDARD,
             tracksStock: false,
+            pdvVisible: true,
             stockUnit: StockUnit.UNIT,
             costPrice: fractionalSaleCost,
             salePrice: item.fractionalSaleProduct.salePrice,

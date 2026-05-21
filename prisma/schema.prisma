@@ -254,6 +254,7 @@ model Product {
   currentStock  Int          @default(0)
   stockUnit     StockUnit    @default(UNIT)
   tracksStock   Boolean      @default(true)
+  pdvVisible    Boolean      @default(true)
   status        RecordStatus @default(ACTIVE)
   categoryId    String
   supplierId    String?
