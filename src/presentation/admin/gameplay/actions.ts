@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
@@ -33,6 +33,7 @@ export async function retryGameplayReleaseAction(
     revalidatePath("/admin/services");
     revalidatePath("/admin/gameplay");
     revalidatePath("/admin/pdv");
+    refresh();
 
     return {
       status: result.status === "LIBERADA" ? "success" : "error",
@@ -65,6 +66,7 @@ export async function manualServiceReleaseAction(
 
     revalidatePath("/admin/services");
     revalidatePath("/admin/pdv");
+    refresh();
 
     return {
       status: "success",
@@ -95,6 +97,7 @@ export async function endServiceSessionAction(
 
     revalidatePath("/admin/services");
     revalidatePath("/admin/pdv");
+    refresh();
 
     return {
       status: "success",
