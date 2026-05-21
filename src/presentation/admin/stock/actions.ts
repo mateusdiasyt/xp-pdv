@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/application/auth/guards";
 import {
   fetchAndStoreStockInvoiceXmlByAccessKey,
+  importReviewedStockInvoiceXmlRecord,
   importStockInvoiceXmlById,
   registerStockMovementRecord,
   storeStockInvoiceXmlRecord,
@@ -17,7 +18,7 @@ function buildStockXmlSummaryMessage(
   result: Awaited<ReturnType<typeof storeStockInvoiceXmlRecord>>,
 ) {
   if (!result.imported) {
-    return `${prefixes.stored} Agora voce pode importar os itens pela lista de XMLs guardados.`;
+    return `${prefixes.stored} Abra a conferencia na lista de XMLs guardados antes de dar entrada no estoque.`;
   }
 
   const summaryParts = [
@@ -135,6 +136,36 @@ export async function importStockInvoiceXmlItemsAction(
     return {
       status: "success",
       message: `Importacao concluida: ${summaryParts.join(" | ")}.`,
+    };
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
+  }
+}
+
+export async function importReviewedStockInvoiceXmlAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  try {
+    const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
+    const result = await importReviewedStockInvoiceXmlRecord(formData, session.user.id);
+    revalidatePath("/admin/stock");
+    revalidatePath("/admin/products");
+
+    const summaryParts = [
+      `${result.stockMovements} entrada(s)`,
+      `${result.updatedProducts} produto(s) atualizado(s)`,
+      `${result.createdProducts} produto(s) criado(s)`,
+    ];
+
+    if (result.skippedItems > 0) {
+      summaryParts.push(`${result.skippedItems} item(ns) ignorado(s)`);
+    }
+
+    return {
+      status: "success",
+      message: `Entrada XML confirmada: ${summaryParts.join(" | ")}.`,
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

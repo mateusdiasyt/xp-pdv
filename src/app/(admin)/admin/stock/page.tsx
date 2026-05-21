@@ -1,16 +1,17 @@
 import { StockMovementType } from "@prisma/client";
+import Link from "next/link";
 import { Fragment } from "react";
 
 import { requirePermission } from "@/application/auth/guards";
 import { getStockFormOptions, getStockInvoiceXmlHistory, getStockMovements } from "@/application/stock/stock-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { CreateStockMovementForm } from "@/presentation/admin/stock/create-stock-movement-form";
 import { FetchStockInvoiceXmlByKeyForm } from "@/presentation/admin/stock/fetch-stock-invoice-xml-by-key-form";
-import { ImportStockInvoiceXmlButton } from "@/presentation/admin/stock/import-stock-invoice-xml-button";
 import { UploadStockInvoiceXmlForm } from "@/presentation/admin/stock/upload-stock-invoice-xml-form";
 
 function movementTypeLabel(type: StockMovementType) {
@@ -170,7 +171,12 @@ export default async function StockPage() {
                           {xmlEntry.importedAt ? (
                             <span className="text-xs text-muted-foreground">Importacao concluida</span>
                           ) : (
-                            <ImportStockInvoiceXmlButton stockInvoiceXmlId={xmlEntry.id} compact />
+                            <Link
+                              href={`/admin/stock/xml/${xmlEntry.id}`}
+                              className={buttonVariants({ size: "sm" })}
+                            >
+                              Conferir entrada
+                            </Link>
                           )}
                         </TableCell>
                       ) : null}
@@ -225,7 +231,7 @@ export default async function StockPage() {
 
                               {!xmlEntry.importedAt ? (
                                 <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
-                                  Conferiu quantidades, custos e fornecedor? Use o botao Confirmar importacao na linha acima para criar produtos e dar entrada no estoque.
+                                  Abra Conferir entrada para revisar produto, preco, imagem e quantidade antes de movimentar o estoque.
                                 </p>
                               ) : null}
                             </div>

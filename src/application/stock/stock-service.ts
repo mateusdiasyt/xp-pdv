@@ -10,12 +10,16 @@ import { listProductOptions } from "@/infrastructure/db/repositories/product-rep
 import {
   createStockInvoiceXmlRecord,
   findStockInvoiceXmlById,
+  importReviewedStockInvoiceItems,
   importStockInvoiceItems,
   isMissingStockInvoiceXmlTableError,
+  listStockInvoiceReviewProducts,
   listStockInvoiceXmls,
   listStockMovements,
   registerStockMovement,
+  type ReviewedStockInvoiceItemInput,
 } from "@/infrastructure/db/repositories/stock-repository";
+import { listCategoryOptions } from "@/infrastructure/db/repositories/category-repository";
 
 const MAX_XML_FILE_SIZE_BYTES = 2_000_000;
 const FOCUS_NFE_RECEIVED_BASE_URL = "https://api.focusnfe.com.br";
@@ -57,6 +61,8 @@ type StockXmlImportSummary = {
   stockMovements: number;
   skippedItems: number;
 };
+
+type StockInvoiceXmlReviewDecision = "existing" | "create" | "skip";
 
 const STOCK_XML_PREVIEW_ITEM_LIMIT = 8;
 
@@ -324,7 +330,9 @@ async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
 
   const rawXml = await response.text();
   if (!rawXml.includes("<") || !rawXml.toLowerCase().includes("infnfe")) {
-    throw new Error("A Focus respondeu, mas o conteudo baixado nao parece ser um XML valido de NF-e.");
+    throw new Error(
+      "A Focus ainda nao devolveu o XML completo desta NF-e. Se ela acabou de chegar, conclua a Ciencia da Operacao no fluxo fiscal e tente novamente. Se tiver o XML do fornecedor, envie o arquivo diretamente.",
+    );
   }
 
   return rawXml;
@@ -400,6 +408,195 @@ async function runStockXmlImport(params: {
   });
 
   return summary;
+}
+
+async function assertStockInvoiceXmlIsPending(xmlRecordId: string) {
+  const alreadyImported = await findAuditLogByActionEntity({
+    action: "stock.xml.import",
+    entity: "StockInvoiceXml",
+    entityId: xmlRecordId,
+  });
+
+  if (alreadyImported) {
+    throw new Error("Este XML ja foi importado anteriormente para o estoque.");
+  }
+}
+
+function normalizeReviewMatchValue(rawValue?: string | null) {
+  const normalized = rawValue?.trim().toLowerCase();
+  return normalized || undefined;
+}
+
+function findStockInvoiceReviewProductMatch(
+  item: ParsedStockInvoiceItem,
+  products: Awaited<ReturnType<typeof listStockInvoiceReviewProducts>>,
+) {
+  const skuCandidates = [
+    normalizeReviewMatchValue(item.supplierEan),
+    normalizeReviewMatchValue(item.supplierCommercialEan),
+    normalizeReviewMatchValue(item.supplierProductCode),
+  ].filter((value): value is string => Boolean(value));
+
+  const skuMatch = products.find((product) => skuCandidates.includes(product.sku.trim().toLowerCase()));
+  if (skuMatch) {
+    return skuMatch;
+  }
+
+  const normalizedName = normalizeReviewMatchValue(item.description);
+  return normalizedName ? products.find((product) => product.name.trim().toLowerCase() === normalizedName) : undefined;
+}
+
+function toDecimalInputValue(value: Prisma.Decimal) {
+  return value.toDecimalPlaces(2).toFixed(2);
+}
+
+function buildStockInvoiceReviewItem(
+  item: ParsedStockInvoiceItem,
+  matchedProduct: Awaited<ReturnType<typeof listStockInvoiceReviewProducts>>[number] | undefined,
+  fallbackCategoryId: string,
+) {
+  const suggestedSku = item.supplierEan ?? item.supplierCommercialEan ?? item.supplierProductCode ?? "";
+
+  return {
+    lineNumber: item.lineNumber,
+    description: item.description,
+    supplierProductCode: item.supplierProductCode,
+    supplierEan: item.supplierEan,
+    supplierCommercialEan: item.supplierCommercialEan,
+    ncm: item.ncm ?? "",
+    cfop: item.cfop,
+    quantity: item.quantity,
+    unitCost: toDecimalInputValue(item.unitCost),
+    totalCost: toDecimalInputValue(item.unitCost.times(item.quantity)),
+    commercialUnit: item.commercialUnit,
+    commercialQuantity: item.commercialQuantity,
+    taxableUnit: item.taxableUnit,
+    taxableQuantity: item.taxableQuantity,
+    suggestedDecision: matchedProduct ? ("existing" as const) : ("create" as const),
+    suggestedSku,
+    matchedProductId: matchedProduct?.id,
+    initialProduct: {
+      name: matchedProduct?.name ?? item.description,
+      ncm: matchedProduct?.ncm ?? item.ncm ?? "",
+      imageUrl: matchedProduct?.imageUrl ?? "",
+      categoryId: matchedProduct?.categoryId ?? fallbackCategoryId,
+      salePrice: matchedProduct ? toDecimalInputValue(matchedProduct.salePrice) : toDecimalInputValue(item.unitCost),
+      happyHourPrice: matchedProduct?.happyHourPrice ? toDecimalInputValue(matchedProduct.happyHourPrice) : "",
+      minStock: matchedProduct?.minStock ?? 0,
+    },
+  };
+}
+
+function getReviewField(input: FormData, lineNumber: number, fieldName: string) {
+  return String(input.get(`item.${lineNumber}.${fieldName}`) ?? "").trim();
+}
+
+function parseReviewedDecision(rawValue: string, lineNumber: number): StockInvoiceXmlReviewDecision {
+  if (rawValue === "existing" || rawValue === "create" || rawValue === "skip") {
+    return rawValue;
+  }
+
+  throw new Error(`Escolha o destino do item ${lineNumber} antes de importar.`);
+}
+
+function parseReviewedPositiveInteger(rawValue: string, lineNumber: number, fieldLabel: string) {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${fieldLabel} invalida no item ${lineNumber}.`);
+  }
+
+  return parsed;
+}
+
+function parseReviewedNonNegativeInteger(rawValue: string, lineNumber: number, fieldLabel: string) {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${fieldLabel} invalido no item ${lineNumber}.`);
+  }
+
+  return parsed;
+}
+
+function parseReviewedDecimal(rawValue: string, lineNumber: number, fieldLabel: string, allowZero = false) {
+  const normalized = rawValue.replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+    throw new Error(`${fieldLabel} invalido no item ${lineNumber}.`);
+  }
+
+  const parsed = new Prisma.Decimal(normalized);
+  if ((!allowZero && parsed.lessThanOrEqualTo(0)) || parsed.lessThan(0)) {
+    throw new Error(`${fieldLabel} invalido no item ${lineNumber}.`);
+  }
+
+  return parsed;
+}
+
+function parseReviewedOptionalDecimal(rawValue: string, lineNumber: number, fieldLabel: string) {
+  return rawValue ? parseReviewedDecimal(rawValue, lineNumber, fieldLabel, true) : null;
+}
+
+function parseReviewedNcm(rawValue: string, lineNumber: number) {
+  const normalized = rawValue.replace(/\D/g, "");
+  if (!/^\d{8}$/.test(normalized)) {
+    throw new Error(`NCM invalido no item ${lineNumber}. Use 8 digitos.`);
+  }
+
+  return normalized;
+}
+
+function parseReviewedImageUrl(rawValue: string, lineNumber: number) {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  if (rawValue.length > 4_000_000 || !/^(https?:\/\/.+|\/.+|data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+)$/i.test(rawValue)) {
+    throw new Error(`Imagem invalida no item ${lineNumber}.`);
+  }
+
+  return rawValue;
+}
+
+function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoiceItem[]) {
+  return items.map<ReviewedStockInvoiceItemInput>((item) => {
+    const decision = parseReviewedDecision(getReviewField(input, item.lineNumber, "decision"), item.lineNumber);
+
+    if (decision === "skip") {
+      return {
+        ...item,
+        decision,
+      };
+    }
+
+    const name = getReviewField(input, item.lineNumber, "name");
+    const categoryId = getReviewField(input, item.lineNumber, "categoryId");
+    if (name.length < 2 || !categoryId) {
+      throw new Error(`Nome e categoria sao obrigatorios no item ${item.lineNumber}.`);
+    }
+
+    return {
+      ...item,
+      decision,
+      productId: decision === "existing" ? getReviewField(input, item.lineNumber, "productId") : undefined,
+      name,
+      sku: decision === "create" ? getReviewField(input, item.lineNumber, "sku") : undefined,
+      ncm: parseReviewedNcm(getReviewField(input, item.lineNumber, "ncm"), item.lineNumber),
+      categoryId,
+      imageUrl: parseReviewedImageUrl(getReviewField(input, item.lineNumber, "imageUrl"), item.lineNumber),
+      quantity: parseReviewedPositiveInteger(getReviewField(input, item.lineNumber, "quantity"), item.lineNumber, "Quantidade"),
+      unitCost: parseReviewedDecimal(getReviewField(input, item.lineNumber, "unitCost"), item.lineNumber, "Custo unitario"),
+      salePrice: parseReviewedDecimal(getReviewField(input, item.lineNumber, "salePrice"), item.lineNumber, "Preco de venda", true),
+      happyHourPrice: parseReviewedOptionalDecimal(
+        getReviewField(input, item.lineNumber, "happyHourPrice"),
+        item.lineNumber,
+        "Preco Happy Hour",
+      ),
+      minStock: parseReviewedNonNegativeInteger(
+        getReviewField(input, item.lineNumber, "minStock"),
+        item.lineNumber,
+        "Estoque minimo",
+      ),
+    };
+  });
 }
 
 function buildStockInvoiceXmlPreview(rawXml: string) {
@@ -482,6 +679,62 @@ export async function getStockInvoiceXmlHistory() {
   }
 }
 
+export async function getStockInvoiceXmlReview(stockInvoiceXmlId: string) {
+  const xmlRecord = await findStockInvoiceXmlById(stockInvoiceXmlId);
+  if (!xmlRecord) {
+    throw new Error("XML nao encontrado para conferencia.");
+  }
+
+  const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
+  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+
+  const [categories, products, importedAudit] = await Promise.all([
+    listCategoryOptions(),
+    listStockInvoiceReviewProducts(),
+    findAuditLogByActionEntity({
+      action: "stock.xml.import",
+      entity: "StockInvoiceXml",
+      entityId: xmlRecord.id,
+    }),
+  ]);
+
+  const fallbackCategoryId = categories[0]?.id;
+  if (!fallbackCategoryId) {
+    throw new Error("Cadastre ao menos uma categoria antes de importar produtos pelo XML.");
+  }
+
+  return {
+    xml: {
+      id: xmlRecord.id,
+      accessKey: xmlRecord.accessKey,
+      invoiceNumber: xmlRecord.invoiceNumber,
+      invoiceSeries: xmlRecord.invoiceSeries,
+      supplierName: parsedInvoice.supplierName,
+      supplierDocument: parsedInvoice.supplierDocument,
+      recipientName: parsedInvoice.recipientName,
+      recipientDocument: parsedInvoice.recipientDocument,
+      issuedAt: parsedInvoice.issuedAt,
+      totalAmount: parsedInvoice.totalAmount ? toDecimalInputValue(parsedInvoice.totalAmount) : undefined,
+      sourceFileName: xmlRecord.sourceFileName,
+      storedAt: xmlRecord.createdAt,
+      importedAt: importedAudit?.createdAt,
+    },
+    categories,
+    products: products.map((product) => ({
+      ...product,
+      salePrice: toDecimalInputValue(product.salePrice),
+      happyHourPrice: product.happyHourPrice ? toDecimalInputValue(product.happyHourPrice) : "",
+    })),
+    items: parsedInvoice.items.map((item) =>
+      buildStockInvoiceReviewItem(
+        item,
+        findStockInvoiceReviewProductMatch(item, products),
+        fallbackCategoryId,
+      ),
+    ),
+  };
+}
+
 export async function registerStockMovementRecord(input: FormData, actorId?: string) {
   const parsed = createStockMovementSchema.parse({
     productId: input.get("productId"),
@@ -553,7 +806,7 @@ async function storeRawStockInvoiceXmlRecord(params: {
     throw new Error("XML muito grande. Limite de 2 MB por nota.");
   }
 
-  const { input, actorId, rawXml } = params;
+  const { actorId, rawXml } = params;
   const parsedInvoice = parseStockInvoiceXml(rawXml);
   assertInvoiceRecipientMatchesCompany(parsedInvoice);
 
@@ -657,5 +910,64 @@ export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actor
     updatedProducts: summary.updatedProducts,
     stockMovements: summary.stockMovements,
     skippedItems: summary.skippedItems,
+  };
+}
+
+export async function importReviewedStockInvoiceXmlRecord(input: FormData, actorId?: string): Promise<StockXmlImportSummary> {
+  const stockInvoiceXmlId = String(input.get("stockInvoiceXmlId") ?? "").trim();
+  if (!stockInvoiceXmlId) {
+    throw new Error("XML nao identificado para importacao.");
+  }
+
+  const xmlRecord = await findStockInvoiceXmlById(stockInvoiceXmlId);
+  if (!xmlRecord) {
+    throw new Error("XML nao encontrado para importacao.");
+  }
+
+  const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
+  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+  await assertStockInvoiceXmlIsPending(xmlRecord.id);
+
+  const reviewedItems = parseReviewedStockInvoiceItems(input, parsedInvoice.items);
+  if (!reviewedItems.some((item) => item.decision !== "skip")) {
+    throw new Error("Escolha ao menos um item para dar entrada no estoque.");
+  }
+
+  const summary = await importReviewedStockInvoiceItems({
+    accessKey: parsedInvoice.accessKey,
+    invoiceNumber: parsedInvoice.invoiceNumber,
+    invoiceSeries: parsedInvoice.invoiceSeries,
+    supplierName: parsedInvoice.supplierName,
+    supplierDocument: parsedInvoice.supplierDocument,
+    actorId,
+    items: reviewedItems,
+  });
+
+  await createAuditLog({
+    userId: actorId,
+    action: "stock.xml.import",
+    entity: "StockInvoiceXml",
+    entityId: xmlRecord.id,
+    metadata: {
+      accessKey: parsedInvoice.accessKey,
+      invoiceNumber: parsedInvoice.invoiceNumber,
+      invoiceSeries: parsedInvoice.invoiceSeries,
+      createdProducts: summary.createdProducts,
+      updatedProducts: summary.updatedProducts,
+      stockMovements: summary.stockMovements,
+      skippedItems: summary.skippedItems,
+      reviewedItems: reviewedItems.map((item) => ({
+        lineNumber: item.lineNumber,
+        decision: item.decision,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitCost: item.unitCost.toString(),
+      })),
+    },
+  });
+
+  return {
+    imported: true,
+    ...summary,
   };
 }

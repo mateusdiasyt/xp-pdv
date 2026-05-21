@@ -1,4 +1,4 @@
-import { Prisma, RecordStatus, StockMovementType } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus, StockMovementType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -204,6 +204,35 @@ type ImportStockInvoiceItemsResult = {
   updatedProducts: number;
   stockMovements: number;
   skippedItems: number;
+};
+
+export type ReviewedStockInvoiceItemInput = {
+  lineNumber: number;
+  supplierProductCode?: string;
+  supplierEan?: string;
+  supplierCommercialEan?: string;
+  description: string;
+  ncm?: string;
+  cfop?: string;
+  quantity: number;
+  unitCost: Prisma.Decimal;
+  commercialUnit?: string;
+  commercialQuantity?: number;
+  taxableUnit?: string;
+  taxableQuantity?: number;
+  decision: "existing" | "create" | "skip";
+  productId?: string;
+  name?: string;
+  sku?: string;
+  categoryId?: string;
+  imageUrl?: string;
+  salePrice?: Prisma.Decimal;
+  happyHourPrice?: Prisma.Decimal | null;
+  minStock?: number;
+};
+
+type ImportReviewedStockInvoiceItemsInput = Omit<ImportStockInvoiceItemsInput, "allowCreateProducts" | "items"> & {
+  items: ReviewedStockInvoiceItemInput[];
 };
 
 function normalizeSupplierDocument(rawValue?: string) {
@@ -474,6 +503,234 @@ export async function importStockInvoiceItems(data: ImportStockInvoiceItemsInput
           supplierId: supplierId ?? product.supplierId ?? undefined,
           salePrice: nextSalePrice,
           marginPercent: calculateMargin(item.unitCost, nextSalePrice),
+        },
+      });
+
+      productStockMap.set(product.id, resultingStock);
+      updatedProductIds.add(product.id);
+      stockMovements += 1;
+    }
+
+    return {
+      createdProducts,
+      updatedProducts: updatedProductIds.size,
+      stockMovements,
+      skippedItems,
+    };
+  });
+}
+
+export async function listStockInvoiceReviewProducts() {
+  return prisma.product.findMany({
+    where: {
+      kind: ProductKind.STANDARD,
+      tracksStock: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      ncm: true,
+      imageUrl: true,
+      salePrice: true,
+      happyHourPrice: true,
+      minStock: true,
+      currentStock: true,
+      categoryId: true,
+      supplierId: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
+}
+
+async function resolveStockInvoiceSupplier(tx: Prisma.TransactionClient, data: ImportReviewedStockInvoiceItemsInput) {
+  const normalizedSupplierDocument = normalizeSupplierDocument(data.supplierDocument);
+
+  if (!data.supplierName && !normalizedSupplierDocument) {
+    return undefined;
+  }
+
+  const supplier = await tx.supplier.findFirst({
+    where: normalizedSupplierDocument
+      ? {
+          document: normalizedSupplierDocument,
+        }
+      : {
+          tradeName: {
+            equals: (data.supplierName ?? "").trim(),
+            mode: "insensitive",
+          },
+        },
+    select: {
+      id: true,
+    },
+  });
+
+  if (supplier) {
+    return supplier.id;
+  }
+
+  const createdSupplier = await tx.supplier.create({
+    data: {
+      tradeName: (data.supplierName ?? "Fornecedor XML").trim(),
+      document: normalizedSupplierDocument,
+      status: RecordStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return createdSupplier.id;
+}
+
+function buildXmlStockMovementNote(
+  data: ImportReviewedStockInvoiceItemsInput,
+  item: ReviewedStockInvoiceItemInput,
+) {
+  const xmlUnitDetails = [
+    item.commercialQuantity && item.commercialUnit ? `compra ${item.commercialQuantity} ${item.commercialUnit}` : null,
+    item.taxableQuantity && item.taxableUnit ? `vendavel ${item.taxableQuantity} ${item.taxableUnit}` : null,
+    item.cfop ? `CFOP ${item.cfop}` : null,
+  ].filter(Boolean);
+
+  return `Entrada conferida via XML ${data.invoiceNumber ? `N${data.invoiceNumber}` : ""}${data.invoiceSeries ? ` serie ${data.invoiceSeries}` : ""} (${data.accessKey})${xmlUnitDetails.length ? ` - ${xmlUnitDetails.join(" | ")}` : ""}.`;
+}
+
+export async function importReviewedStockInvoiceItems(
+  data: ImportReviewedStockInvoiceItemsInput,
+): Promise<ImportStockInvoiceItemsResult> {
+  return prisma.$transaction(async (tx) => {
+    const supplierId = await resolveStockInvoiceSupplier(tx, data);
+    const productStockMap = new Map<string, number>();
+    const updatedProductIds = new Set<string>();
+    let createdProducts = 0;
+    let stockMovements = 0;
+    let skippedItems = 0;
+
+    for (const item of data.items) {
+      if (item.decision === "skip") {
+        skippedItems += 1;
+        continue;
+      }
+
+      if (!item.name || !item.categoryId || !item.salePrice) {
+        throw new Error(`Revise o cadastro do item ${item.lineNumber} antes de importar.`);
+      }
+
+      let product:
+        | {
+            id: string;
+            name: string;
+            sku: string;
+            ncm: string | null;
+            salePrice: Prisma.Decimal;
+            currentStock: number;
+            supplierId: string | null;
+          }
+        | null = null;
+
+      if (item.decision === "existing") {
+        if (!item.productId) {
+          throw new Error(`Selecione o produto existente do item ${item.lineNumber}.`);
+        }
+
+        product = await tx.product.findFirst({
+          where: {
+            id: item.productId,
+            kind: ProductKind.STANDARD,
+            tracksStock: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            ncm: true,
+            salePrice: true,
+            currentStock: true,
+            supplierId: true,
+          },
+        });
+
+        if (!product) {
+          throw new Error(`O produto vinculado ao item ${item.lineNumber} nao esta disponivel para estoque.`);
+        }
+      } else {
+        const skuCandidates = [
+          toSafeSkuToken(item.sku),
+          toSafeSkuToken(item.supplierEan),
+          toSafeSkuToken(item.supplierCommercialEan),
+          toSafeSkuToken(item.supplierProductCode),
+        ].filter((value): value is string => Boolean(value));
+        const sku = await buildUniqueSku(tx, skuCandidates[0], data.accessKey, item.lineNumber);
+
+        product = await tx.product.create({
+          data: {
+            name: item.name.trim(),
+            sku,
+            ncm: item.ncm,
+            description: `Cadastro conferido via XML de compra (${data.accessKey}).`,
+            imageUrl: item.imageUrl,
+            kind: ProductKind.STANDARD,
+            tracksStock: true,
+            costPrice: item.unitCost,
+            salePrice: item.salePrice,
+            happyHourPrice: item.happyHourPrice,
+            marginPercent: calculateMargin(item.unitCost, item.salePrice),
+            minStock: item.minStock ?? 0,
+            currentStock: 0,
+            status: RecordStatus.ACTIVE,
+            categoryId: item.categoryId,
+            supplierId,
+          },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            ncm: true,
+            salePrice: true,
+            currentStock: true,
+            supplierId: true,
+          },
+        });
+
+        createdProducts += 1;
+      }
+
+      const currentStock = productStockMap.get(product.id) ?? product.currentStock;
+      const resultingStock = currentStock + item.quantity;
+
+      await tx.stockMovement.create({
+        data: {
+          productId: product.id,
+          type: StockMovementType.IN,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          previousStock: currentStock,
+          resultingStock,
+          note: buildXmlStockMovementNote(data, item),
+          operatorId: data.actorId,
+        },
+      });
+
+      await tx.product.update({
+        where: {
+          id: product.id,
+        },
+        data: {
+          name: item.name.trim(),
+          categoryId: item.categoryId,
+          imageUrl: item.imageUrl,
+          minStock: item.minStock ?? 0,
+          currentStock: resultingStock,
+          costPrice: item.unitCost,
+          ncm: item.ncm ?? product.ncm ?? undefined,
+          supplierId: supplierId ?? product.supplierId ?? undefined,
+          salePrice: item.salePrice,
+          happyHourPrice: item.happyHourPrice,
+          marginPercent: calculateMargin(item.unitCost, item.salePrice),
         },
       });
 
