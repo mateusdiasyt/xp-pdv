@@ -6,7 +6,6 @@ import { requirePermission } from "@/application/auth/guards";
 import { getStockFormOptions, getStockInvoiceXmlHistory, getStockMovements } from "@/application/stock/stock-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
@@ -173,7 +172,7 @@ export default async function StockPage() {
                           ) : (
                             <Link
                               href={`/admin/stock/xml/${xmlEntry.id}`}
-                              className={buttonVariants({ size: "sm" })}
+                              className="inline-flex h-8 items-center justify-center rounded-xl bg-primary px-3 text-[0.8rem] font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-xl hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                             >
                               Conferir entrada
                             </Link>

@@ -5,7 +5,6 @@ import { requirePermission } from "@/application/auth/guards";
 import { getStockInvoiceXmlReview } from "@/application/stock/stock-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { StockInvoiceXmlReviewForm } from "@/presentation/admin/stock/stock-invoice-xml-review-form";
@@ -31,7 +30,10 @@ export default async function StockInvoiceXmlReviewPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/stock" className={buttonVariants({ variant: "outline" })}>
+      <Link
+        href="/admin/stock"
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-background/85 px-3.5 text-sm font-medium text-foreground shadow-sm transition-all hover:border-border hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+      >
         <ArrowLeft className="h-4 w-4" />
         Voltar ao estoque
       </Link>
