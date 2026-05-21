@@ -287,6 +287,7 @@ export function QuickSaleForm({
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
   const [discountAmount, setDiscountAmount] = useState("0.00");
+  const [selectedCashSessionId, setSelectedCashSessionId] = useState(openSessions[0]?.id ?? "");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     { id: 1, method: PaymentMethod.PIX, amount: "0.00" },
@@ -566,6 +567,8 @@ export function QuickSaleForm({
       ) : (
         <form action={saleFormAction} className="space-y-4">
           <input type="hidden" name="customerName" value={customerNameValue} />
+          <input type="hidden" name="cashSessionId" value={selectedCashSessionId} />
+          <input type="hidden" name="discountAmount" value={discountAmount} />
           <fieldset className="hidden" aria-hidden="true">
             {cartItems.map((item) => (
               <div key={`quick-item-${item.productId}`}>
@@ -660,9 +663,9 @@ export function QuickSaleForm({
                     <Label htmlFor="quick-sale-session">Caixa</Label>
                     <select
                       id="quick-sale-session"
-                      name="cashSessionId"
                       className="admin-native-select"
-                      defaultValue={openSessions[0]?.id}
+                      value={selectedCashSessionId}
+                      onChange={(event) => setSelectedCashSessionId(event.target.value)}
                       required
                     >
                       {openSessions.map((session) => (
@@ -677,7 +680,6 @@ export function QuickSaleForm({
                     <Label htmlFor="quick-sale-discount">Desconto (R$)</Label>
                     <Input
                       id="quick-sale-discount"
-                      name="discountAmount"
                       value={discountAmount}
                       onChange={(event) => setDiscountAmount(event.target.value)}
                       placeholder="0.00"
