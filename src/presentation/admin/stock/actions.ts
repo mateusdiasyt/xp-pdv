@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
@@ -44,6 +44,7 @@ export async function createStockMovementAction(
     await registerStockMovementRecord(formData, session.user.id);
     revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
+    refresh();
     return { status: "success", message: "Movimentacao registrada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -62,6 +63,7 @@ export async function uploadStockInvoiceXmlAction(
     if (result.imported) {
       revalidatePath("/admin/products");
     }
+    refresh();
 
     return {
       status: "success",
@@ -90,6 +92,7 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
     if (result.imported) {
       revalidatePath("/admin/products");
     }
+    refresh();
 
     return {
       status: "success",
@@ -122,6 +125,7 @@ export async function importStockInvoiceXmlItemsAction(
     const result = await importStockInvoiceXmlById(stockInvoiceXmlId, session.user.id);
     revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
+    refresh();
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,
@@ -152,6 +156,7 @@ export async function importReviewedStockInvoiceXmlAction(
     const result = await importReviewedStockInvoiceXmlRecord(formData, session.user.id);
     revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
+    refresh();
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,

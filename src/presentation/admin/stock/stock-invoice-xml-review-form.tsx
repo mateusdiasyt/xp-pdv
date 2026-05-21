@@ -3,8 +3,7 @@
 import Image from "next/image";
 import { ImageIcon, PackageCheck } from "lucide-react";
 import type { ChangeEvent } from "react";
-import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -454,14 +453,7 @@ export function StockInvoiceXmlReviewForm({
   products,
   items,
 }: StockInvoiceXmlReviewFormProps) {
-  const router = useRouter();
   const [state, formAction] = useActionState(importReviewedStockInvoiceXmlAction, initialActionState);
-
-  useEffect(() => {
-    if (state.status === "success") {
-      router.refresh();
-    }
-  }, [router, state.status]);
 
   return (
     <form

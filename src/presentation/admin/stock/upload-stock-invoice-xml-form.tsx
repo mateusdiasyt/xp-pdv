@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -11,16 +10,14 @@ import { initialActionState } from "@/presentation/admin/common/action-state";
 import { uploadStockInvoiceXmlAction } from "@/presentation/admin/stock/actions";
 
 export function UploadStockInvoiceXmlForm() {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction] = useActionState(uploadStockInvoiceXmlAction, initialActionState);
 
   useEffect(() => {
     if (state.status === "success") {
       formRef.current?.reset();
-      router.refresh();
     }
-  }, [router, state.status]);
+  }, [state]);
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-4">

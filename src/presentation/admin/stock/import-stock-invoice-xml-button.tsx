@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -14,14 +13,7 @@ type ImportStockInvoiceXmlButtonProps = {
 };
 
 export function ImportStockInvoiceXmlButton({ stockInvoiceXmlId, compact = false }: ImportStockInvoiceXmlButtonProps) {
-  const router = useRouter();
   const [state, formAction] = useActionState(importStockInvoiceXmlItemsAction, initialActionState);
-
-  useEffect(() => {
-    if (state.status === "success") {
-      router.refresh();
-    }
-  }, [router, state.status]);
 
   return (
     <form
