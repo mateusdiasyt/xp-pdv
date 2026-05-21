@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ProductKind, RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus, StockUnit } from "@prisma/client";
 import { ImageIcon } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useEffect, useState } from "react";
@@ -25,6 +25,14 @@ type SupplierOption = {
   tradeName: string;
 };
 
+type StockIngredientOption = {
+  id: string;
+  name: string;
+  sku: string;
+  currentStock: number;
+  stockUnit: StockUnit;
+};
+
 type ProductFormInitialData = {
   productId?: string;
   name?: string;
@@ -45,6 +53,9 @@ type ProductFormInitialData = {
   happyHourPrice?: string | null;
   minStock?: number;
   currentStock?: number;
+  stockUnit?: StockUnit;
+  recipeIngredientProductId?: string | null;
+  recipeQuantity?: number | null;
   status?: RecordStatus;
 };
 
@@ -57,6 +68,7 @@ type ProductFormProps = {
   action: ProductFormAction;
   categories: ProductOption[];
   suppliers: SupplierOption[];
+  stockIngredients: StockIngredientOption[];
   submitLabel: string;
   initialData?: ProductFormInitialData;
   onSuccess?: () => void;
@@ -137,6 +149,7 @@ export function CreateProductForm({
   action,
   categories,
   suppliers,
+  stockIngredients,
   submitLabel,
   initialData,
   onSuccess,
@@ -370,6 +383,9 @@ export function CreateProductForm({
             <input type="hidden" name="costPrice" value="0.00" />
             <input type="hidden" name="minStock" value="0" />
             <input type="hidden" name="currentStock" value="0" />
+            <input type="hidden" name="stockUnit" value={StockUnit.UNIT} />
+            <input type="hidden" name="recipeIngredientProductId" value="" />
+            <input type="hidden" name="recipeQuantity" value="" />
 
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
               <strong className="mb-1 block text-foreground">Gameplay e tratado como servico municipal.</strong>
@@ -383,6 +399,9 @@ export function CreateProductForm({
             <input type="hidden" name="costPrice" value="0.00" />
             <input type="hidden" name="minStock" value="0" />
             <input type="hidden" name="currentStock" value="0" />
+            <input type="hidden" name="stockUnit" value={StockUnit.UNIT} />
+            <input type="hidden" name="recipeIngredientProductId" value="" />
+            <input type="hidden" name="recipeQuantity" value="" />
             <input type="hidden" name="gameplayPlanCode" value="" />
             <input type="hidden" name="gameplayDurationMinutes" value="" />
 
@@ -460,6 +479,22 @@ export function CreateProductForm({
             {usesStockControls ? (
               <>
                 <div className="space-y-2">
+                  <Label htmlFor="stockUnit">Unidade do estoque</Label>
+                  <select
+                    id="stockUnit"
+                    name="stockUnit"
+                    className="admin-native-select"
+                    defaultValue={initialData?.stockUnit ?? StockUnit.UNIT}
+                  >
+                    <option value={StockUnit.UNIT}>Unidades</option>
+                    <option value={StockUnit.MILLILITER}>Mililitros</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Use mililitros para barril, garrafa base ou outro insumo fracionado.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="minStock">Estoque minimo</Label>
                   <Input
                     id="minStock"
@@ -491,12 +526,55 @@ export function CreateProductForm({
               <>
                 <input type="hidden" name="minStock" value="0" />
                 <input type="hidden" name="currentStock" value="0" />
+                <input type="hidden" name="stockUnit" value={StockUnit.UNIT} />
                 <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground md:col-span-2">
                   <strong className="mb-1 block text-foreground">Venda sem bloqueio por estoque.</strong>
                   O item continua como produto fiscal para NFC-e, mas nao bloqueia venda nem gera baixa automatica de estoque.
                 </div>
               </>
             )}
+
+            <div className="space-y-3 rounded-2xl border border-border/75 bg-background/35 p-4 md:col-span-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Consumo de insumo fracionado</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para um copo de chopp, selecione o barril e informe quanto sai do saldo a cada item vendido.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+                <div className="space-y-2">
+                  <Label htmlFor="recipeIngredientProductId">Insumo baixado na venda</Label>
+                  <select
+                    id="recipeIngredientProductId"
+                    name="recipeIngredientProductId"
+                    className="admin-native-select"
+                    defaultValue={initialData?.recipeIngredientProductId ?? ""}
+                  >
+                    <option value="">Nao usar insumo</option>
+                    {stockIngredients
+                      .filter((ingredient) => ingredient.id !== initialData?.productId)
+                      .map((ingredient) => (
+                        <option key={ingredient.id} value={ingredient.id}>
+                          {ingredient.name} | {ingredient.sku} | {ingredient.currentStock}{" "}
+                          {ingredient.stockUnit === StockUnit.MILLILITER ? "ml" : "un"}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="recipeQuantity">Consumo por venda</Label>
+                  <Input
+                    id="recipeQuantity"
+                    name="recipeQuantity"
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="Ex.: 500"
+                    defaultValue={initialData?.recipeQuantity ?? ""}
+                  />
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           <>

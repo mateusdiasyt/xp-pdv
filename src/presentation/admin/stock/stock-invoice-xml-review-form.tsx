@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { StockUnit } from "@prisma/client";
 import { ImageIcon, PackageCheck } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useState } from "react";
@@ -28,6 +29,7 @@ type ReviewProduct = {
   happyHourPrice: string;
   minStock: number;
   currentStock: number;
+  stockUnit: StockUnit;
   categoryId: string;
 };
 
@@ -40,6 +42,12 @@ type ReviewItem = {
   ncm: string;
   cfop?: string;
   quantity: number;
+  sourceQuantity: number;
+  suggestedStockUnit: StockUnit;
+  fractionalSuggestion?: {
+    quantityMultiplier: number;
+    quantityLabel: string;
+  };
   unitCost: string;
   totalCost: string;
   commercialUnit?: string;
@@ -57,6 +65,7 @@ type ReviewItem = {
     salePrice: string;
     happyHourPrice: string;
     minStock: number;
+    stockUnit: StockUnit;
   };
 };
 
@@ -73,6 +82,8 @@ function moneyLabel(value: string) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
   }).format(Number(value));
 }
 
@@ -220,6 +231,7 @@ function StockInvoiceXmlReviewItem({
       salePrice: product.salePrice,
       happyHourPrice: product.happyHourPrice,
       minStock: product.minStock,
+      stockUnit: product.stockUnit,
     });
   }
 
@@ -238,6 +250,12 @@ function StockInvoiceXmlReviewItem({
             <span className="rounded-full border border-border/70 px-2 py-1">NCM {item.ncm || "-"}</span>
             <span className="rounded-full border border-border/70 px-2 py-1">CFOP {item.cfop ?? "-"}</span>
           </div>
+          {item.fractionalSuggestion ? (
+            <p className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
+              Possivel insumo fracionado detectado. O XML traz {item.sourceQuantity} volume(s); a entrada foi sugerida como{" "}
+              {item.quantity} ml ({item.fractionalSuggestion.quantityLabel}). Confirme antes de importar.
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
@@ -252,7 +270,7 @@ function StockInvoiceXmlReviewItem({
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor={`decision-${item.lineNumber}`}>Destino da linha</Label>
               <select
@@ -289,6 +307,22 @@ function StockInvoiceXmlReviewItem({
                 disabled={decision === "skip"}
                 required={decision !== "skip"}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`stock-unit-${item.lineNumber}`}>Unidade do saldo</Label>
+              <select
+                id={`stock-unit-${item.lineNumber}`}
+                name={`item.${item.lineNumber}.stockUnit`}
+                className="admin-native-select"
+                value={fields.stockUnit}
+                onChange={(event) => updateFields({ stockUnit: event.target.value as StockUnit })}
+                disabled={decision === "skip"}
+                required={decision !== "skip"}
+              >
+                <option value={StockUnit.UNIT}>Unidades</option>
+                <option value={StockUnit.MILLILITER}>Mililitros</option>
+              </select>
             </div>
           </div>
 

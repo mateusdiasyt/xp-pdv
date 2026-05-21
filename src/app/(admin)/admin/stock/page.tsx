@@ -1,4 +1,4 @@
-import { StockMovementType } from "@prisma/client";
+import { StockMovementType, StockUnit } from "@prisma/client";
 import Link from "next/link";
 import { Fragment } from "react";
 
@@ -35,6 +35,10 @@ function movementTypeClass(type: StockMovementType) {
   }
 
   return "bg-amber-100 text-amber-700 hover:bg-amber-100";
+}
+
+function stockUnitLabel(stockUnit: StockUnit) {
+  return stockUnit === StockUnit.MILLILITER ? "ml" : "un";
 }
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -282,9 +286,15 @@ export default async function StockPage() {
                   <TableCell>
                     <Badge className={movementTypeClass(movement.type)}>{movementTypeLabel(movement.type)}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">{movement.quantity}</TableCell>
-                  <TableCell className="text-right">{movement.previousStock}</TableCell>
-                  <TableCell className="text-right">{movement.resultingStock}</TableCell>
+                  <TableCell className="text-right">
+                    {movement.quantity} {stockUnitLabel(movement.product.stockUnit)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {movement.previousStock} {stockUnitLabel(movement.product.stockUnit)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {movement.resultingStock} {stockUnitLabel(movement.product.stockUnit)}
+                  </TableCell>
                   <TableCell>{movement.operator?.name ?? "-"}</TableCell>
                 </TableRow>
               ))}

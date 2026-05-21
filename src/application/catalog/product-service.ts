@@ -1,4 +1,4 @@
-import { Prisma, ProductKind, RecordStatus } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus, StockUnit } from "@prisma/client";
 
 import { createProductSchema, updateProductSchema, updateProductStatusSchema } from "@/domain/catalog/schemas";
 import { emptyToUndefined } from "@/domain/shared/normalizers";
@@ -9,6 +9,7 @@ import {
   countProducts,
   getProductForEdit,
   getProductImageById,
+  listStockIngredientOptions,
   listProductOptions,
   listProducts,
   updateProduct,
@@ -55,8 +56,12 @@ export async function getProductOptions() {
 }
 
 export async function getProductFormOptions() {
-  const [categories, suppliers] = await Promise.all([listCategoryOptions(), listSupplierOptions()]);
-  return { categories, suppliers };
+  const [categories, suppliers, stockIngredients] = await Promise.all([
+    listCategoryOptions(),
+    listSupplierOptions(),
+    listStockIngredientOptions(),
+  ]);
+  return { categories, suppliers, stockIngredients };
 }
 
 export async function createProductRecord(input: FormData, actorId?: string) {
@@ -79,6 +84,9 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     happyHourPrice: input.get("happyHourPrice"),
     minStock: input.get("minStock"),
     currentStock: input.get("currentStock"),
+    stockUnit: input.get("stockUnit"),
+    recipeIngredientProductId: input.get("recipeIngredientProductId"),
+    recipeQuantity: input.get("recipeQuantity"),
     status: input.get("status"),
   });
 
@@ -110,6 +118,9 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     marginPercent,
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
+    stockUnit: tracksStock ? parsed.stockUnit : StockUnit.UNIT,
+    recipeIngredientProductId: !isServiceLike ? emptyToUndefined(parsed.recipeIngredientProductId) : undefined,
+    recipeQuantity: !isServiceLike ? parsed.recipeQuantity : undefined,
     status: parsed.status,
   });
 
@@ -131,6 +142,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
       happyHourPrice: created.happyHourPrice?.toString(),
       categoryId: created.categoryId,
       supplierId: created.supplierId,
+      stockUnit: created.stockUnit,
     },
   });
 }
@@ -156,6 +168,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     happyHourPrice: input.get("happyHourPrice"),
     minStock: input.get("minStock"),
     currentStock: input.get("currentStock"),
+    stockUnit: input.get("stockUnit"),
+    recipeIngredientProductId: input.get("recipeIngredientProductId"),
+    recipeQuantity: input.get("recipeQuantity"),
     status: input.get("status"),
   });
 
@@ -188,6 +203,9 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     marginPercent,
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
+    stockUnit: tracksStock ? parsed.stockUnit : StockUnit.UNIT,
+    recipeIngredientProductId: !isServiceLike ? emptyToUndefined(parsed.recipeIngredientProductId) : undefined,
+    recipeQuantity: !isServiceLike ? parsed.recipeQuantity : undefined,
     status: parsed.status,
   });
 
@@ -209,6 +227,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
       happyHourPrice: updated.happyHourPrice?.toString(),
       categoryId: updated.categoryId,
       supplierId: updated.supplierId,
+      stockUnit: updated.stockUnit,
     },
   });
 }

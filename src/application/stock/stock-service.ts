@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, StockUnit } from "@prisma/client";
 
 import { createStockMovementSchema } from "@/domain/stock/schemas";
 import {
@@ -106,6 +106,32 @@ function normalizeXmlCode(rawValue?: string) {
   }
 
   return normalized;
+}
+
+function inferFractionalStockSuggestion(item: Pick<ParsedStockInvoiceItem, "description" | "commercialUnit" | "taxableUnit">) {
+  const source = `${item.description} ${item.commercialUnit ?? ""} ${item.taxableUnit ?? ""}`.toUpperCase();
+  const volumeMatch = source.match(/\b(\d+(?:[.,]\d+)?)\s*(ML|L|LT|LITRO|LITROS)\b/);
+  const isKegLike = /\b(BAR|BARRIL|KEG)\b/.test(source);
+
+  if (!volumeMatch || !isKegLike) {
+    return undefined;
+  }
+
+  const volume = Number(volumeMatch[1]?.replace(",", "."));
+  if (!Number.isFinite(volume) || volume <= 0) {
+    return undefined;
+  }
+
+  const unit = volumeMatch[2];
+  const millilitersPerPackage = unit === "ML" ? Math.round(volume) : Math.round(volume * 1_000);
+  if (millilitersPerPackage <= 0) {
+    return undefined;
+  }
+
+  return {
+    quantityMultiplier: millilitersPerPackage,
+    quantityLabel: `${millilitersPerPackage} ml por volume do XML`,
+  };
 }
 
 function parseXmlNumber(rawValue?: string) {
@@ -450,12 +476,26 @@ function toDecimalInputValue(value: Prisma.Decimal) {
   return value.toDecimalPlaces(2).toFixed(2);
 }
 
+function toCostInputValue(value: Prisma.Decimal) {
+  return value.toDecimalPlaces(4).toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 function buildStockInvoiceReviewItem(
   item: ParsedStockInvoiceItem,
   matchedProduct: Awaited<ReturnType<typeof listStockInvoiceReviewProducts>>[number] | undefined,
   fallbackCategoryId: string,
 ) {
   const suggestedSku = item.supplierEan ?? item.supplierCommercialEan ?? item.supplierProductCode ?? "";
+  const fractionalSuggestion = inferFractionalStockSuggestion(item);
+  const suggestedStockUnit = matchedProduct?.stockUnit ?? (fractionalSuggestion ? StockUnit.MILLILITER : StockUnit.UNIT);
+  const suggestedQuantity =
+    suggestedStockUnit === StockUnit.MILLILITER && fractionalSuggestion
+      ? item.quantity * fractionalSuggestion.quantityMultiplier
+      : item.quantity;
+  const suggestedUnitCost =
+    suggestedStockUnit === StockUnit.MILLILITER && fractionalSuggestion
+      ? item.unitCost.dividedBy(fractionalSuggestion.quantityMultiplier)
+      : item.unitCost;
 
   return {
     lineNumber: item.lineNumber,
@@ -465,8 +505,11 @@ function buildStockInvoiceReviewItem(
     supplierCommercialEan: item.supplierCommercialEan,
     ncm: item.ncm ?? "",
     cfop: item.cfop,
-    quantity: item.quantity,
-    unitCost: toDecimalInputValue(item.unitCost),
+    quantity: suggestedQuantity,
+    sourceQuantity: item.quantity,
+    fractionalSuggestion,
+    suggestedStockUnit,
+    unitCost: toCostInputValue(suggestedUnitCost),
     totalCost: toDecimalInputValue(item.unitCost.times(item.quantity)),
     commercialUnit: item.commercialUnit,
     commercialQuantity: item.commercialQuantity,
@@ -483,6 +526,7 @@ function buildStockInvoiceReviewItem(
       salePrice: matchedProduct ? toDecimalInputValue(matchedProduct.salePrice) : toDecimalInputValue(item.unitCost),
       happyHourPrice: matchedProduct?.happyHourPrice ? toDecimalInputValue(matchedProduct.happyHourPrice) : "",
       minStock: matchedProduct?.minStock ?? 0,
+      stockUnit: suggestedStockUnit,
     },
   };
 }
@@ -517,9 +561,16 @@ function parseReviewedNonNegativeInteger(rawValue: string, lineNumber: number, f
   return parsed;
 }
 
-function parseReviewedDecimal(rawValue: string, lineNumber: number, fieldLabel: string, allowZero = false) {
+function parseReviewedDecimal(
+  rawValue: string,
+  lineNumber: number,
+  fieldLabel: string,
+  allowZero = false,
+  precision = 2,
+) {
   const normalized = rawValue.replace(",", ".");
-  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+  const decimalPattern = new RegExp(`^\\d+(\\.\\d{1,${precision}})?$`);
+  if (!decimalPattern.test(normalized)) {
     throw new Error(`${fieldLabel} invalido no item ${lineNumber}.`);
   }
 
@@ -564,6 +615,7 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
       return {
         ...item,
         decision,
+        stockUnit: StockUnit.UNIT,
       };
     }
 
@@ -583,7 +635,13 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
       categoryId,
       imageUrl: parseReviewedImageUrl(getReviewField(input, item.lineNumber, "imageUrl"), item.lineNumber),
       quantity: parseReviewedPositiveInteger(getReviewField(input, item.lineNumber, "quantity"), item.lineNumber, "Quantidade"),
-      unitCost: parseReviewedDecimal(getReviewField(input, item.lineNumber, "unitCost"), item.lineNumber, "Custo unitario"),
+      unitCost: parseReviewedDecimal(
+        getReviewField(input, item.lineNumber, "unitCost"),
+        item.lineNumber,
+        "Custo unitario",
+        false,
+        4,
+      ),
       salePrice: parseReviewedDecimal(getReviewField(input, item.lineNumber, "salePrice"), item.lineNumber, "Preco de venda", true),
       happyHourPrice: parseReviewedOptionalDecimal(
         getReviewField(input, item.lineNumber, "happyHourPrice"),
@@ -595,8 +653,17 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
         item.lineNumber,
         "Estoque minimo",
       ),
+      stockUnit: parseReviewedStockUnit(getReviewField(input, item.lineNumber, "stockUnit"), item.lineNumber),
     };
   });
+}
+
+function parseReviewedStockUnit(rawValue: string, lineNumber: number) {
+  if (rawValue === StockUnit.UNIT || rawValue === StockUnit.MILLILITER) {
+    return rawValue;
+  }
+
+  throw new Error(`Unidade de estoque invalida no item ${lineNumber}.`);
 }
 
 function buildStockInvoiceXmlPreview(rawXml: string) {

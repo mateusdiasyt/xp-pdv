@@ -1,4 +1,4 @@
-import { Prisma, ProductKind, RecordStatus } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus, StockUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -98,6 +98,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         marginPercent: Prisma.Decimal;
         minStock: number;
         currentStock: number;
+        stockUnit: StockUnit;
         status: RecordStatus;
         categoryId: string;
         supplierId: string | null;
@@ -126,6 +127,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         p."marginPercent",
         p."minStock",
         p."currentStock",
+        p."stockUnit",
         p."status",
         p."categoryId",
         p."supplierId",
@@ -173,6 +175,7 @@ export async function listProducts(filters?: ListProductsFilters) {
         marginPercent: true,
         minStock: true,
         currentStock: true,
+        stockUnit: true,
         status: true,
         categoryId: true,
         supplierId: true,
@@ -220,10 +223,30 @@ export async function createProduct(data: {
   marginPercent: Prisma.Decimal;
   minStock: number;
   currentStock: number;
+  stockUnit: StockUnit;
+  recipeIngredientProductId?: string;
+  recipeQuantity?: number;
   status: RecordStatus;
 }) {
-  return prisma.product.create({
-    data,
+  const { recipeIngredientProductId, recipeQuantity, ...productData } = data;
+
+  return prisma.$transaction(async (tx) => {
+    const product = await tx.product.create({
+      data: productData,
+    });
+
+    if (recipeIngredientProductId && recipeQuantity) {
+      await assertRecipeIngredientIsValid(tx, product.id, recipeIngredientProductId);
+      await tx.productRecipeIngredient.create({
+        data: {
+          productId: product.id,
+          ingredientProductId: recipeIngredientProductId,
+          quantity: recipeQuantity,
+        },
+      });
+    }
+
+    return product;
   });
 }
 
@@ -248,32 +271,57 @@ export async function updateProduct(data: {
   marginPercent: Prisma.Decimal;
   minStock: number;
   currentStock: number;
+  stockUnit: StockUnit;
+  recipeIngredientProductId?: string;
+  recipeQuantity?: number;
   status: RecordStatus;
 }) {
-  return prisma.product.update({
-    where: { id: data.productId },
-    data: {
-      name: data.name,
-      sku: data.sku,
-      ncm: data.ncm,
-      description: data.description,
-      imageUrl: data.imageUrl,
-      kind: data.kind,
-      serviceCnae: data.serviceCnae,
-      serviceDescription: data.serviceDescription,
-      gameplayPlanCode: data.gameplayPlanCode,
-      gameplayDurationMinutes: data.gameplayDurationMinutes,
-      tracksStock: data.tracksStock,
-      categoryId: data.categoryId,
-      supplierId: data.supplierId,
-      costPrice: data.costPrice,
-      salePrice: data.salePrice,
-      happyHourPrice: data.happyHourPrice,
-      marginPercent: data.marginPercent,
-      minStock: data.minStock,
-      currentStock: data.currentStock,
-      status: data.status,
-    },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.product.update({
+      where: { id: data.productId },
+      data: {
+        name: data.name,
+        sku: data.sku,
+        ncm: data.ncm,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        kind: data.kind,
+        serviceCnae: data.serviceCnae,
+        serviceDescription: data.serviceDescription,
+        gameplayPlanCode: data.gameplayPlanCode,
+        gameplayDurationMinutes: data.gameplayDurationMinutes,
+        tracksStock: data.tracksStock,
+        categoryId: data.categoryId,
+        supplierId: data.supplierId,
+        costPrice: data.costPrice,
+        salePrice: data.salePrice,
+        happyHourPrice: data.happyHourPrice,
+        marginPercent: data.marginPercent,
+        minStock: data.minStock,
+        currentStock: data.currentStock,
+        stockUnit: data.stockUnit,
+        status: data.status,
+      },
+    });
+
+    await tx.productRecipeIngredient.deleteMany({
+      where: {
+        productId: data.productId,
+      },
+    });
+
+    if (data.recipeIngredientProductId && data.recipeQuantity) {
+      await assertRecipeIngredientIsValid(tx, data.productId, data.recipeIngredientProductId);
+      await tx.productRecipeIngredient.create({
+        data: {
+          productId: data.productId,
+          ingredientProductId: data.recipeIngredientProductId,
+          quantity: data.recipeQuantity,
+        },
+      });
+    }
+
+    return updated;
   });
 }
 
@@ -304,9 +352,17 @@ export async function getProductForEdit(productId: string) {
       happyHourPrice: true,
       minStock: true,
       currentStock: true,
+      stockUnit: true,
       status: true,
       categoryId: true,
       supplierId: true,
+      recipeIngredients: {
+        select: {
+          ingredientProductId: true,
+          quantity: true,
+        },
+        take: 1,
+      },
     },
   });
 }
@@ -337,6 +393,7 @@ export async function listProductOptions() {
         gameplayDurationMinutes: true,
         tracksStock: true,
         currentStock: true,
+        stockUnit: true,
         status: true,
         salePrice: true,
         happyHourPrice: true,
@@ -369,6 +426,7 @@ export async function listProductOptions() {
         gameplayDurationMinutes: true,
         tracksStock: true,
         currentStock: true,
+        stockUnit: true,
         status: true,
         salePrice: true,
         happyHourPrice: true,
@@ -401,6 +459,7 @@ export async function listLowStockProducts() {
       currentStock: true,
       minStock: true,
       tracksStock: true,
+      stockUnit: true,
     },
   });
 
@@ -408,6 +467,51 @@ export async function listLowStockProducts() {
     .filter((product) => product.tracksStock && product.currentStock <= product.minStock)
     .sort((a, b) => a.currentStock - b.currentStock)
     .slice(0, 5);
+}
+
+async function assertRecipeIngredientIsValid(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  ingredientProductId: string,
+) {
+  if (productId === ingredientProductId) {
+    throw new Error("O produto nao pode consumir o proprio estoque.");
+  }
+
+  const ingredient = await tx.product.findFirst({
+    where: {
+      id: ingredientProductId,
+      kind: ProductKind.STANDARD,
+      tracksStock: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!ingredient) {
+    throw new Error("Selecione um insumo com controle de estoque para a receita.");
+  }
+}
+
+export async function listStockIngredientOptions() {
+  return prisma.product.findMany({
+    where: {
+      kind: ProductKind.STANDARD,
+      tracksStock: true,
+      status: RecordStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      currentStock: true,
+      stockUnit: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
 }
 
 export async function updateProductStatus(data: { productId: string; status: RecordStatus }) {

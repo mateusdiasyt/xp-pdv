@@ -9,6 +9,7 @@ import {
   RefundStatus,
   SaleStatus,
   StockMovementType,
+  StockUnit,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -72,6 +73,13 @@ const PDV_TRANSACTION_OPTIONS = {
   timeout: 40_000,
 };
 
+type StockBalanceProduct = {
+  id: string;
+  name: string;
+  currentStock: number;
+  costPrice: Prisma.Decimal;
+};
+
 type GameplayStationProductData = {
   name: string;
   gameplayPlanCode: string | null;
@@ -121,6 +129,72 @@ function resolveEffectiveSalePrice(
   }
 
   return product.salePrice;
+}
+
+function resolveRecipeUnitCost(product: {
+  costPrice: Prisma.Decimal;
+  recipeIngredients: Array<{
+    quantity: number;
+    ingredientProduct: {
+      costPrice: Prisma.Decimal;
+    };
+  }>;
+}) {
+  if (product.recipeIngredients.length === 0) {
+    return product.costPrice;
+  }
+
+  return product.recipeIngredients.reduce(
+    (total, ingredient) => total.plus(ingredient.ingredientProduct.costPrice.times(ingredient.quantity)),
+    new Prisma.Decimal(0),
+  );
+}
+
+async function moveTrackedStock(
+  tx: PrismaTx,
+  balances: Map<string, number>,
+  product: StockBalanceProduct,
+  quantity: number,
+  type: StockMovementType,
+  note: string,
+  operatorId?: string,
+) {
+  if (quantity <= 0) {
+    return;
+  }
+
+  const previousStock = balances.get(product.id) ?? product.currentStock;
+  const resultingStock = type === StockMovementType.IN ? previousStock + quantity : previousStock - quantity;
+
+  if (resultingStock < 0) {
+    throw new Error(`Estoque insuficiente para ${product.name}.`);
+  }
+
+  const stockUpdate = await tx.product.updateMany({
+    where: { id: product.id },
+    data: {
+      currentStock: resultingStock,
+    },
+  });
+
+  if (stockUpdate.count === 0) {
+    throw new Error("Produto nao encontrado para atualizar o estoque.");
+  }
+
+  await tx.stockMovement.create({
+    data: {
+      productId: product.id,
+      type,
+      quantity,
+      unitCost: product.costPrice,
+      previousStock,
+      resultingStock,
+      note,
+      operatorId,
+    },
+  });
+
+  balances.set(product.id, resultingStock);
 }
 
 function normalizeOptionalPaymentText(value?: string) {
@@ -289,6 +363,11 @@ export async function listPdvProductOptions() {
     return await prisma.product.findMany({
       where: {
         status: RecordStatus.ACTIVE,
+        NOT: {
+          kind: ProductKind.STANDARD,
+          tracksStock: true,
+          stockUnit: StockUnit.MILLILITER,
+        },
       },
       select: {
         id: true,
@@ -325,6 +404,11 @@ export async function listPdvProductOptions() {
     const products = await prisma.product.findMany({
       where: {
         status: RecordStatus.ACTIVE,
+        NOT: {
+          kind: ProductKind.STANDARD,
+          tracksStock: true,
+          stockUnit: StockUnit.MILLILITER,
+        },
       },
       select: {
         id: true,
@@ -520,6 +604,19 @@ async function runCreateSaleWithStockAdjustment(
       costPrice: true,
       currentStock: true,
       status: true,
+      recipeIngredients: {
+        select: {
+          quantity: true,
+          ingredientProduct: {
+            select: {
+              id: true,
+              name: true,
+              currentStock: true,
+              costPrice: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -549,6 +646,15 @@ async function runCreateSaleWithStockAdjustment(
       }
     } else if (product.kind === ProductKind.STANDARD && product.tracksStock && product.currentStock < item.quantity) {
       throw new Error(`Estoque insuficiente para ${product.name}.`);
+    }
+
+    if (product.kind === ProductKind.STANDARD) {
+      for (const recipeIngredient of product.recipeIngredients) {
+        const requiredQuantity = recipeIngredient.quantity * item.quantity;
+        if (recipeIngredient.ingredientProduct.currentStock < requiredQuantity) {
+          throw new Error(`Estoque insuficiente do insumo ${recipeIngredient.ingredientProduct.name} para ${product.name}.`);
+        }
+      }
     }
 
     const unitPrice = resolveEffectiveSalePrice(product, {
@@ -656,9 +762,9 @@ async function runCreateSaleWithStockAdjustment(
               product.kind === ProductKind.GAMEPLAY ? product.gameplayDurationMinutes : null,
             quantity: item.quantity,
             unitPrice,
-            unitCost: product.costPrice,
+            unitCost: resolveRecipeUnitCost(product),
             lineTotal: unitPrice.times(item.quantity),
-            lineCostTotal: product.costPrice.times(item.quantity),
+            lineCostTotal: resolveRecipeUnitCost(product).times(item.quantity),
           };
         }),
       },
@@ -685,41 +791,41 @@ async function runCreateSaleWithStockAdjustment(
     },
   });
 
+  const stockBalances = new Map<string, number>();
+
   for (const item of data.items) {
     const product = productMap.get(item.productId);
     if (!product) {
       continue;
     }
 
-    if (product.kind !== ProductKind.STANDARD || !product.tracksStock) {
+    if (product.kind !== ProductKind.STANDARD) {
       continue;
     }
 
-    const resultingStock = product.currentStock - item.quantity;
-
-    const stockUpdate = await tx.product.updateMany({
-      where: { id: product.id },
-      data: {
-        currentStock: resultingStock,
-      },
-    });
-
-    if (stockUpdate.count === 0) {
-      throw new Error("Produto nao encontrado para atualizar o estoque.");
+    if (product.tracksStock) {
+      await moveTrackedStock(
+        tx,
+        stockBalances,
+        product,
+        item.quantity,
+        StockMovementType.OUT,
+        `Saida por venda ${data.saleNumber}`,
+        data.operatorId,
+      );
     }
 
-    await tx.stockMovement.create({
-      data: {
-        productId: product.id,
-        type: StockMovementType.OUT,
-        quantity: item.quantity,
-        unitCost: product.costPrice,
-        previousStock: product.currentStock,
-        resultingStock,
-        note: `Saida por venda ${data.saleNumber}`,
-        operatorId: data.operatorId,
-      },
-    });
+    for (const recipeIngredient of product.recipeIngredients) {
+      await moveTrackedStock(
+        tx,
+        stockBalances,
+        recipeIngredient.ingredientProduct,
+        recipeIngredient.quantity * item.quantity,
+        StockMovementType.OUT,
+        `Consumo por venda ${data.saleNumber}: ${product.name}`,
+        data.operatorId,
+      );
+    }
   }
 
   return sale;
@@ -772,10 +878,24 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
         where: { id: { in: productIds } },
         select: {
           id: true,
+          name: true,
           kind: true,
           tracksStock: true,
           currentStock: true,
           costPrice: true,
+          recipeIngredients: {
+            select: {
+              quantity: true,
+              ingredientProduct: {
+                select: {
+                  id: true,
+                  name: true,
+                  currentStock: true,
+                  costPrice: true,
+                },
+              },
+            },
+          },
         },
       });
       const productMap = new Map(products.map((product) => [product.id, product]));
@@ -838,42 +958,44 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
 
       let restoredQuantity = 0;
 
+      const stockBalances = new Map<string, number>();
+
       for (const item of sale.items) {
         const product = productMap.get(item.productId);
         if (!product) {
           continue;
         }
 
-        if (product.kind !== ProductKind.STANDARD || !product.tracksStock) {
+        if (product.kind !== ProductKind.STANDARD) {
           continue;
         }
 
-        const resultingStock = product.currentStock + item.quantity;
-
-        const stockUpdate = await tx.product.updateMany({
-          where: { id: item.productId },
-          data: {
-            currentStock: resultingStock,
-          },
-        });
-
-        if (stockUpdate.count === 0) {
-          throw new Error("Produto nao encontrado para atualizar o estoque.");
+        if (product.tracksStock) {
+          await moveTrackedStock(
+            tx,
+            stockBalances,
+            product,
+            item.quantity,
+            StockMovementType.IN,
+            `Retorno por cancelamento da venda ${sale.saleNumber}: ${data.cancelReason}`,
+            data.cancelledById,
+          );
+          restoredQuantity += item.quantity;
         }
 
-        await tx.stockMovement.create({
-          data: {
-            productId: item.productId,
-            type: StockMovementType.IN,
-            quantity: item.quantity,
-            unitCost: product.costPrice,
-            previousStock: product.currentStock,
-            resultingStock,
-            note: `Retorno por cancelamento da venda ${sale.saleNumber}: ${data.cancelReason}`,
-            operatorId: data.cancelledById,
-          },
-        });
-        restoredQuantity += item.quantity;
+        for (const recipeIngredient of product.recipeIngredients) {
+          const restoredIngredientQuantity = recipeIngredient.quantity * item.quantity;
+          await moveTrackedStock(
+            tx,
+            stockBalances,
+            recipeIngredient.ingredientProduct,
+            restoredIngredientQuantity,
+            StockMovementType.IN,
+            `Retorno por cancelamento da venda ${sale.saleNumber}: insumo de ${item.productNameSnapshot}`,
+            data.cancelledById,
+          );
+          restoredQuantity += restoredIngredientQuantity;
+        }
       }
 
       const updatedCancellation = await tx.saleCancellation.update({

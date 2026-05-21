@@ -18,12 +18,21 @@ type SupplierOption = {
   tradeName: string;
 };
 
+type StockIngredientOption = {
+  id: string;
+  name: string;
+  sku: string;
+  currentStock: number;
+  stockUnit: "UNIT" | "MILLILITER";
+};
+
 type CreateProductDialogProps = {
   categories: ProductOption[];
   suppliers: SupplierOption[];
+  stockIngredients: StockIngredientOption[];
 };
 
-export function CreateProductDialog({ categories, suppliers }: CreateProductDialogProps) {
+export function CreateProductDialog({ categories, suppliers, stockIngredients }: CreateProductDialogProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -42,6 +51,7 @@ export function CreateProductDialog({ categories, suppliers }: CreateProductDial
             action={createProductAction}
             categories={categories}
             suppliers={suppliers}
+            stockIngredients={stockIngredients}
             submitLabel="Criar produto"
             onSuccess={() => setOpen(false)}
           />

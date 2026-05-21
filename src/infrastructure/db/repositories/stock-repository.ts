@@ -1,4 +1,4 @@
-import { Prisma, ProductKind, RecordStatus, StockMovementType } from "@prisma/client";
+import { Prisma, ProductKind, RecordStatus, StockMovementType, StockUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -19,6 +19,7 @@ export async function listStockMovements() {
           id: true,
           name: true,
           sku: true,
+          stockUnit: true,
         },
       },
       operator: {
@@ -229,6 +230,7 @@ export type ReviewedStockInvoiceItemInput = {
   salePrice?: Prisma.Decimal;
   happyHourPrice?: Prisma.Decimal | null;
   minStock?: number;
+  stockUnit: StockUnit;
 };
 
 type ImportReviewedStockInvoiceItemsInput = Omit<ImportStockInvoiceItemsInput, "allowCreateProducts" | "items"> & {
@@ -536,6 +538,7 @@ export async function listStockInvoiceReviewProducts() {
       happyHourPrice: true,
       minStock: true,
       currentStock: true,
+      stockUnit: true,
       categoryId: true,
       supplierId: true,
     },
@@ -629,6 +632,7 @@ export async function importReviewedStockInvoiceItems(
             salePrice: Prisma.Decimal;
             currentStock: number;
             supplierId: string | null;
+            stockUnit: StockUnit;
           }
         | null = null;
 
@@ -651,6 +655,7 @@ export async function importReviewedStockInvoiceItems(
             salePrice: true,
             currentStock: true,
             supplierId: true,
+            stockUnit: true,
           },
         });
 
@@ -675,6 +680,7 @@ export async function importReviewedStockInvoiceItems(
             imageUrl: item.imageUrl,
             kind: ProductKind.STANDARD,
             tracksStock: true,
+            stockUnit: item.stockUnit,
             costPrice: item.unitCost,
             salePrice: item.salePrice,
             happyHourPrice: item.happyHourPrice,
@@ -693,6 +699,7 @@ export async function importReviewedStockInvoiceItems(
             salePrice: true,
             currentStock: true,
             supplierId: true,
+            stockUnit: true,
           },
         });
 
@@ -725,6 +732,7 @@ export async function importReviewedStockInvoiceItems(
           imageUrl: item.imageUrl,
           minStock: item.minStock ?? 0,
           currentStock: resultingStock,
+          stockUnit: item.stockUnit,
           costPrice: item.unitCost,
           ncm: item.ncm ?? product.ncm ?? undefined,
           supplierId: supplierId ?? product.supplierId ?? undefined,

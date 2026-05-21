@@ -1,7 +1,7 @@
 "use client";
 
 import { PencilLine } from "lucide-react";
-import type { ProductKind, RecordStatus } from "@prisma/client";
+import type { ProductKind, RecordStatus, StockUnit } from "@prisma/client";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,18 @@ type SupplierOption = {
   tradeName: string;
 };
 
+type StockIngredientOption = {
+  id: string;
+  name: string;
+  sku: string;
+  currentStock: number;
+  stockUnit: StockUnit;
+};
+
 type EditProductDialogProps = {
   categories: ProductOption[];
   suppliers: SupplierOption[];
+  stockIngredients: StockIngredientOption[];
   product: {
     id: string;
     name: string;
@@ -48,10 +57,13 @@ type ProductEditPayload = {
   happyHourPrice?: string | null;
   minStock: number;
   currentStock: number;
+  stockUnit: StockUnit;
+  recipeIngredientProductId?: string | null;
+  recipeQuantity?: number | null;
   status: RecordStatus;
 };
 
-export function EditProductDialog({ categories, suppliers, product }: EditProductDialogProps) {
+export function EditProductDialog({ categories, suppliers, stockIngredients, product }: EditProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [productPayload, setProductPayload] = useState<ProductEditPayload | null>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
@@ -113,6 +125,7 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
               action={updateProductAction}
               categories={categories}
               suppliers={suppliers}
+              stockIngredients={stockIngredients}
               submitLabel="Salvar alteracoes"
               initialData={{
                 productId: productPayload.id,
@@ -134,6 +147,9 @@ export function EditProductDialog({ categories, suppliers, product }: EditProduc
                 happyHourPrice: productPayload.happyHourPrice,
                 minStock: productPayload.minStock,
                 currentStock: productPayload.currentStock,
+                stockUnit: productPayload.stockUnit,
+                recipeIngredientProductId: productPayload.recipeIngredientProductId,
+                recipeQuantity: productPayload.recipeQuantity,
                 status: productPayload.status,
               }}
               onSuccess={() => setOpen(false)}

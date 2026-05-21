@@ -54,6 +54,11 @@ enum ProductKind {
   SERVICE
 }
 
+enum StockUnit {
+  UNIT
+  MILLILITER
+}
+
 enum SaleStatus {
   COMPLETED
   CANCELLED
@@ -241,12 +246,13 @@ model Product {
     gameplayDurationMinutes Int?
     serviceCnae   String?
     serviceDescription String?
-    costPrice     Decimal      @db.Decimal(12, 2)
+    costPrice     Decimal      @db.Decimal(12, 4)
   salePrice     Decimal      @db.Decimal(12, 2)
   happyHourPrice Decimal?     @db.Decimal(12, 2)
   marginPercent Decimal      @default(0) @db.Decimal(5, 2)
   minStock      Int          @default(0)
   currentStock  Int          @default(0)
+  stockUnit     StockUnit    @default(UNIT)
   tracksStock   Boolean      @default(true)
   status        RecordStatus @default(ACTIVE)
   categoryId    String
@@ -262,6 +268,8 @@ model Product {
   stockMovements StockMovement[]
   saleItems      SaleItem[]
   comandaItems   ComandaItem[]
+  recipeIngredients ProductRecipeIngredient[] @relation("RecipeProduct")
+  ingredientUses ProductRecipeIngredient[] @relation("RecipeIngredient")
 
   @@index([name])
     @@index([categoryId])
@@ -273,12 +281,27 @@ model Product {
     @@index([unitId])
   }
 
+model ProductRecipeIngredient {
+  id                  String   @id @default(cuid())
+  productId           String
+  ingredientProductId String
+  quantity            Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  product           Product @relation("RecipeProduct", fields: [productId], references: [id], onDelete: Cascade)
+  ingredientProduct Product @relation("RecipeIngredient", fields: [ingredientProductId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, ingredientProductId])
+  @@index([ingredientProductId])
+}
+
 model StockMovement {
   id             String            @id @default(cuid())
   productId      String
   type           StockMovementType
   quantity       Int
-  unitCost       Decimal?          @db.Decimal(12, 2)
+  unitCost       Decimal?          @db.Decimal(12, 4)
   previousStock  Int
   resultingStock Int
   note           String?

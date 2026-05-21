@@ -1,7 +1,7 @@
 import { StockMovementType } from "@prisma/client";
 import { z } from "zod";
 
-const decimalRegex = /^\d+(\.\d{1,2})?$/;
+const decimalRegex = /^\d+(\.\d{1,4})?$/;
 
 export const createStockMovementSchema = z.object({
   productId: z.string().min(1, "Produto obrigatorio"),

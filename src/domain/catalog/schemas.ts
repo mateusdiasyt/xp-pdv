@@ -1,7 +1,8 @@
-import { ProductKind, RecordStatus } from "@prisma/client";
+import { ProductKind, RecordStatus, StockUnit } from "@prisma/client";
 import { z } from "zod";
 
-const decimalRegex = /^\d+(\.\d{1,2})?$/;
+const moneyDecimalRegex = /^\d+(\.\d{1,2})?$/;
+const costDecimalRegex = /^\d+(\.\d{1,4})?$/;
 const imagePathRegex = /^(https?:\/\/.+|\/.+)$/i;
 const imageDataUrlRegex = /^data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+$/;
 const ncmRegex = /^\d{8}$/;
@@ -33,6 +34,8 @@ const productFiscalFieldsRefinement = (
     serviceCnae?: string;
     gameplayPlanCode?: string;
     gameplayDurationMinutes?: number;
+    recipeIngredientProductId?: string;
+    recipeQuantity?: number;
   },
   context: z.RefinementCtx,
 ) => {
@@ -52,11 +55,7 @@ const productFiscalFieldsRefinement = (
     });
   }
 
-  if (data.kind !== ProductKind.GAMEPLAY) {
-    return;
-  }
-
-  if (!data.gameplayPlanCode?.trim()) {
+  if (data.kind === ProductKind.GAMEPLAY && !data.gameplayPlanCode?.trim()) {
     context.addIssue({
       code: "custom",
       path: ["gameplayPlanCode"],
@@ -64,11 +63,19 @@ const productFiscalFieldsRefinement = (
     });
   }
 
-  if (!data.gameplayDurationMinutes) {
+  if (data.kind === ProductKind.GAMEPLAY && !data.gameplayDurationMinutes) {
     context.addIssue({
       code: "custom",
       path: ["gameplayDurationMinutes"],
       message: "Informe a duracao do gameplay em minutos.",
+    });
+  }
+
+  if (data.kind === ProductKind.STANDARD && data.recipeIngredientProductId?.trim() && !data.recipeQuantity) {
+    context.addIssue({
+      code: "custom",
+      path: ["recipeQuantity"],
+      message: "Informe quanto do insumo sera consumido por venda.",
     });
   }
 };
@@ -132,11 +139,23 @@ const productSchemaBase = z.object({
     },
     z.number().int("Duracao deve ser um numero inteiro").positive("Duracao deve ser maior que zero").optional(),
   ),
-  costPrice: z.string().regex(decimalRegex, "Custo invalido"),
-  salePrice: z.string().regex(decimalRegex, "Preco invalido"),
-  happyHourPrice: z.string().regex(decimalRegex, "Preco Happy Hour invalido").optional().or(z.literal("")),
+  costPrice: z.string().regex(costDecimalRegex, "Custo invalido"),
+  salePrice: z.string().regex(moneyDecimalRegex, "Preco invalido"),
+  happyHourPrice: z.string().regex(moneyDecimalRegex, "Preco Happy Hour invalido").optional().or(z.literal("")),
   minStock: z.coerce.number().int().min(0, "Estoque minimo invalido"),
   currentStock: z.coerce.number().int().min(0, "Estoque atual invalido"),
+  stockUnit: z.nativeEnum(StockUnit).default(StockUnit.UNIT),
+  recipeIngredientProductId: z.string().optional().or(z.literal("")),
+  recipeQuantity: z.preprocess(
+    (value) => {
+      if (value === null || value === undefined || value === "") {
+        return undefined;
+      }
+
+      return Number(value);
+    },
+    z.number().int("Consumo do insumo deve ser inteiro").positive("Consumo do insumo deve ser maior que zero").optional(),
+  ),
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 

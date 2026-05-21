@@ -211,7 +211,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <Download className="h-4 w-4" />
             Atualizar
           </Link>
-          {canManage ? <CreateProductDialog categories={options.categories} suppliers={options.suppliers} /> : null}
+          {canManage ? (
+            <CreateProductDialog
+              categories={options.categories}
+              suppliers={options.suppliers}
+              stockIngredients={options.stockIngredients}
+            />
+          ) : null}
         </div>
       </section>
 
@@ -366,7 +372,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               ? "NFS-e"
                               : !product.tracksStock
                                 ? "Livre"
-                              : product.currentStock}
+                              : `${product.currentStock} ${product.stockUnit === "MILLILITER" ? "ml" : "un"}`}
                         </p>
                         <p
                           className={cn(
@@ -397,6 +403,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           <EditProductDialog
                             categories={options.categories}
                             suppliers={options.suppliers}
+                            stockIngredients={options.stockIngredients}
                             product={{
                               id: product.id,
                               name: product.name,

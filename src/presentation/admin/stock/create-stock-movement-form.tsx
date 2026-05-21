@@ -1,6 +1,6 @@
 "use client";
 
-import { RecordStatus, StockMovementType } from "@prisma/client";
+import { RecordStatus, StockMovementType, StockUnit } from "@prisma/client";
 import { useActionState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
@@ -16,6 +16,7 @@ type StockProductOption = {
   name: string;
   sku: string;
   currentStock: number;
+  stockUnit: StockUnit;
   status: RecordStatus;
 };
 
@@ -26,6 +27,7 @@ type CreateStockMovementFormProps = {
 export function CreateStockMovementForm({ products }: CreateStockMovementFormProps) {
   const [state, formAction] = useActionState(createStockMovementAction, initialActionState);
   const activeProducts = products.filter((product) => product.status === RecordStatus.ACTIVE);
+  const stockUnitLabel = (stockUnit: StockUnit) => (stockUnit === StockUnit.MILLILITER ? "ml" : "un");
 
   return (
     <form action={formAction} className="grid gap-4 md:grid-cols-2" id="novo-registro">
@@ -40,7 +42,7 @@ export function CreateStockMovementForm({ products }: CreateStockMovementFormPro
         >
           {activeProducts.map((product) => (
             <option key={product.id} value={product.id}>
-              {product.name} ({product.sku}) - estoque atual {product.currentStock}
+              {product.name} ({product.sku}) - estoque atual {product.currentStock} {stockUnitLabel(product.stockUnit)}
             </option>
           ))}
         </select>
@@ -61,7 +63,7 @@ export function CreateStockMovementForm({ products }: CreateStockMovementFormPro
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="quantity">Quantidade</Label>
+        <Label htmlFor="quantity">Quantidade movimentada</Label>
         <Input id="quantity" name="quantity" type="number" min={1} defaultValue={1} required />
       </div>
 

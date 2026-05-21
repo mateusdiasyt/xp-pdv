@@ -53,6 +53,9 @@ export async function GET(
       happyHourPrice: product.happyHourPrice?.toString() ?? "",
       minStock: product.minStock,
       currentStock: product.currentStock,
+      stockUnit: product.stockUnit,
+      recipeIngredientProductId: product.recipeIngredients[0]?.ingredientProductId ?? "",
+      recipeQuantity: product.recipeIngredients[0]?.quantity ?? "",
       status: product.status,
     },
     {
