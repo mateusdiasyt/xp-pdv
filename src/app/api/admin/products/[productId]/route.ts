@@ -54,8 +54,7 @@ export async function GET(
       minStock: product.minStock,
       currentStock: product.currentStock,
       stockUnit: product.stockUnit,
-      recipeIngredientProductId: product.recipeIngredients[0]?.ingredientProductId ?? "",
-      recipeQuantity: product.recipeIngredients[0]?.quantity ?? "",
+      recipeIngredients: product.recipeIngredients,
       status: product.status,
     },
     {

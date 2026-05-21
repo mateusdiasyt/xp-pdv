@@ -25,6 +25,50 @@ function calculateMargin(costPrice: Prisma.Decimal, salePrice: Prisma.Decimal) {
   return salePrice.minus(costPrice).dividedBy(salePrice).times(100).toDecimalPlaces(2);
 }
 
+type RecipeIngredientInput = {
+  ingredientProductId: string;
+  quantity: number;
+};
+
+function formValueToString(value: FormDataEntryValue | null | undefined) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readRecipeIngredients(input: FormData): RecipeIngredientInput[] {
+  const ingredientIds = input.getAll("recipeIngredientProductId").map(formValueToString);
+  const quantities = input.getAll("recipeQuantity").map(formValueToString);
+  const rowCount = Math.max(ingredientIds.length, quantities.length);
+  const ingredients: RecipeIngredientInput[] = [];
+  const usedIngredientIds = new Set<string>();
+
+  for (let index = 0; index < rowCount; index += 1) {
+    const ingredientProductId = ingredientIds[index] ?? "";
+    const rawQuantity = quantities[index] ?? "";
+
+    if (!ingredientProductId && !rawQuantity) {
+      continue;
+    }
+
+    if (!ingredientProductId) {
+      throw new Error("Selecione o item do estoque usado na receita.");
+    }
+
+    const quantity = Number(rawQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error("Informe um consumo inteiro maior que zero para cada item da receita.");
+    }
+
+    if (usedIngredientIds.has(ingredientProductId)) {
+      throw new Error("Nao repita o mesmo item do estoque na receita.");
+    }
+
+    usedIngredientIds.add(ingredientProductId);
+    ingredients.push({ ingredientProductId, quantity });
+  }
+
+  return ingredients;
+}
+
 export async function getProducts(filters?: {
   search?: string;
   status?: RecordStatus;
@@ -97,6 +141,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const happyHourPrice = parsed.happyHourPrice ? new Prisma.Decimal(parsed.happyHourPrice) : null;
   const marginPercent = calculateMargin(costPrice, salePrice);
+  const recipeIngredients = !isServiceLike ? readRecipeIngredients(input) : [];
 
   const created = await createProduct({
     name: parsed.name.trim(),
@@ -119,8 +164,7 @@ export async function createProductRecord(input: FormData, actorId?: string) {
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
     stockUnit: tracksStock ? parsed.stockUnit : StockUnit.UNIT,
-    recipeIngredientProductId: !isServiceLike ? emptyToUndefined(parsed.recipeIngredientProductId) : undefined,
-    recipeQuantity: !isServiceLike ? parsed.recipeQuantity : undefined,
+    recipeIngredients,
     status: parsed.status,
   });
 
@@ -181,6 +225,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
   const salePrice = new Prisma.Decimal(parsed.salePrice);
   const happyHourPrice = parsed.happyHourPrice ? new Prisma.Decimal(parsed.happyHourPrice) : null;
   const marginPercent = calculateMargin(costPrice, salePrice);
+  const recipeIngredients = !isServiceLike ? readRecipeIngredients(input) : [];
 
   const updated = await updateProduct({
     productId: parsed.productId,
@@ -204,8 +249,7 @@ export async function updateProductRecord(input: FormData, actorId?: string) {
     minStock: tracksStock ? parsed.minStock : 0,
     currentStock: tracksStock ? parsed.currentStock : 0,
     stockUnit: tracksStock ? parsed.stockUnit : StockUnit.UNIT,
-    recipeIngredientProductId: !isServiceLike ? emptyToUndefined(parsed.recipeIngredientProductId) : undefined,
-    recipeQuantity: !isServiceLike ? parsed.recipeQuantity : undefined,
+    recipeIngredients,
     status: parsed.status,
   });
 

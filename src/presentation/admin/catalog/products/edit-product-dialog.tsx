@@ -58,8 +58,10 @@ type ProductEditPayload = {
   minStock: number;
   currentStock: number;
   stockUnit: StockUnit;
-  recipeIngredientProductId?: string | null;
-  recipeQuantity?: number | null;
+  recipeIngredients?: Array<{
+    ingredientProductId: string;
+    quantity: number;
+  }>;
   status: RecordStatus;
 };
 
@@ -105,7 +107,7 @@ export function EditProductDialog({ categories, suppliers, stockIngredients, pro
       <DialogContent className="max-w-[min(1100px,95vw)] gap-0 border-border/80 bg-card p-0 sm:max-w-[min(1100px,95vw)]">
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
           <DialogTitle>Editar produto</DialogTitle>
-          <DialogDescription>Ajuste imagem, precificacao, estoque e dados de catalogo.</DialogDescription>
+          <DialogDescription>Ajuste imagem, fiscal, venda, receita e estoque do produto.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[78vh] overflow-y-auto p-5">
           {isLoadingProduct ? (
@@ -148,8 +150,7 @@ export function EditProductDialog({ categories, suppliers, stockIngredients, pro
                 minStock: productPayload.minStock,
                 currentStock: productPayload.currentStock,
                 stockUnit: productPayload.stockUnit,
-                recipeIngredientProductId: productPayload.recipeIngredientProductId,
-                recipeQuantity: productPayload.recipeQuantity,
+                recipeIngredients: productPayload.recipeIngredients,
                 status: productPayload.status,
               }}
               onSuccess={() => setOpen(false)}

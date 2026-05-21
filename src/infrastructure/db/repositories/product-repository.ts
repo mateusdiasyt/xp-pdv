@@ -224,25 +224,30 @@ export async function createProduct(data: {
   minStock: number;
   currentStock: number;
   stockUnit: StockUnit;
-  recipeIngredientProductId?: string;
-  recipeQuantity?: number;
+  recipeIngredients?: Array<{
+    ingredientProductId: string;
+    quantity: number;
+  }>;
   status: RecordStatus;
 }) {
-  const { recipeIngredientProductId, recipeQuantity, ...productData } = data;
+  const { recipeIngredients = [], ...productData } = data;
 
   return prisma.$transaction(async (tx) => {
     const product = await tx.product.create({
       data: productData,
     });
 
-    if (recipeIngredientProductId && recipeQuantity) {
-      await assertRecipeIngredientIsValid(tx, product.id, recipeIngredientProductId);
-      await tx.productRecipeIngredient.create({
-        data: {
+    for (const recipeIngredient of recipeIngredients) {
+      await assertRecipeIngredientIsValid(tx, product.id, recipeIngredient.ingredientProductId);
+    }
+
+    if (recipeIngredients.length > 0) {
+      await tx.productRecipeIngredient.createMany({
+        data: recipeIngredients.map((recipeIngredient) => ({
           productId: product.id,
-          ingredientProductId: recipeIngredientProductId,
-          quantity: recipeQuantity,
-        },
+          ingredientProductId: recipeIngredient.ingredientProductId,
+          quantity: recipeIngredient.quantity,
+        })),
       });
     }
 
@@ -272,8 +277,10 @@ export async function updateProduct(data: {
   minStock: number;
   currentStock: number;
   stockUnit: StockUnit;
-  recipeIngredientProductId?: string;
-  recipeQuantity?: number;
+  recipeIngredients?: Array<{
+    ingredientProductId: string;
+    quantity: number;
+  }>;
   status: RecordStatus;
 }) {
   return prisma.$transaction(async (tx) => {
@@ -310,14 +317,17 @@ export async function updateProduct(data: {
       },
     });
 
-    if (data.recipeIngredientProductId && data.recipeQuantity) {
-      await assertRecipeIngredientIsValid(tx, data.productId, data.recipeIngredientProductId);
-      await tx.productRecipeIngredient.create({
-        data: {
+    for (const recipeIngredient of data.recipeIngredients ?? []) {
+      await assertRecipeIngredientIsValid(tx, data.productId, recipeIngredient.ingredientProductId);
+    }
+
+    if (data.recipeIngredients?.length) {
+      await tx.productRecipeIngredient.createMany({
+        data: data.recipeIngredients.map((recipeIngredient) => ({
           productId: data.productId,
-          ingredientProductId: data.recipeIngredientProductId,
-          quantity: data.recipeQuantity,
-        },
+          ingredientProductId: recipeIngredient.ingredientProductId,
+          quantity: recipeIngredient.quantity,
+        })),
       });
     }
 
@@ -361,7 +371,6 @@ export async function getProductForEdit(productId: string) {
           ingredientProductId: true,
           quantity: true,
         },
-        take: 1,
       },
     },
   });

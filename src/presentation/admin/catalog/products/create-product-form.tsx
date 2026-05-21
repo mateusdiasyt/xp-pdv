@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { ProductKind, RecordStatus, StockUnit } from "@prisma/client";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, Plus, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useEffect, useState } from "react";
 
@@ -33,6 +33,11 @@ type StockIngredientOption = {
   stockUnit: StockUnit;
 };
 
+type RecipeIngredientInput = {
+  ingredientProductId: string;
+  quantity: number;
+};
+
 type ProductFormInitialData = {
   productId?: string;
   name?: string;
@@ -54,8 +59,7 @@ type ProductFormInitialData = {
   minStock?: number;
   currentStock?: number;
   stockUnit?: StockUnit;
-  recipeIngredientProductId?: string | null;
-  recipeQuantity?: number | null;
+  recipeIngredients?: RecipeIngredientInput[];
   status?: RecordStatus;
 };
 
@@ -112,6 +116,24 @@ const serviceCnaeOptions = [
   },
 ];
 
+type RecipeIngredientDraft = {
+  key: string;
+  ingredientProductId: string;
+  quantity: string;
+};
+
+function buildRecipeIngredientDrafts(initialIngredients?: RecipeIngredientInput[]) {
+  if (!initialIngredients?.length) {
+    return [{ key: "recipe-0", ingredientProductId: "", quantity: "" }];
+  }
+
+  return initialIngredients.map((ingredient, index) => ({
+    key: `recipe-${index}`,
+    ingredientProductId: ingredient.ingredientProductId,
+    quantity: String(ingredient.quantity),
+  }));
+}
+
 async function buildImagePreviewDataUrl(file: File) {
   const imageBitmapUrl = URL.createObjectURL(file);
 
@@ -160,6 +182,9 @@ export function CreateProductForm({
   const [fileInputKey, setFileInputKey] = useState(0);
   const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
   const [tracksStock, setTracksStock] = useState(initialData?.tracksStock ?? true);
+  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientDraft[]>(() =>
+    buildRecipeIngredientDrafts(initialData?.recipeIngredients),
+  );
   const [serviceCnae, setServiceCnae] = useState(
     initialData?.serviceCnae ?? (initialData?.kind === ProductKind.GAMEPLAY ? "9329804" : "9329803"),
   );
@@ -216,6 +241,37 @@ export function CreateProductForm({
     if (nextKind === ProductKind.SERVICE) {
       setServiceCnae("9329803");
     }
+  }
+
+  function handleRecipeIngredientChange(
+    lineKey: string,
+    field: "ingredientProductId" | "quantity",
+    value: string,
+  ) {
+    setRecipeIngredients((currentLines) =>
+      currentLines.map((line) => (line.key === lineKey ? { ...line, [field]: value } : line)),
+    );
+  }
+
+  function handleAddRecipeIngredient() {
+    setRecipeIngredients((currentLines) => [
+      ...currentLines,
+      {
+        key: `recipe-${Date.now()}-${currentLines.length}`,
+        ingredientProductId: "",
+        quantity: "",
+      },
+    ]);
+  }
+
+  function handleRemoveRecipeIngredient(lineKey: string) {
+    setRecipeIngredients((currentLines) => {
+      if (currentLines.length === 1) {
+        return [{ ...currentLines[0], ingredientProductId: "", quantity: "" }];
+      }
+
+      return currentLines.filter((line) => line.key !== lineKey);
+    });
   }
 
   return (
@@ -412,22 +468,26 @@ export function CreateProductForm({
           </>
         ) : (
           <>
-            <div className="space-y-2">
-              <Label htmlFor="supplierId">Fornecedor</Label>
-              <select
-                id="supplierId"
-                name="supplierId"
-                className="admin-native-select"
-                defaultValue={initialData?.supplierId ?? ""}
-              >
-                <option value="">Sem fornecedor</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.tradeName}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {tracksStock ? (
+              <div className="space-y-2">
+                <Label htmlFor="supplierId">Fornecedor</Label>
+                <select
+                  id="supplierId"
+                  name="supplierId"
+                  className="admin-native-select"
+                  defaultValue={initialData?.supplierId ?? ""}
+                >
+                  <option value="">Sem fornecedor</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.tradeName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <input type="hidden" name="supplierId" value="" />
+            )}
 
             <input type="hidden" name="gameplayPlanCode" value="" />
             <input type="hidden" name="gameplayDurationMinutes" value="" />
@@ -538,43 +598,73 @@ export function CreateProductForm({
               <div>
                 <p className="text-sm font-semibold text-foreground">Receita e baixa automatica do estoque</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Para drinks, selecione a lata usada. Para chopp ou outro insumo fracionado, selecione o insumo e informe o consumo por venda.
+                  Adicione cada item do estoque consumido na venda. Use uma linha para a lata inteira e outras linhas para novos insumos quando precisar.
                 </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
-                <div className="space-y-2">
-                  <Label htmlFor="recipeIngredientProductId">Item do estoque consumido na venda</Label>
-                  <select
-                    id="recipeIngredientProductId"
-                    name="recipeIngredientProductId"
-                    className="admin-native-select"
-                    defaultValue={initialData?.recipeIngredientProductId ?? ""}
+              <div className="space-y-3">
+                {recipeIngredients.map((recipeIngredient, index) => (
+                  <div
+                    key={recipeIngredient.key}
+                    className="grid gap-3 rounded-2xl border border-border/65 bg-background/50 p-3 md:grid-cols-[minmax(0,1fr)_180px_auto]"
                   >
-                    <option value="">Nao usar insumo</option>
-                    {stockIngredients
-                      .filter((ingredient) => ingredient.id !== initialData?.productId)
-                      .map((ingredient) => (
-                        <option key={ingredient.id} value={ingredient.id}>
-                          {ingredient.name} | {ingredient.sku} | {ingredient.currentStock}{" "}
-                          {ingredient.stockUnit === StockUnit.MILLILITER ? "ml" : "un"}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="recipeQuantity">Consumo por venda</Label>
-                  <Input
-                    id="recipeQuantity"
-                    name="recipeQuantity"
-                    type="number"
-                    min={1}
-                    step={1}
-                    placeholder="Ex.: 1 ou 500"
-                    defaultValue={initialData?.recipeQuantity ?? ""}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use 1 para uma lata inteira ou a quantidade da unidade do insumo.
-                  </p>
+                    <div className="space-y-2">
+                      <Label htmlFor={`recipeIngredientProductId-${recipeIngredient.key}`}>
+                        {index === 0 ? "Item do estoque consumido na venda" : `Item da receita ${index + 1}`}
+                      </Label>
+                      <select
+                        id={`recipeIngredientProductId-${recipeIngredient.key}`}
+                        name="recipeIngredientProductId"
+                        className="admin-native-select"
+                        value={recipeIngredient.ingredientProductId}
+                        onChange={(event) =>
+                          handleRecipeIngredientChange(recipeIngredient.key, "ingredientProductId", event.target.value)
+                        }
+                      >
+                        <option value="">Nao usar insumo</option>
+                        {stockIngredients
+                          .filter((ingredient) => ingredient.id !== initialData?.productId)
+                          .map((ingredient) => (
+                            <option key={ingredient.id} value={ingredient.id}>
+                              {ingredient.name} | {ingredient.sku} | {ingredient.currentStock}{" "}
+                              {ingredient.stockUnit === StockUnit.MILLILITER ? "ml" : "un"}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`recipeQuantity-${recipeIngredient.key}`}>Consumo por venda</Label>
+                      <Input
+                        id={`recipeQuantity-${recipeIngredient.key}`}
+                        name="recipeQuantity"
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder="Ex.: 1 ou 500"
+                        value={recipeIngredient.quantity}
+                        onChange={(event) =>
+                          handleRecipeIngredientChange(recipeIngredient.key, "quantity", event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label={`Remover item ${index + 1} da receita`}
+                        onClick={() => handleRemoveRecipeIngredient(recipeIngredient.key)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <p>Use 1 para uma lata inteira ou a quantidade da unidade do insumo, como 500 ml.</p>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={handleAddRecipeIngredient}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar insumo
+                  </Button>
                 </div>
               </div>
             </div>
