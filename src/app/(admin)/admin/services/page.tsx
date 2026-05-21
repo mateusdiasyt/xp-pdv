@@ -12,6 +12,7 @@ import { PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
 import { ManualServiceControlForm } from "@/presentation/admin/gameplay/manual-service-control-form";
 import { RetryGameplayReleaseForm } from "@/presentation/admin/gameplay/retry-gameplay-release-form";
+import { ServiceCountdown, ServicesAutoRefresh } from "@/presentation/admin/gameplay/services-live-sync";
 
 type ServicesPageProps = {
   searchParams: Promise<{
@@ -137,6 +138,7 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
         title="Servicos ativos"
         description="Acompanhe PS5 e simulador, evite venda duplicada e reenvie liberacoes quando precisar."
       />
+      <ServicesAutoRefresh />
 
       <section className="grid gap-3 lg:grid-cols-2">
         {stationCatalog.map((station) => {
@@ -156,11 +158,19 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 {release ? (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <span>Origem: {getReleaseOriginLabel(release)}</span>
-                    <span>Plano: {release.planCode}</span>
-                    <span>{getReleaseDurationLabel(release)}</span>
-                  </div>
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <span>Origem: {getReleaseOriginLabel(release)}</span>
+                      <span>Plano: {release.planCode}</span>
+                      <span>{getReleaseDurationLabel(release)}</span>
+                    </div>
+                    <ServiceCountdown
+                      durationMinutes={release.durationMinutes}
+                      planCode={release.planCode}
+                      releasedUntil={release.releasedUntil?.toISOString()}
+                      serviceStartsAt={(release.serviceStartsAt ?? release.paidAt).toISOString()}
+                    />
+                  </>
                 ) : (
                   <p>Nenhuma venda ativa nesta estacao.</p>
                 )}

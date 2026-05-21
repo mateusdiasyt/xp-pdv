@@ -1,7 +1,8 @@
 "use client";
 
 import { Play, Square } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,15 @@ const durationOptions = [
 ];
 
 export function ManualServiceControlForm({ stationId, isBusy }: ManualServiceControlFormProps) {
+  const router = useRouter();
   const [releaseState, releaseAction] = useActionState(manualServiceReleaseAction, initialActionState);
   const [endState, endAction] = useActionState(endServiceSessionAction, initialActionState);
+
+  useEffect(() => {
+    if (releaseState.status === "success" || endState.status === "success") {
+      router.refresh();
+    }
+  }, [endState.status, releaseState.status, router]);
 
   return (
     <div className="space-y-3 border-t border-border/60 pt-4">
