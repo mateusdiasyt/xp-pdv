@@ -67,6 +67,15 @@ type ReviewItem = {
     minStock: number;
     stockUnit: StockUnit;
   };
+  fractionalSaleProduct?: {
+    name: string;
+    sku: string;
+    ncm: string;
+    categoryId: string;
+    salePrice: string;
+    happyHourPrice: string;
+    consumptionQuantity: number;
+  };
 };
 
 type ProductFields = ReviewItem["initialProduct"];
@@ -207,6 +216,10 @@ function StockInvoiceXmlReviewItem({
   const [decision, setDecision] = useState<"existing" | "create" | "skip">(item.suggestedDecision);
   const [selectedProductId, setSelectedProductId] = useState(item.matchedProductId ?? products[0]?.id ?? "");
   const [fields, setFields] = useState<ProductFields>(item.initialProduct);
+  const [createFractionalSaleProduct, setCreateFractionalSaleProduct] = useState(
+    Boolean(item.fractionalSaleProduct && !item.matchedProductId),
+  );
+  const [fractionalSaleProduct, setFractionalSaleProduct] = useState(item.fractionalSaleProduct);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
 
   function updateFields(nextFields: Partial<ProductFields>) {
@@ -233,6 +246,10 @@ function StockInvoiceXmlReviewItem({
       minStock: product.minStock,
       stockUnit: product.stockUnit,
     });
+  }
+
+  function updateFractionalSaleProduct(nextFields: Partial<NonNullable<ReviewItem["fractionalSaleProduct"]>>) {
+    setFractionalSaleProduct((current) => (current ? { ...current, ...nextFields } : current));
   }
 
   return (
@@ -464,6 +481,125 @@ function StockInvoiceXmlReviewItem({
                   />
                 </div>
               </div>
+
+              {item.fractionalSaleProduct && fields.stockUnit === StockUnit.MILLILITER && fractionalSaleProduct ? (
+                <div className="rounded-[1.5rem] border border-primary/30 bg-primary/7 p-4">
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name={`item.${item.lineNumber}.fractionalSaleProduct.enabled`}
+                      checked={createFractionalSaleProduct}
+                      onChange={(event) => setCreateFractionalSaleProduct(event.target.checked)}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">Criar copo vendavel junto com o barril</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        O barril entra em mililitros. Este item aparece no PDV e cada venda baixa o consumo informado do insumo.
+                      </span>
+                    </span>
+                  </label>
+
+                  {createFractionalSaleProduct ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor={`fractional-sale-name-${item.lineNumber}`}>Nome do item vendavel</Label>
+                        <Input
+                          id={`fractional-sale-name-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.name`}
+                          value={fractionalSaleProduct.name}
+                          onChange={(event) => updateFractionalSaleProduct({ name: event.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-sku-${item.lineNumber}`}>SKU do item vendavel</Label>
+                        <Input
+                          id={`fractional-sale-sku-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.sku`}
+                          value={fractionalSaleProduct.sku}
+                          onChange={(event) => updateFractionalSaleProduct({ sku: event.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-ncm-${item.lineNumber}`}>NCM do item vendavel</Label>
+                        <Input
+                          id={`fractional-sale-ncm-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.ncm`}
+                          value={fractionalSaleProduct.ncm}
+                          onChange={(event) =>
+                            updateFractionalSaleProduct({ ncm: event.target.value.replace(/\D/g, "").slice(0, 8) })
+                          }
+                          inputMode="numeric"
+                          maxLength={8}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-category-${item.lineNumber}`}>Categoria do item vendavel</Label>
+                        <select
+                          id={`fractional-sale-category-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.categoryId`}
+                          className="admin-native-select"
+                          value={fractionalSaleProduct.categoryId}
+                          onChange={(event) => updateFractionalSaleProduct({ categoryId: event.target.value })}
+                          required
+                        >
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-consumption-${item.lineNumber}`}>Consumo por venda</Label>
+                        <Input
+                          id={`fractional-sale-consumption-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.consumptionQuantity`}
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={fractionalSaleProduct.consumptionQuantity}
+                          onChange={(event) =>
+                            updateFractionalSaleProduct({ consumptionQuantity: Number(event.target.value || 0) })
+                          }
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">Use 500 para um copo de 500 ml.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-price-${item.lineNumber}`}>Preco de venda do copo</Label>
+                        <Input
+                          id={`fractional-sale-price-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.salePrice`}
+                          value={fractionalSaleProduct.salePrice}
+                          onChange={(event) => updateFractionalSaleProduct({ salePrice: event.target.value })}
+                          inputMode="decimal"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`fractional-sale-happy-hour-${item.lineNumber}`}>Preco Happy Hour</Label>
+                        <Input
+                          id={`fractional-sale-happy-hour-${item.lineNumber}`}
+                          name={`item.${item.lineNumber}.fractionalSaleProduct.happyHourPrice`}
+                          value={fractionalSaleProduct.happyHourPrice}
+                          onChange={(event) => updateFractionalSaleProduct({ happyHourPrice: event.target.value })}
+                          inputMode="decimal"
+                          placeholder="Opcional"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           )}
         </div>

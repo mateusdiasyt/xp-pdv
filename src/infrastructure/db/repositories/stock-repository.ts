@@ -231,6 +231,15 @@ export type ReviewedStockInvoiceItemInput = {
   happyHourPrice?: Prisma.Decimal | null;
   minStock?: number;
   stockUnit: StockUnit;
+  fractionalSaleProduct?: {
+    name: string;
+    sku?: string;
+    ncm: string;
+    categoryId: string;
+    salePrice: Prisma.Decimal;
+    happyHourPrice?: Prisma.Decimal | null;
+    consumptionQuantity: number;
+  };
 };
 
 type ImportReviewedStockInvoiceItemsInput = Omit<ImportStockInvoiceItemsInput, "allowCreateProducts" | "items"> & {
@@ -741,6 +750,50 @@ export async function importReviewedStockInvoiceItems(
           marginPercent: calculateMargin(item.unitCost, item.salePrice),
         },
       });
+
+      if (item.fractionalSaleProduct) {
+        const fractionalSaleSku = await buildUniqueSku(
+          tx,
+          toSafeSkuToken(item.fractionalSaleProduct.sku),
+          data.accessKey,
+          item.lineNumber + 1_000,
+        );
+        const fractionalSaleCost = item.unitCost
+          .times(item.fractionalSaleProduct.consumptionQuantity)
+          .toDecimalPlaces(4);
+        const fractionalSaleProduct = await tx.product.create({
+          data: {
+            name: item.fractionalSaleProduct.name.trim(),
+            sku: fractionalSaleSku,
+            ncm: item.fractionalSaleProduct.ncm,
+            description: `Item vendavel criado na conferencia XML ${data.accessKey}. Consome ${item.fractionalSaleProduct.consumptionQuantity} do insumo ${product.name}.`,
+            kind: ProductKind.STANDARD,
+            tracksStock: false,
+            stockUnit: StockUnit.UNIT,
+            costPrice: fractionalSaleCost,
+            salePrice: item.fractionalSaleProduct.salePrice,
+            happyHourPrice: item.fractionalSaleProduct.happyHourPrice,
+            marginPercent: calculateMargin(fractionalSaleCost, item.fractionalSaleProduct.salePrice),
+            minStock: 0,
+            currentStock: 0,
+            status: RecordStatus.ACTIVE,
+            categoryId: item.fractionalSaleProduct.categoryId,
+            supplierId,
+            recipeIngredients: {
+              create: {
+                ingredientProductId: product.id,
+                quantity: item.fractionalSaleProduct.consumptionQuantity,
+              },
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        createdProducts += 1;
+        updatedProductIds.add(fractionalSaleProduct.id);
+      }
 
       productStockMap.set(product.id, resultingStock);
       updatedProductIds.add(product.id);

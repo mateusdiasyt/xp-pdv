@@ -163,6 +163,29 @@ function inferSellableUnitMultiplier(description: string) {
   return Number.isInteger(multiplier) && multiplier > 1 ? multiplier : 1;
 }
 
+function buildFractionalSaleProductName(description: string) {
+  const normalizedDescription = description.toUpperCase();
+
+  if (normalizedDescription.includes("VINHO")) {
+    return "Chopp de vinho 500ml";
+  }
+
+  if (normalizedDescription.includes("PILSEN") || normalizedDescription.includes("CHOPP") || normalizedDescription.includes("CHOPE")) {
+    return "Chopp Pilsen 500ml";
+  }
+
+  return `${description} 500ml`;
+}
+
+function buildFractionalSaleProductSku(
+  item: Pick<ParsedStockInvoiceItem, "supplierEan" | "supplierCommercialEan" | "supplierProductCode" | "lineNumber">,
+) {
+  const sourceCode = item.supplierEan ?? item.supplierCommercialEan ?? item.supplierProductCode ?? `LINHA-${item.lineNumber}`;
+  const normalizedCode = sourceCode.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36);
+
+  return `COPO-${normalizedCode || `LINHA-${item.lineNumber}`}-500ML`;
+}
+
 function parseXmlDate(rawValue?: string) {
   if (!rawValue) {
     return undefined;
@@ -583,11 +606,23 @@ function buildStockInvoiceReviewItem(
       ncm: matchedProduct?.ncm ?? item.ncm ?? "",
       imageUrl: matchedProduct?.imageUrl ?? "",
       categoryId: matchedProduct?.categoryId ?? fallbackCategoryId,
-      salePrice: matchedProduct ? toDecimalInputValue(matchedProduct.salePrice) : toDecimalInputValue(item.unitCost),
+      salePrice: matchedProduct ? toDecimalInputValue(matchedProduct.salePrice) : toDecimalInputValue(suggestedUnitCost),
       happyHourPrice: matchedProduct?.happyHourPrice ? toDecimalInputValue(matchedProduct.happyHourPrice) : "",
       minStock: matchedProduct?.minStock ?? 0,
       stockUnit: suggestedStockUnit,
     },
+    fractionalSaleProduct:
+      fractionalSuggestion && suggestedStockUnit === StockUnit.MILLILITER
+        ? {
+            name: buildFractionalSaleProductName(item.description),
+            sku: buildFractionalSaleProductSku(item),
+            ncm: item.ncm ?? "",
+            categoryId: fallbackCategoryId,
+            salePrice: toDecimalInputValue(suggestedUnitCost.times(500)),
+            happyHourPrice: "",
+            consumptionQuantity: 500,
+          }
+        : undefined,
   };
 }
 
@@ -685,6 +720,45 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
       throw new Error(`Nome e categoria sao obrigatorios no item ${item.lineNumber}.`);
     }
 
+    const stockUnit = parseReviewedStockUnit(getReviewField(input, item.lineNumber, "stockUnit"), item.lineNumber);
+    const fractionalSaleProductEnabled = getReviewField(input, item.lineNumber, "fractionalSaleProduct.enabled") === "on";
+    let fractionalSaleProduct: ReviewedStockInvoiceItemInput["fractionalSaleProduct"];
+
+    if (fractionalSaleProductEnabled) {
+      if (stockUnit !== StockUnit.MILLILITER) {
+        throw new Error(`O item vendavel fracionado da linha ${item.lineNumber} exige entrada do insumo em mililitros.`);
+      }
+
+      const fractionalSaleName = getReviewField(input, item.lineNumber, "fractionalSaleProduct.name");
+      const fractionalSaleCategoryId = getReviewField(input, item.lineNumber, "fractionalSaleProduct.categoryId");
+      if (fractionalSaleName.length < 2 || !fractionalSaleCategoryId) {
+        throw new Error(`Nome e categoria do item vendavel da linha ${item.lineNumber} sao obrigatorios.`);
+      }
+
+      fractionalSaleProduct = {
+        name: fractionalSaleName,
+        sku: getReviewField(input, item.lineNumber, "fractionalSaleProduct.sku") || undefined,
+        ncm: parseReviewedNcm(getReviewField(input, item.lineNumber, "fractionalSaleProduct.ncm"), item.lineNumber),
+        categoryId: fractionalSaleCategoryId,
+        salePrice: parseReviewedDecimal(
+          getReviewField(input, item.lineNumber, "fractionalSaleProduct.salePrice"),
+          item.lineNumber,
+          "Preco do item vendavel",
+          true,
+        ),
+        happyHourPrice: parseReviewedOptionalDecimal(
+          getReviewField(input, item.lineNumber, "fractionalSaleProduct.happyHourPrice"),
+          item.lineNumber,
+          "Preco Happy Hour do item vendavel",
+        ),
+        consumptionQuantity: parseReviewedPositiveInteger(
+          getReviewField(input, item.lineNumber, "fractionalSaleProduct.consumptionQuantity"),
+          item.lineNumber,
+          "Consumo do item vendavel",
+        ),
+      };
+    }
+
     return {
       ...item,
       decision,
@@ -713,7 +787,8 @@ function parseReviewedStockInvoiceItems(input: FormData, items: ParsedStockInvoi
         item.lineNumber,
         "Estoque minimo",
       ),
-      stockUnit: parseReviewedStockUnit(getReviewField(input, item.lineNumber, "stockUnit"), item.lineNumber),
+      stockUnit,
+      fractionalSaleProduct,
     };
   });
 }
