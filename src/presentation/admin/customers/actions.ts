@@ -19,7 +19,6 @@ export async function createCustomerAction(
   try {
     const session = await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
     await createCustomerRecord(formData, session.user.id);
-    revalidatePath("/admin/customers");
     return { status: "success", message: "Cliente cadastrado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -40,7 +39,6 @@ export async function updateCustomerAction(
   try {
     const session = await requirePermission(PERMISSIONS.CUSTOMERS_MANAGE);
     await updateCustomerRecord(formData, session.user.id);
-    revalidatePath("/admin/customers");
     return { status: "success", message: "Cliente atualizado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

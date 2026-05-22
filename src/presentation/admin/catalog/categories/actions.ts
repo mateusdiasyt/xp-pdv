@@ -15,7 +15,6 @@ export async function createCategoryAction(
   try {
     const session = await requirePermission(PERMISSIONS.CATEGORIES_MANAGE);
     await createCategoryRecord(formData, session.user.id);
-    revalidatePath("/admin/categories");
     return { status: "success", message: "Categoria criada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

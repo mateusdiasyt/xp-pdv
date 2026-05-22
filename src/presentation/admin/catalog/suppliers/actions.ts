@@ -15,7 +15,6 @@ export async function createSupplierAction(
   try {
     const session = await requirePermission(PERMISSIONS.SUPPLIERS_MANAGE);
     await createSupplierRecord(formData, session.user.id);
-    revalidatePath("/admin/suppliers");
     return { status: "success", message: "Fornecedor criado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

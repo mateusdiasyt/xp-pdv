@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { requirePermission } from "@/application/auth/guards";
 import {
   createSupportTicketRecord,
@@ -22,7 +20,6 @@ export async function createSupportTicketAction(
       id: session.user.id,
       name: actorName,
     });
-    revalidatePath("/admin/support");
     return { status: "success", message: "Ticket registrado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -41,7 +38,6 @@ export async function updateSupportTicketStatusAction(
       id: session.user.id,
       name: actorName,
     });
-    revalidatePath("/admin/support");
     return { status: "success", message: "Status do ticket atualizado." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

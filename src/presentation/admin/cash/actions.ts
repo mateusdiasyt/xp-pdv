@@ -19,7 +19,6 @@ export async function openCashSessionAction(
   try {
     const session = await requirePermission(PERMISSIONS.CASH_MANAGE);
     await openCashSessionRecord(formData, session.user.id);
-    revalidatePath("/admin/cash");
     revalidatePath("/admin/pdv");
     return { status: "success", message: "Sessao de caixa aberta com sucesso." };
   } catch (error) {
@@ -35,7 +34,6 @@ export async function closeCashSessionAction(
   try {
     const session = await requirePermission(PERMISSIONS.CASH_MANAGE);
     await closeCashSessionRecord(formData, session.user.id);
-    revalidatePath("/admin/cash");
     revalidatePath("/admin/pdv");
     return { status: "success", message: "Sessao de caixa fechada com sucesso." };
   } catch (error) {
@@ -51,7 +49,6 @@ export async function registerCashWithdrawalAction(
   try {
     const session = await requirePermission(PERMISSIONS.CASH_MANAGE);
     await registerCashWithdrawalRecord(formData, session.user.id);
-    revalidatePath("/admin/cash");
     return { status: "success", message: "Sangria registrada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

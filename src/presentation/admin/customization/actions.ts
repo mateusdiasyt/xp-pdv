@@ -20,7 +20,6 @@ export async function updateBrandCustomizationAction(
       id: session.user.id,
       name: actorName,
     });
-    revalidatePath("/admin/customization");
     revalidatePath("/admin");
     revalidatePath("/admin/pdv");
     revalidatePath("/login");
@@ -43,7 +42,6 @@ export async function updateFiscalEnvironmentAction(
       name: actorName,
     });
 
-    revalidatePath("/admin/customization");
     revalidatePath("/admin/pdv");
     revalidatePath("/admin");
 

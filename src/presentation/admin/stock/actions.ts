@@ -1,6 +1,6 @@
 "use server";
 
-import { refresh, revalidatePath } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
@@ -42,9 +42,7 @@ export async function createStockMovementAction(
   try {
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
     await registerStockMovementRecord(formData, session.user.id);
-    revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
-    refresh();
     return { status: "success", message: "Movimentacao registrada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -59,11 +57,9 @@ export async function uploadStockInvoiceXmlAction(
   try {
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
     const result = await storeStockInvoiceXmlRecord(formData, session.user.id);
-    revalidatePath("/admin/stock");
     if (result.imported) {
       revalidatePath("/admin/products");
     }
-    refresh();
 
     return {
       status: "success",
@@ -88,11 +84,9 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
   try {
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
     const result = await fetchAndStoreStockInvoiceXmlByAccessKey(formData, session.user.id);
-    revalidatePath("/admin/stock");
     if (result.imported) {
       revalidatePath("/admin/products");
     }
-    refresh();
 
     return {
       status: "success",
@@ -123,9 +117,7 @@ export async function importStockInvoiceXmlItemsAction(
     }
 
     const result = await importStockInvoiceXmlById(stockInvoiceXmlId, session.user.id);
-    revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
-    refresh();
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,
@@ -154,9 +146,7 @@ export async function importReviewedStockInvoiceXmlAction(
   try {
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
     const result = await importReviewedStockInvoiceXmlRecord(formData, session.user.id);
-    revalidatePath("/admin/stock");
     revalidatePath("/admin/products");
-    refresh();
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,

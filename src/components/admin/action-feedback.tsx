@@ -1,12 +1,29 @@
+"use client";
+
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import type { ActionState } from "@/presentation/admin/common/action-state";
 
 type ActionFeedbackProps = {
   state: ActionState;
+  refreshOnSuccess?: boolean;
 };
 
-export function ActionFeedback({ state }: ActionFeedbackProps) {
+export function ActionFeedback({ state, refreshOnSuccess = true }: ActionFeedbackProps) {
+  const router = useRouter();
+  const lastRefreshedState = useRef<ActionState | null>(null);
+
+  useEffect(() => {
+    if (!refreshOnSuccess || state.status !== "success" || lastRefreshedState.current === state) {
+      return;
+    }
+
+    lastRefreshedState.current = state;
+    router.refresh();
+  }, [refreshOnSuccess, router, state]);
+
   if (state.status === "idle") {
     return null;
   }

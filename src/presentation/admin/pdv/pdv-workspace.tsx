@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import { ProductKind } from "@prisma/client";
 
@@ -99,7 +98,6 @@ function HappyHourToggle({
   canManage: boolean;
   onStateChange: (active: boolean) => void;
 }) {
-  const router = useRouter();
   const [state, action, isPending] = useActionState(updatePdvHappyHourAction, initialActionState);
 
   useEffect(() => {
@@ -109,8 +107,7 @@ function HappyHourToggle({
 
     const nextActive = Boolean((state.data as { happyHourActive?: boolean }).happyHourActive);
     onStateChange(nextActive);
-    router.refresh();
-  }, [onStateChange, router, state]);
+  }, [onStateChange, state]);
 
   if (!canManage) {
     return active ? (

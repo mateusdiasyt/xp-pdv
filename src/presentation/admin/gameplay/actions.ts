@@ -1,6 +1,6 @@
 "use server";
 
-import { refresh, revalidatePath } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
@@ -30,10 +30,7 @@ export async function retryGameplayReleaseAction(
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     const result = await triggerGameplayReleaseForSale(saleId, session.user.id);
 
-    revalidatePath("/admin/services");
-    revalidatePath("/admin/gameplay");
     revalidatePath("/admin/pdv");
-    refresh();
 
     return {
       status: result.status === "LIBERADA" ? "success" : "error",
@@ -64,9 +61,7 @@ export async function manualServiceReleaseAction(
       operator: getOperatorName(session.user),
     });
 
-    revalidatePath("/admin/services");
     revalidatePath("/admin/pdv");
-    refresh();
 
     return {
       status: "success",
@@ -95,9 +90,7 @@ export async function endServiceSessionAction(
       operator: getOperatorName(session.user),
     });
 
-    revalidatePath("/admin/services");
     revalidatePath("/admin/pdv");
-    refresh();
 
     return {
       status: "success",

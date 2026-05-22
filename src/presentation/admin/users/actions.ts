@@ -15,7 +15,6 @@ export async function createUserAction(
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
     await createUserRecord(formData, session.user.id);
-    revalidatePath("/admin/users");
     return { status: "success", message: "Usuario criado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -30,7 +29,6 @@ export async function updateUserStatusAction(
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
     await updateUserStatusRecord(formData, session.user.id);
-    revalidatePath("/admin/users");
     return { status: "success", message: "Status atualizado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -51,7 +49,6 @@ export async function updateUserAccessAction(
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
     await updateUserAccessRecord(formData, session.user.id);
-    revalidatePath("/admin/users");
     return { status: "success", message: "Acesso atualizado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

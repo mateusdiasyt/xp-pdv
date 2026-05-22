@@ -19,7 +19,6 @@ export async function createProductAction(
   try {
     const session = await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
     await createProductRecord(formData, session.user.id);
-    revalidatePath("/admin/products");
     return { status: "success", message: "Produto criado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -40,7 +39,6 @@ export async function updateProductAction(
   try {
     const session = await requirePermission(PERMISSIONS.PRODUCTS_MANAGE);
     await updateProductRecord(formData, session.user.id);
-    revalidatePath("/admin/products");
     revalidatePath("/admin/pdv");
     return { status: "success", message: "Produto atualizado com sucesso." };
   } catch (error) {
