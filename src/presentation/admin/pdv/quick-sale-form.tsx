@@ -24,7 +24,18 @@ import {
 import { useActionState, useDeferredValue, useEffect, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -297,6 +308,7 @@ export function QuickSaleForm({
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [quickSaleStep, setQuickSaleStep] = useState<QuickSaleStep>("items");
+  const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
 
   const hasOpenSessions = openSessions.length > 0;
   const hasProducts = products.length > 0;
@@ -565,7 +577,7 @@ export function QuickSaleForm({
           </Link>
         </section>
       ) : (
-        <form action={saleFormAction} className="space-y-4">
+        <form id="quick-sale-form" action={saleFormAction} className="space-y-4">
           <input type="hidden" name="customerName" value={customerNameValue} />
           <input type="hidden" name="cashSessionId" value={selectedCashSessionId} />
           <input type="hidden" name="discountAmount" value={discountAmount} />
@@ -1304,9 +1316,64 @@ export function QuickSaleForm({
               </div>
             </div>
 
-            <FormSubmitButton>
-              {cartItems.length === 0 ? "Selecione itens para fechar" : "Finalizar e gerar ticket"}
-            </FormSubmitButton>
+            <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
+              <AlertDialogTrigger
+                render={
+                  <Button type="button" disabled={cartItems.length === 0} className="gap-2" />
+                }
+              >
+                <Check className="h-4 w-4" />
+                {cartItems.length === 0 ? "Selecione itens para fechar" : "Revisar e finalizar venda"}
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
+                <AlertDialogHeader className="place-items-start text-left">
+                  <AlertDialogMedia className="mb-1 rounded-2xl border border-primary/20 bg-primary/12 text-primary">
+                    <Receipt className="h-5 w-5" />
+                  </AlertDialogMedia>
+                  <AlertDialogTitle className="text-lg font-semibold">Confirmar venda rapida?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-left">
+                    Ao confirmar, o pedido sera gravado, o estoque sera atualizado e o ticket com o fluxo fiscal sera
+                    iniciado.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div className="grid gap-2 rounded-[1.2rem] border border-border/75 bg-background/40 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                    <span>Itens no pedido</span>
+                    <span className="font-semibold text-foreground">{cartItems.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                    <span>Pagamentos</span>
+                    <span className="font-semibold text-foreground">
+                      {formatCurrency(paymentsTotalInCents / 100)}
+                    </span>
+                  </div>
+                  {hasCashPayment && changeInCents > 0 ? (
+                    <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                      <span>Troco previsto</span>
+                      <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
+                    </div>
+                  ) : null}
+                  <div className="mt-1 flex items-center justify-between gap-3 border-t border-border/70 pt-2">
+                    <span className="font-semibold text-foreground">Total da venda</span>
+                    <span className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</span>
+                  </div>
+                </div>
+
+                <AlertDialogFooter className="-mx-5 -mb-5 mt-1 rounded-b-[1.5rem] border-border/70 bg-background/45 p-4">
+                  <AlertDialogCancel>Voltar e revisar</AlertDialogCancel>
+                  <AlertDialogAction
+                    type="submit"
+                    form="quick-sale-form"
+                    className="gap-2"
+                    onClick={() => setIsFinalizeDialogOpen(false)}
+                  >
+                    <Check className="h-4 w-4" />
+                    Confirmar e gerar ticket
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <ActionFeedback state={saleState} />
               </section>
             </div>
