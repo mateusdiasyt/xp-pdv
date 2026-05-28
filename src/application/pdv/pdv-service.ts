@@ -21,6 +21,7 @@ import {
   prepareGameplayReleaseForSale,
   triggerGameplayReleaseForSale,
 } from "@/application/gameplay/gameplay-release-service";
+import { getPdvCoupons } from "@/application/coupons/coupon-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import { getBusyGameplayReleasesByStationIds } from "@/infrastructure/db/repositories/gameplay-release-repository";
 import {
@@ -299,6 +300,7 @@ export async function getPdvData() {
     customersResult,
     openComandasResult,
     pdvConfigurationResult,
+    couponsResult,
   ] = await Promise.all([
     settlePdvSection("sessoes de caixa", () => listPdvOpenSessions(), []),
     settlePdvSection("produtos", () => listPdvProductOptions(), []),
@@ -309,6 +311,7 @@ export async function getPdvData() {
       happyHourActive: false,
       happyHourUpdatedAt: null,
     }),
+    settlePdvSection("cupons", () => getPdvCoupons(), []),
   ]);
 
   return {
@@ -318,6 +321,7 @@ export async function getPdvData() {
     customers: customersResult.data,
     openComandas: openComandasResult.data,
     pdvConfiguration: pdvConfigurationResult.data,
+    coupons: couponsResult.data,
     issues: [
       openSessionsResult.issue,
       productsResult.issue,
@@ -325,6 +329,7 @@ export async function getPdvData() {
       customersResult.issue,
       openComandasResult.issue,
       pdvConfigurationResult.issue,
+      couponsResult.issue,
     ].filter(Boolean) as string[],
   };
 }
@@ -364,6 +369,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
   const parsed = createSaleSchema.parse({
     cashSessionId: input.get("cashSessionId"),
     customerName: input.get("customerName"),
+    couponCode: input.get("couponCode") ?? "",
     discountAmount: input.get("discountAmount") ?? "0",
     cashReceived: input.get("cashReceived") ?? "",
   });
@@ -400,6 +406,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     cashSessionId: parsed.cashSessionId,
     operatorId: actorId,
     customerName: emptyToUndefined(parsed.customerName),
+    couponCode: emptyToUndefined(parsed.couponCode),
     discountAmount,
     items,
     payments,
@@ -572,6 +579,7 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
   const parsed = closeComandaSchema.parse({
     comandaId: input.get("comandaId"),
     cashSessionId: input.get("cashSessionId"),
+    couponCode: input.get("couponCode") ?? "",
     discountAmount: input.get("discountAmount") ?? "0",
     cashReceived: input.get("cashReceived") ?? "",
   });
@@ -602,6 +610,7 @@ export async function closeComandaRecord(input: FormData, actorId: string) {
     cashSessionId: parsed.cashSessionId,
     payments,
     discountAmount,
+    couponCode: emptyToUndefined(parsed.couponCode),
     operatorId: actorId,
     saleNumber: createSaleNumber(),
   });

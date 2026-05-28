@@ -9,6 +9,7 @@ export const createSaleSchema = z.object({
     z.string().min(1, "Sessao de caixa obrigatoria"),
   ),
   customerName: z.string().max(120, "Nome do cliente muito longo").optional().or(z.literal("")),
+  couponCode: z.string().trim().max(32, "Cupom muito longo").optional().or(z.literal("")),
   discountAmount: z.string().regex(decimalRegex, "Desconto invalido"),
   cashReceived: z.string().regex(decimalRegex, "Valor recebido invalido").optional().or(z.literal("")),
 });
@@ -100,6 +101,7 @@ export const updateComandaCustomerSchema = z.object({
 export const closeComandaSchema = z.object({
   comandaId: z.string().min(1, "Comanda obrigatoria"),
   cashSessionId: z.string().min(1, "Sessao de caixa obrigatoria"),
+  couponCode: z.string().trim().max(32, "Cupom muito longo").optional().or(z.literal("")),
   discountAmount: z.string().regex(decimalRegex, "Desconto invalido"),
   cashReceived: z.string().regex(decimalRegex, "Valor recebido invalido").optional().or(z.literal("")),
 });

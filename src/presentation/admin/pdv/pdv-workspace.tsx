@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import { ProductKind } from "@prisma/client";
+import type { CouponDiscountType } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -79,10 +80,24 @@ type OpenComandaView = {
   }>;
 };
 
+type CouponOption = {
+  id: string;
+  code: string;
+  name: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  maxDiscountAmount?: number | null;
+  minSubtotalAmount?: number | null;
+  usageLimit?: number | null;
+  usedCount: number;
+  productIds: string[];
+};
+
 type PdvWorkspaceProps = {
   customers: CustomerOption[];
   openSessions: OpenSessionOption[];
   products: ProductOption[];
+  coupons: CouponOption[];
   openComandas: OpenComandaView[];
   canManage: boolean;
   happyHourActive: boolean;
@@ -147,6 +162,7 @@ export function PdvWorkspace({
   customers,
   openSessions,
   products,
+  coupons,
   openComandas,
   canManage,
   happyHourActive,
@@ -223,6 +239,7 @@ export function PdvWorkspace({
               customers={customers}
               openSessions={openSessions}
               products={products}
+              coupons={coupons}
               happyHourActive={isHappyHourActive}
             />
           </CardContent>
@@ -299,6 +316,7 @@ export function PdvWorkspace({
                 customers={customers}
                 openSessions={openSessions}
                 products={comandaProducts}
+                coupons={coupons}
                 happyHourActive={isHappyHourActive}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}

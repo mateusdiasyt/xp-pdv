@@ -17,6 +17,7 @@ import {
   Receipt,
   Sandwich,
   Search,
+  TicketPercent,
   Trash2,
   Tv,
   Wallet,
@@ -43,6 +44,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
 import { initialActionState } from "@/presentation/admin/common/action-state";
 import { closeQuickSaleAction } from "@/presentation/admin/pdv/actions";
+import {
+  calculateCouponDiscountInCents,
+  normalizeCouponCode,
+  type PdvCouponOption,
+} from "@/presentation/admin/pdv/coupon-utils";
 
 type CustomerOption = {
   id: string;
@@ -82,6 +88,7 @@ type QuickSaleFormProps = {
   customers: CustomerOption[];
   openSessions: OpenSessionOption[];
   products: ProductOption[];
+  coupons: PdvCouponOption[];
   canManage: boolean;
   happyHourActive: boolean;
 };
@@ -288,6 +295,7 @@ export function QuickSaleForm({
   customers,
   openSessions,
   products,
+  coupons,
   canManage,
   happyHourActive,
 }: QuickSaleFormProps) {
@@ -298,6 +306,8 @@ export function QuickSaleForm({
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
   const [discountAmount, setDiscountAmount] = useState("0.00");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCouponCode, setAppliedCouponCode] = useState("");
   const [selectedCashSessionId, setSelectedCashSessionId] = useState(openSessions[0]?.id ?? "");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
@@ -338,7 +348,8 @@ export function QuickSaleForm({
     }
 
     if (!selectedCategoryId || !selectedCategoryIsAvailable) {
-      setSelectedCategoryId(firstCategoryId);
+      const timeoutId = window.setTimeout(() => setSelectedCategoryId(firstCategoryId), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
 
@@ -372,7 +383,22 @@ export function QuickSaleForm({
   const gameplayCartItems = cartItems.filter((item) => item.product.kind === ProductKind.GAMEPLAY);
 
   const subtotalInCents = cartItems.reduce((sum, item) => sum + Math.round(item.lineTotal * 100), 0);
-  const discountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const manualDiscountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const appliedCoupon = appliedCouponCode
+    ? coupons.find((coupon) => coupon.code === appliedCouponCode)
+    : null;
+  const couponPreview = appliedCoupon
+    ? calculateCouponDiscountInCents({
+        coupon: appliedCoupon,
+        subtotalInCents,
+        lines: cartItems.map((item) => ({
+          productId: item.productId,
+          lineTotalInCents: Math.round(item.lineTotal * 100),
+        })),
+      })
+    : null;
+  const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
+  const discountInCents = manualDiscountInCents + couponDiscountInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
   const paymentsTotalInCents = paymentLines.reduce(
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
@@ -397,10 +423,12 @@ export function QuickSaleForm({
     .slice(0, 8);
   const customerNameValue = selectedCustomer?.fullName ?? customerQuery.trim();
   const canProceedToPayment = cartItems.length > 0;
+  const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
 
   useEffect(() => {
     if (cartItems.length === 0 && quickSaleStep === "payment") {
-      setQuickSaleStep("items");
+      const timeoutId = window.setTimeout(() => setQuickSaleStep("items"), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [cartItems.length, quickSaleStep]);
 
@@ -482,6 +510,13 @@ export function QuickSaleForm({
         amount: "0.00",
       },
     ]);
+  }
+
+  function applyCoupon() {
+    const normalizedCode = normalizeCouponCode(couponCode);
+    const coupon = coupons.find((item) => item.code === normalizedCode);
+    setAppliedCouponCode(coupon ? coupon.code : "");
+    setCouponCode(normalizedCode);
   }
 
   function removePaymentLine(id: number) {
@@ -581,6 +616,7 @@ export function QuickSaleForm({
           <input type="hidden" name="customerName" value={customerNameValue} />
           <input type="hidden" name="cashSessionId" value={selectedCashSessionId} />
           <input type="hidden" name="discountAmount" value={discountAmount} />
+          <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
           <fieldset className="hidden" aria-hidden="true">
             {cartItems.map((item) => (
               <div key={`quick-item-${item.productId}`}>
@@ -670,7 +706,7 @@ export function QuickSaleForm({
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_168px]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_168px_220px]">
                   <div className="space-y-2">
                     <Label htmlFor="quick-sale-session">Caixa</Label>
                     <select
@@ -697,6 +733,27 @@ export function QuickSaleForm({
                       placeholder="0.00"
                       required
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quick-sale-coupon">Cupom</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="quick-sale-coupon"
+                        value={couponCode}
+                        onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                        placeholder="CODIGO"
+                      />
+                      <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
+                        <TicketPercent className="h-4 w-4" />
+                        <span className="sr-only">Aplicar cupom</span>
+                      </Button>
+                    </div>
+                    {appliedCouponCode ? (
+                      <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
+                    ) : couponCode ? (
+                      <p className="text-xs text-muted-foreground">Nao aplicado</p>
+                    ) : null}
                   </div>
                 </div>
               </section>

@@ -13,6 +13,10 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import {
+  resolveCouponRedemptionInTransaction,
+  type CouponRedemptionInput,
+} from "@/infrastructure/db/repositories/coupon-repository";
 
 type SaleItemInput = {
   productId: string;
@@ -46,6 +50,7 @@ type CreateSaleWithStockAdjustmentInput = {
   operatorId: string;
   customerName?: string;
   discountAmount: Prisma.Decimal;
+  couponCode?: string;
   items: SaleItemInput[];
   payments: SalePaymentInput[];
   gameplaySelections?: GameplaySelectionInput[];
@@ -627,6 +632,7 @@ async function runCreateSaleWithStockAdjustment(
     (data.gameplaySelections ?? []).map((selection) => [selection.productId, selection.stationId.trim().toLowerCase()]),
   );
 
+  const productLineTotals: Array<{ productId: string; lineTotal: Prisma.Decimal }> = [];
   const subtotalAmount = data.items.reduce((acc, item) => {
     const product = productMap.get(item.productId);
     if (!product) {
@@ -664,18 +670,37 @@ async function runCreateSaleWithStockAdjustment(
       unitPriceOverride: item.unitPrice,
     });
 
-    return acc.plus(unitPrice.times(item.quantity));
+    const lineTotal = unitPrice.times(item.quantity);
+    productLineTotals.push({
+      productId: item.productId,
+      lineTotal,
+    });
+
+    return acc.plus(lineTotal);
   }, new Prisma.Decimal(0));
 
-  if (data.discountAmount.lessThan(0)) {
+  const manualDiscountAmount = data.discountAmount;
+  let couponRedemption: CouponRedemptionInput | null = null;
+  if (data.couponCode) {
+    couponRedemption = await resolveCouponRedemptionInTransaction(
+      tx,
+      data.couponCode,
+      subtotalAmount,
+      productLineTotals,
+    );
+  }
+
+  const totalDiscountAmount = manualDiscountAmount.plus(couponRedemption?.discountAmount ?? 0);
+
+  if (totalDiscountAmount.lessThan(0)) {
     throw new Error("Desconto invalido.");
   }
 
-  if (data.discountAmount.greaterThan(subtotalAmount)) {
+  if (totalDiscountAmount.greaterThan(subtotalAmount)) {
     throw new Error("Desconto nao pode ser maior que o subtotal da venda.");
   }
 
-  const totalAmount = subtotalAmount.minus(data.discountAmount);
+  const totalAmount = subtotalAmount.minus(totalDiscountAmount);
   const tolerance = new Prisma.Decimal("0.01");
   const nonCashPayments = data.payments.filter((payment) => payment.method !== PaymentMethod.CASH);
   const cashPayments = data.payments.filter((payment) => payment.method === PaymentMethod.CASH);
@@ -730,7 +755,7 @@ async function runCreateSaleWithStockAdjustment(
       operatorId: data.operatorId,
       customerName: data.customerName,
       subtotalAmount,
-      discountAmount: data.discountAmount,
+      discountAmount: totalDiscountAmount,
       totalAmount,
       items: {
         create: data.items.map((item) => {
@@ -787,6 +812,17 @@ async function runCreateSaleWithStockAdjustment(
           processedAt: payment.processedAt ?? new Date(),
         })),
       },
+      coupons: couponRedemption
+        ? {
+            create: {
+              couponId: couponRedemption.couponId,
+              codeSnapshot: couponRedemption.codeSnapshot,
+              discountTypeSnapshot: couponRedemption.discountTypeSnapshot,
+              discountValueSnapshot: couponRedemption.discountValueSnapshot,
+              discountAmount: couponRedemption.discountAmount,
+            },
+          }
+        : undefined,
     },
     include: {
       items: true,

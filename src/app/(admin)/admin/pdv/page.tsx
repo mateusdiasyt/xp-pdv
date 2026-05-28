@@ -216,7 +216,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     );
   }
 
-  const { openSessions, products, sales, customers, openComandas, pdvConfiguration, issues } = await getPdvData();
+  const { openSessions, products, sales, customers, openComandas, pdvConfiguration, coupons, issues } = await getPdvData();
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.PDV_MANAGE);
   const canCancel = hasPermission(session.user.permissions, PERMISSIONS.PDV_CANCEL);
 
@@ -283,6 +283,19 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     })),
   }));
 
+  const couponOptions = coupons.map((coupon) => ({
+    id: coupon.id,
+    code: coupon.code,
+    name: coupon.name,
+    discountType: coupon.discountType,
+    discountValue: Number(coupon.discountValue),
+    maxDiscountAmount: coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : null,
+    minSubtotalAmount: coupon.minSubtotalAmount ? Number(coupon.minSubtotalAmount) : null,
+    usageLimit: coupon.usageLimit,
+    usedCount: coupon.usedCount,
+    productIds: coupon.products.map((product) => product.productId),
+  }));
+
   const groupedSales = sales.reduce<Array<{ dateKey: string; dateLabel: string; sales: typeof sales }>>(
     (accumulator, sale) => {
       const dateKey = sale.createdAt.toISOString().slice(0, 10);
@@ -322,6 +335,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
           openSessions={openSessionOptions}
           openComandas={openComandasView}
           products={productOptions}
+          coupons={couponOptions}
           happyHourActive={pdvConfiguration.happyHourActive}
         />
       </div>

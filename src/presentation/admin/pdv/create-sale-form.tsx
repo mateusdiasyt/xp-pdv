@@ -16,6 +16,7 @@ import {
   Receipt,
   Search,
   Sandwich,
+  TicketPercent,
   Trash2,
   UserRound,
   Wallet,
@@ -41,6 +42,11 @@ import {
   updateComandaCustomerAction,
   updateComandaItemAction,
 } from "@/presentation/admin/pdv/actions";
+import {
+  calculateCouponDiscountInCents,
+  normalizeCouponCode,
+  type PdvCouponOption,
+} from "@/presentation/admin/pdv/coupon-utils";
 
 type CustomerOption = {
   id: string;
@@ -106,6 +112,7 @@ type CreateSaleFormProps = {
   customers: CustomerOption[];
   openSessions: OpenSessionOption[];
   products: ProductOption[];
+  coupons: PdvCouponOption[];
   selectedComanda: SelectedComanda;
   canManage: boolean;
   happyHourActive: boolean;
@@ -282,6 +289,7 @@ export function CreateSaleForm({
   customers,
   openSessions,
   products,
+  coupons,
   selectedComanda,
   canManage,
   happyHourActive,
@@ -305,6 +313,8 @@ export function CreateSaleForm({
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [discountAmount, setDiscountAmount] = useState("0.00");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCouponCode, setAppliedCouponCode] = useState("");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
   const [customerQuery, setCustomerQuery] = useState(selectedCustomerInputValue);
@@ -321,7 +331,22 @@ export function CreateSaleForm({
 
   const optimisticSubtotalAmount = optimisticItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const subtotalInCents = Math.round(optimisticSubtotalAmount * 100);
-  const discountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const manualDiscountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const appliedCoupon = appliedCouponCode
+    ? coupons.find((coupon) => coupon.code === appliedCouponCode)
+    : null;
+  const couponPreview = appliedCoupon
+    ? calculateCouponDiscountInCents({
+        coupon: appliedCoupon,
+        subtotalInCents,
+        lines: optimisticItems.map((item) => ({
+          productId: item.productId,
+          lineTotalInCents: Math.round(item.lineTotal * 100),
+        })),
+      })
+    : null;
+  const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
+  const discountInCents = manualDiscountInCents + couponDiscountInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
   const paymentsTotalInCents = paymentLines.reduce(
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
@@ -359,7 +384,8 @@ export function CreateSaleForm({
     }
 
     if (!selectedCategoryId || !selectedCategoryIsAvailable) {
-      setSelectedCategoryId(firstCategoryId);
+      const timeoutId = window.setTimeout(() => setSelectedCategoryId(firstCategoryId), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
 
@@ -416,6 +442,14 @@ export function CreateSaleForm({
       return matchesName || (normalizedCustomerQueryDigits.length > 0 && matchesDocument);
     })
     .slice(0, 8);
+  const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
+
+  function applyCoupon() {
+    const normalizedCode = normalizeCouponCode(couponCode);
+    const coupon = coupons.find((item) => item.code === normalizedCode);
+    setAppliedCouponCode(coupon ? coupon.code : "");
+    setCouponCode(normalizedCode);
+  }
 
   function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
     setPaymentLines((currentLines) =>
@@ -555,6 +589,7 @@ export function CreateSaleForm({
             <div className="relative w-full max-w-md">
               <form ref={customerFormRef} action={customerFormAction}>
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
+                <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
                 <input ref={customerIdInputRef} type="hidden" name="customerId" defaultValue={selectedComanda.customerId ?? ""} />
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
@@ -912,6 +947,27 @@ export function CreateSaleForm({
                     placeholder="0.00"
                     required
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`couponCode-${selectedComanda.id}`}>Cupom</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id={`couponCode-${selectedComanda.id}`}
+                      value={couponCode}
+                      onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                      placeholder="CODIGO"
+                    />
+                    <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
+                      <TicketPercent className="h-4 w-4" />
+                      <span className="sr-only">Aplicar cupom</span>
+                    </Button>
+                  </div>
+                  {appliedCouponCode ? (
+                    <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
+                  ) : couponCode ? (
+                    <p className="text-xs text-muted-foreground">Nao aplicado</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">

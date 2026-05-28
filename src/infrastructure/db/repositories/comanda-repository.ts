@@ -542,6 +542,7 @@ export async function closeComandaWithSale(data: {
   cashSessionId: string;
   payments: SalePaymentInput[];
   discountAmount: Prisma.Decimal;
+  couponCode?: string;
   operatorId: string;
   saleNumber: string;
 }) {
@@ -581,6 +582,7 @@ export async function closeComandaWithSale(data: {
         operatorId: data.operatorId,
         customerName: comanda.customer?.fullName ?? comanda.customerNameSnapshot ?? undefined,
         discountAmount: data.discountAmount,
+        couponCode: data.couponCode,
         items: comanda.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,

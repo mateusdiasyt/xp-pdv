@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Boxes,
+  BadgePercent,
   Calculator,
   ChartColumnBig,
   ContactRound,
@@ -39,6 +40,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "PDV",
     href: "/admin/pdv",
     icon: Receipt,
+    permission: PERMISSIONS.PDV_VIEW,
+  },
+  {
+    label: "Cupons",
+    href: "/admin/coupons",
+    icon: BadgePercent,
     permission: PERMISSIONS.PDV_VIEW,
   },
   {
