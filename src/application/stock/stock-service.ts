@@ -1,4 +1,4 @@
-import { Prisma, StockUnit } from "@prisma/client";
+import { Prisma, StockMovementType, StockUnit } from "@prisma/client";
 
 import { createStockMovementSchema } from "@/domain/stock/schemas";
 import {
@@ -17,6 +17,7 @@ import {
   listStockInvoiceXmls,
   listStockMovements,
   registerStockMovement,
+  type ListStockMovementsFilters,
   type ReviewedStockInvoiceItemInput,
 } from "@/infrastructure/db/repositories/stock-repository";
 import { listCategoryOptions } from "@/infrastructure/db/repositories/category-repository";
@@ -832,8 +833,33 @@ function buildStockInvoiceXmlPreview(rawXml: string) {
   };
 }
 
-export async function getStockMovements() {
-  return listStockMovements();
+export async function getStockMovements(filters?: {
+  categoryId?: string;
+  type?: string;
+  query?: string;
+}) {
+  const movementType =
+    filters?.type === StockMovementType.IN ||
+    filters?.type === StockMovementType.OUT ||
+    filters?.type === StockMovementType.ADJUSTMENT
+      ? filters.type
+      : undefined;
+  const query = filters?.query?.trim() || undefined;
+  const categoryId =
+    filters?.categoryId && filters.categoryId !== "all" ? filters.categoryId.trim() || undefined : undefined;
+
+  const normalizedFilters: ListStockMovementsFilters = {
+    categoryId,
+    type: movementType,
+    query,
+    take: 150,
+  };
+
+  return listStockMovements(normalizedFilters);
+}
+
+export async function getStockMovementFilterOptions() {
+  return listCategoryOptions();
 }
 
 export async function getStockFormOptions() {

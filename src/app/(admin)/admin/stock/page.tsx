@@ -1,17 +1,33 @@
 import { StockMovementType, StockUnit } from "@prisma/client";
 import Link from "next/link";
 import { Fragment } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
-import { getStockFormOptions, getStockInvoiceXmlHistory, getStockMovements } from "@/application/stock/stock-service";
+import {
+  getStockFormOptions,
+  getStockInvoiceXmlHistory,
+  getStockMovementFilterOptions,
+  getStockMovements,
+} from "@/application/stock/stock-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { CreateStockMovementForm } from "@/presentation/admin/stock/create-stock-movement-form";
 import { FetchStockInvoiceXmlByKeyForm } from "@/presentation/admin/stock/fetch-stock-invoice-xml-by-key-form";
 import { UploadStockInvoiceXmlForm } from "@/presentation/admin/stock/upload-stock-invoice-xml-form";
+
+type StockPageProps = {
+  searchParams: Promise<{
+    q?: string;
+    categoryId?: string;
+    movementType?: string;
+  }>;
+};
 
 function movementTypeLabel(type: StockMovementType) {
   if (type === StockMovementType.IN) {
@@ -41,6 +57,28 @@ function stockUnitLabel(stockUnit: StockUnit) {
   return stockUnit === StockUnit.MILLILITER ? "ml" : "un";
 }
 
+function normalizeMovementType(value?: string) {
+  if (
+    value === StockMovementType.IN ||
+    value === StockMovementType.OUT ||
+    value === StockMovementType.ADJUSTMENT
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+const movementFilterOptions: Array<{ label: string; value: string }> = [
+  { label: "Todos os tipos", value: "all" },
+  { label: "Entradas", value: StockMovementType.IN },
+  { label: "Saidas", value: StockMovementType.OUT },
+  { label: "Ajustes", value: StockMovementType.ADJUSTMENT },
+];
+
+const outlineLinkClass =
+  "inline-flex h-10 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70";
+
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
   timeStyle: "short",
@@ -55,14 +93,24 @@ const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
-export default async function StockPage() {
+export default async function StockPage({ searchParams }: StockPageProps) {
   const session = await requirePermission(PERMISSIONS.STOCK_VIEW);
-  const [movements, products, xmlHistory] = await Promise.all([
-    getStockMovements(),
+  const { q, categoryId, movementType } = await searchParams;
+  const query = q?.trim() || undefined;
+  const categoryFilter = categoryId && categoryId !== "all" ? categoryId.trim() || undefined : undefined;
+  const typeFilter = normalizeMovementType(movementType);
+  const [movements, products, xmlHistory, categories] = await Promise.all([
+    getStockMovements({
+      query,
+      categoryId: categoryFilter,
+      type: typeFilter,
+    }),
     getStockFormOptions(),
     getStockInvoiceXmlHistory(),
+    getStockMovementFilterOptions(),
   ]);
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.STOCK_MANAGE);
+  const hasMovementFilters = Boolean(query || categoryFilter || typeFilter);
 
   return (
     <div className="space-y-6">
@@ -252,26 +300,68 @@ export default async function StockPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historico recente</CardTitle>
-          <CardDescription>Ultimas 100 movimentacoes registradas.</CardDescription>
+          <CardTitle>Log de estoque</CardTitle>
+          <CardDescription>
+            Entradas, saidas e ajustes registrados. Use categoria para conferir perdas, baixas e XMLs importados.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <form method="GET" className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px_auto_auto]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input name="q" defaultValue={query ?? ""} placeholder="Buscar produto ou SKU" className="pl-9" />
+            </div>
+
+            <select name="categoryId" className="admin-native-select" defaultValue={categoryFilter ?? "all"}>
+              <option value="all">Todas as categorias</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+
+            <select name="movementType" className="admin-native-select" defaultValue={typeFilter ?? "all"}>
+              {movementFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <Button type="submit" variant="secondary" className="gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtrar
+            </Button>
+
+            <Link href="/admin/stock" className={outlineLinkClass}>
+              Limpar
+            </Link>
+          </form>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+            <p>{movements.length} registro(s) exibido(s)</p>
+            <p>Filtros ativos: {hasMovementFilters ? "sim" : "nao"}</p>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Quantidade</TableHead>
                 <TableHead className="text-right">Estoque antes</TableHead>
                 <TableHead className="text-right">Estoque depois</TableHead>
                 <TableHead>Operador</TableHead>
+                <TableHead>Observacao</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {movements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-zinc-500">
+                  <TableCell colSpan={9} className="text-center text-sm text-zinc-500">
                     Nenhuma movimentacao registrada.
                   </TableCell>
                 </TableRow>
@@ -279,6 +369,7 @@ export default async function StockPage() {
               {movements.map((movement) => (
                 <TableRow key={movement.id}>
                   <TableCell>{dateFormatter.format(movement.createdAt)}</TableCell>
+                  <TableCell>{movement.product.category.name}</TableCell>
                   <TableCell className="font-medium text-zinc-900">
                     {movement.product.name}
                     <p className="text-xs text-zinc-500">{movement.product.sku}</p>
@@ -296,6 +387,9 @@ export default async function StockPage() {
                     {movement.resultingStock} {stockUnitLabel(movement.product.stockUnit)}
                   </TableCell>
                   <TableCell>{movement.operator?.name ?? "-"}</TableCell>
+                  <TableCell className="max-w-[18rem] text-sm text-muted-foreground">
+                    {movement.note || "-"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -11,8 +11,27 @@ type RegisterStockMovementInput = {
   operatorId?: string;
 };
 
-export async function listStockMovements() {
+export type ListStockMovementsFilters = {
+  categoryId?: string;
+  type?: StockMovementType;
+  query?: string;
+  take?: number;
+};
+
+export async function listStockMovements(filters?: ListStockMovementsFilters) {
   return prisma.stockMovement.findMany({
+    where: {
+      type: filters?.type,
+      product: {
+        categoryId: filters?.categoryId,
+        OR: filters?.query
+          ? [
+              { name: { contains: filters.query, mode: "insensitive" } },
+              { sku: { contains: filters.query, mode: "insensitive" } },
+            ]
+          : undefined,
+      },
+    },
     include: {
       product: {
         select: {
@@ -20,6 +39,12 @@ export async function listStockMovements() {
           name: true,
           sku: true,
           stockUnit: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       operator: {
@@ -33,7 +58,7 @@ export async function listStockMovements() {
     orderBy: {
       createdAt: "desc",
     },
-    take: 100,
+    take: filters?.take ?? 100,
   });
 }
 
