@@ -20,6 +20,18 @@ import { issueSaleNfce } from "@/application/fiscal/focus-nfce-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
+function revalidatePdvPage() {
+  revalidatePath("/admin/pdv");
+}
+
+function revalidateSaleSurfaces() {
+  revalidatePath("/admin/pdv");
+  revalidatePath("/admin/cash");
+  revalidatePath("/admin/stock");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin");
+}
+
 export async function createSaleAction(
   prevState: ActionState = initialActionState,
   formData: FormData,
@@ -28,6 +40,7 @@ export async function createSaleAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await createSaleRecord(formData, session.user.id);
+    revalidateSaleSurfaces();
     return { status: "success", message: "Venda registrada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -60,6 +73,7 @@ export async function closeQuickSaleAction(
     params.set("cashReceived", result.cashReceived);
   }
 
+  revalidateSaleSurfaces();
   redirect(`/admin/pdv?${params.toString()}`);
 }
 export async function cancelSaleAction(
@@ -70,10 +84,7 @@ export async function cancelSaleAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_CANCEL);
     const result = await cancelSaleRecord(formData, session.user.id);
-    revalidatePath("/admin/cash");
-    revalidatePath("/admin/stock");
-    revalidatePath("/admin/products");
-    revalidatePath("/admin");
+    revalidateSaleSurfaces();
     return { status: "success", message: result?.message ?? "Venda cancelada com sucesso." };
   } catch (error) {
     return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };
@@ -97,7 +108,7 @@ export async function retrySaleNfceAction(
       actorId: session.user.id,
     });
 
-    revalidatePath("/admin");
+    revalidateSaleSurfaces();
     return {
       status: result.status === "AUTHORIZED" ? "success" : "error",
       message: result.message,
@@ -119,7 +130,7 @@ export async function retrySaleNfceRequest(formData: FormData): Promise<void> {
       saleId,
       actorId: session.user.id,
     });
-    revalidatePath("/admin");
+    revalidateSaleSurfaces();
   } catch {
     // Mantem o fluxo da tela sem travar, a situacao fiscal fica registrada na venda.
   }
@@ -136,6 +147,7 @@ export async function updatePdvHappyHourAction(
       id: session.user.id,
       name: session.user.name,
     });
+    revalidatePdvPage();
     return {
       status: "success",
       message: updated.happyHourActive ? "Happy Hour ativado." : "Happy Hour desativado.",
@@ -156,6 +168,7 @@ export async function createComandaAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await createComandaRecord(formData, session.user.id);
+    revalidatePdvPage();
     return { status: "success", message: "Comanda criada com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -174,6 +187,7 @@ export async function addComandaItemRequest(formData: FormData): Promise<ActionS
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await addComandaItemRecord(formData, session.user.id);
+    revalidatePdvPage();
     return { status: "success", message: "Item adicionado na comanda." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -205,6 +219,7 @@ export async function closeComandaAction(
     params.set("cashReceived", result.cashReceived);
   }
 
+  revalidateSaleSurfaces();
   redirect(`/admin/pdv?${params.toString()}`);
 }
 
@@ -216,6 +231,7 @@ export async function removeComandaItemAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await removeComandaItemRecord(formData, session.user.id);
+    revalidatePdvPage();
     return { status: "success", message: "Item removido da comanda." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -230,6 +246,7 @@ export async function updateComandaItemAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await updateComandaItemRecord(formData, session.user.id);
+    revalidatePdvPage();
     return { status: "success", message: "Item atualizado." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -244,6 +261,7 @@ export async function updateComandaCustomerAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await updateComandaCustomerRecord(formData, session.user.id);
+    revalidatePdvPage();
     return { status: "success", message: "Cliente da comanda atualizado." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -258,7 +276,7 @@ export async function cancelComandaAction(
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await cancelComandaRecord(formData, session.user.id);
-    revalidatePath("/admin");
+    revalidatePdvPage();
     return { status: "success", message: "Comanda cancelada." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

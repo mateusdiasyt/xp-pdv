@@ -1,7 +1,8 @@
 "use client";
 
 import { CircleX } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { PaymentMethod, RefundStatus } from "@prisma/client";
 
@@ -34,9 +35,16 @@ const refundMethodLabels: Record<PaymentMethod, string> = {
 };
 
 export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(cancelSaleAction, initialActionState);
   const suggestedRefundAmount = totalAmount.toFixed(2);
+
+  useEffect(() => {
+    if (state.status === "success") {
+      router.refresh();
+    }
+  }, [router, state.status]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -2,6 +2,7 @@
 
 import { Check, Search } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -34,6 +35,7 @@ export function CreateComandaForm({
   lockNumber = false,
   onSuccess,
 }: CreateComandaFormProps) {
+  const router = useRouter();
   const [state, formAction] = useActionState(createComandaAction, initialActionState);
   const [isWalkIn, setIsWalkIn] = useState(customers.length === 0);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -43,8 +45,9 @@ export function CreateComandaForm({
   useEffect(() => {
     if (state.status === "success") {
       onSuccess?.();
+      router.refresh();
     }
-  }, [onSuccess, state.status]);
+  }, [onSuccess, router, state.status]);
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = customerQuery.trim().toLowerCase();

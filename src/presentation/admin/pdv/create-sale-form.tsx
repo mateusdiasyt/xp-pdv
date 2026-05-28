@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { PaymentMethod } from "@prisma/client";
 import {
@@ -286,6 +287,7 @@ export function CreateSaleForm({
   happyHourActive,
   onClose,
 }: CreateSaleFormProps) {
+  const router = useRouter();
   const selectedCustomerInputValue = selectedComanda.customerId ? (selectedComanda.customerName ?? "") : "";
   const currentCustomerLabel =
     selectedComanda.customerName || (selectedComanda.isWalkIn ? "Comanda avulsa" : "Sem cliente");
@@ -360,6 +362,23 @@ export function CreateSaleForm({
       setSelectedCategoryId(firstCategoryId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
+
+  useEffect(() => {
+    if (
+      updateItemState.status === "success" ||
+      removeItemState.status === "success" ||
+      customerState.status === "success"
+    ) {
+      router.refresh();
+    }
+  }, [customerState.status, removeItemState.status, router, updateItemState.status]);
+
+  useEffect(() => {
+    if (cancelState.status === "success") {
+      onClose();
+      router.refresh();
+    }
+  }, [cancelState.status, onClose, router]);
 
   const normalizedSearch = deferredProductSearch.trim().toLowerCase();
   const filteredProducts = products.filter((product) => {
@@ -483,6 +502,7 @@ export function CreateSaleForm({
         setOptimisticItems(previousItems);
       } else {
         form.reset();
+        router.refresh();
       }
 
       setAddState(result);
