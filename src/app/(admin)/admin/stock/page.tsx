@@ -1,7 +1,7 @@
 import { StockMovementType, StockUnit } from "@prisma/client";
 import Link from "next/link";
 import { Fragment } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { FileText, HelpCircle, History, PackagePlus, Search, SlidersHorizontal } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
@@ -13,8 +13,9 @@ import {
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { CreateStockMovementForm } from "@/presentation/admin/stock/create-stock-movement-form";
@@ -23,6 +24,7 @@ import { UploadStockInvoiceXmlForm } from "@/presentation/admin/stock/upload-sto
 
 type StockPageProps = {
   searchParams: Promise<{
+    panel?: string;
     q?: string;
     categoryId?: string;
     movementType?: string;
@@ -79,6 +81,17 @@ const movementFilterOptions: Array<{ label: string; value: string }> = [
 const outlineLinkClass =
   "inline-flex h-10 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70";
 
+const stockActionLinkClass =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70";
+
+function InfoHint({ label }: { label: string }) {
+  return (
+    <span title={label} aria-label="Ajuda" className="inline-flex">
+      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+    </span>
+  );
+}
+
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
   timeStyle: "short",
@@ -95,218 +108,107 @@ const currencyFormatter = new Intl.NumberFormat("pt-BR", {
 
 export default async function StockPage({ searchParams }: StockPageProps) {
   const session = await requirePermission(PERMISSIONS.STOCK_VIEW);
-  const { q, categoryId, movementType } = await searchParams;
+  const { panel, q, categoryId, movementType } = await searchParams;
   const query = q?.trim() || undefined;
   const categoryFilter = categoryId && categoryId !== "all" ? categoryId.trim() || undefined : undefined;
   const typeFilter = normalizeMovementType(movementType);
-  const [movements, products, xmlHistory, categories] = await Promise.all([
-    getStockMovements({
-      query,
-      categoryId: categoryFilter,
-      type: typeFilter,
-    }),
+  const activePanel = panel === "log" || panel === "xml" ? panel : undefined;
+  const isLogPanelOpen = activePanel === "log";
+  const isXmlPanelOpen = activePanel === "xml";
+  const [products, movements, xmlHistory, categories] = await Promise.all([
     getStockFormOptions(),
-    getStockInvoiceXmlHistory(),
-    getStockMovementFilterOptions(),
+    isLogPanelOpen
+      ? getStockMovements({
+          query,
+          categoryId: categoryFilter,
+          type: typeFilter,
+        })
+      : Promise.resolve([]),
+    isXmlPanelOpen ? getStockInvoiceXmlHistory() : Promise.resolve(null),
+    isLogPanelOpen ? getStockMovementFilterOptions() : Promise.resolve([]),
   ]);
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.STOCK_MANAGE);
   const hasMovementFilters = Boolean(query || categoryFilter || typeFilter);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Modulo ERP"
-        title="Estoque e Movimentacoes"
-        description="Historico auditavel de entradas, saidas e ajustes com operador responsavel."
-      />
+      <PageHeader eyebrow="ERP" title="Estoque" />
+
+      <div className="flex flex-wrap gap-2">
+        <Link href="/admin/stock?panel=log" className={stockActionLinkClass}>
+          <History className="h-4 w-4" />
+          Ver log
+        </Link>
+        <Link href="/admin/stock?panel=xml" className={stockActionLinkClass}>
+          <FileText className="h-4 w-4" />
+          XMLs
+        </Link>
+      </div>
 
       {canManage ? (
         <Card>
-          <CardHeader>
-            <CardTitle>Entrada por NF-e de compra</CardTitle>
-            <CardDescription>
-              Escaneie a chave do DANFE ou envie o XML recebido. O estoque so muda depois da conferencia dos itens.
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <PackagePlus className="h-4 w-4" />
+              Entrada por NF-e
+              <InfoHint label="Busque pela chave do DANFE ou envie o XML. Nada entra no estoque antes da conferencia." />
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-foreground">Buscar pela chave da nota</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Ideal para leitor de barras: leia a chave do DANFE, baixe o XML recebido e confira antes de importar.
-                </p>
-              </div>
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+              <p className="mb-4 text-sm font-semibold text-foreground">Chave da nota</p>
               <FetchStockInvoiceXmlByKeyForm />
             </div>
 
-            <div className="rounded-2xl border border-border/75 bg-card/45 p-4">
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-foreground">Enviar arquivo XML</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Use quando o fornecedor enviar o XML por e-mail, WhatsApp ou download.
-                </p>
-              </div>
+            <div className="rounded-xl border border-border/75 bg-card/45 p-4">
+              <p className="mb-4 text-sm font-semibold text-foreground">Arquivo XML</p>
               <UploadStockInvoiceXmlForm />
             </div>
           </CardContent>
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>XMLs guardados</CardTitle>
-          <CardDescription>
-            Ultimos XMLs enviados para conferencia. A importacao so acontece pelo botao de confirmacao.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {xmlHistory.setupPending ? (
-            <p className="text-sm text-amber-600">
-              A tabela de XML ainda nao foi criada neste banco. Execute o db:push para habilitar o armazenamento.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Chave NF-e</TableHead>
-                  <TableHead>Fornecedor</TableHead>
-                  <TableHead>Nota</TableHead>
-                  <TableHead>Data emissao</TableHead>
-                  <TableHead className="text-right">Itens</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Arquivo</TableHead>
-                  {canManage ? <TableHead className="text-right">Acao</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {xmlHistory.entries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-sm text-zinc-500">
-                      Nenhum XML de estoque foi carregado.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
+      {canManage ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              Movimentacao manual
+              <InfoHint label="Use para perdas, ajustes pontuais e saidas que nao vieram do PDV." />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <details className="group rounded-xl border border-border/75 bg-card/50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Abrir registro manual</span>
+                <span className="text-xs text-muted-foreground group-open:hidden">Fechado</span>
+                <span className="hidden text-xs text-muted-foreground group-open:inline">Aberto</span>
+              </summary>
+              <div className="border-t border-border/70 p-4">
+                <CreateStockMovementForm products={products} />
+              </div>
+            </details>
+          </CardContent>
+        </Card>
+      ) : null}
 
-                {xmlHistory.entries.map((xmlEntry) => (
-                  <Fragment key={xmlEntry.id}>
-                    <TableRow>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{xmlEntry.accessKey}</TableCell>
-                      <TableCell>{xmlEntry.supplierName ?? "-"}</TableCell>
-                      <TableCell>
-                        {xmlEntry.invoiceNumber ? `N${xmlEntry.invoiceNumber}` : "-"}
-                        {xmlEntry.invoiceSeries ? (
-                          <p className="text-xs text-muted-foreground">Serie {xmlEntry.invoiceSeries}</p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{xmlEntry.issuedAt ? dateOnlyFormatter.format(xmlEntry.issuedAt) : "-"}</TableCell>
-                      <TableCell className="text-right">{xmlEntry.itemCount}</TableCell>
-                      <TableCell className="text-right">
-                        {xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}
-                      </TableCell>
-                      <TableCell>
-                        {xmlEntry.importedAt ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                            Importado em {dateFormatter.format(xmlEntry.importedAt)}
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Aguardando conferencia</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <p className="max-w-[14rem] truncate text-sm">{xmlEntry.sourceFileName}</p>
-                        <p className="text-xs text-muted-foreground">Upload em {dateFormatter.format(xmlEntry.createdAt)}</p>
-                      </TableCell>
-                      {canManage ? (
-                        <TableCell className="text-right">
-                          {xmlEntry.importedAt ? (
-                            <span className="text-xs text-muted-foreground">Importacao concluida</span>
-                          ) : (
-                            <Link
-                              href={`/admin/stock/xml/${xmlEntry.id}`}
-                              className="inline-flex h-8 items-center justify-center rounded-xl bg-primary px-3 text-[0.8rem] font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-xl hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
-                            >
-                              Conferir entrada
-                            </Link>
-                          )}
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                    <TableRow className="bg-card/25">
-                      <TableCell colSpan={canManage ? 9 : 8}>
-                        <details className="group rounded-xl border border-border/70 bg-background/45 p-3">
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
-                            <span>Previa dos itens antes de importar</span>
-                            <span className="text-xs font-medium text-muted-foreground group-open:hidden">Abrir</span>
-                            <span className="hidden text-xs font-medium text-muted-foreground group-open:inline">Fechar</span>
-                          </summary>
+      {isLogPanelOpen ? (
+        <Sheet defaultOpen>
+          <SheetContent side="right" showCloseButton={false} className="w-[min(100vw,980px)] overflow-y-auto p-0 sm:max-w-[980px]">
+            <SheetHeader className="border-b border-border/70 p-4">
+              <div className="flex items-center justify-between gap-3 pr-1">
+                <div>
+                  <SheetTitle>Log de estoque</SheetTitle>
+                  <SheetDescription className="sr-only">Movimentacoes de estoque carregadas sob demanda.</SheetDescription>
+                </div>
+                <Link href="/admin/stock" className={outlineLinkClass}>
+                  Fechar
+                </Link>
+              </div>
+            </SheetHeader>
 
-                          {xmlEntry.previewError ? (
-                            <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                              {xmlEntry.previewError} Contate o Mateus.
-                            </p>
-                          ) : xmlEntry.preview ? (
-                            <div className="mt-3 space-y-3">
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                {xmlEntry.preview.recipientName ? <span>Destinatario: {xmlEntry.preview.recipientName}</span> : null}
-                                {xmlEntry.preview.recipientDocument ? <span>CNPJ/CPF: {xmlEntry.preview.recipientDocument}</span> : null}
-                                <span>
-                                  Mostrando {xmlEntry.preview.shownItems.length} de {xmlEntry.preview.itemLines} linha(s) da NF-e.
-                                </span>
-                              </div>
-
-                              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                                {xmlEntry.preview.shownItems.map((item) => (
-                                  <div key={`${xmlEntry.id}-${item.lineNumber}`} className="rounded-xl border border-border/70 bg-card/50 p-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <p className="line-clamp-2 text-sm font-semibold text-foreground">{item.description}</p>
-                                      <span className="rounded-full border border-primary/35 px-2 py-0.5 text-xs font-semibold text-primary">
-                                        {item.quantity} un
-                                      </span>
-                                    </div>
-                                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                      <span>NCM {item.ncm ?? "-"}</span>
-                                      <span>CFOP {item.cfop ?? "-"}</span>
-                                      <span>Custo {currencyFormatter.format(item.unitCost)}</span>
-                                      <span>Total {currencyFormatter.format(item.totalCost)}</span>
-                                    </div>
-                                    {item.commercialUnit || item.taxableUnit ? (
-                                      <p className="mt-2 text-[11px] text-muted-foreground">
-                                        XML: {item.commercialQuantity ?? "-"} {item.commercialUnit ?? "uCom"} /{" "}
-                                        {item.taxableQuantity ?? "-"} {item.taxableUnit ?? "uTrib"}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-
-                              {!xmlEntry.importedAt ? (
-                                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
-                                  Abra Conferir entrada para revisar produto, preco, imagem e quantidade antes de movimentar o estoque.
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </details>
-                      </TableCell>
-                    </TableRow>
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Log de estoque</CardTitle>
-          <CardDescription>
-            Entradas, saidas e ajustes registrados. Use categoria para conferir perdas, baixas e XMLs importados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+            <div className="space-y-4 p-4">
           <form method="GET" className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px_auto_auto]">
+            <input type="hidden" name="panel" value="log" />
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input name="q" defaultValue={query ?? ""} placeholder="Buscar produto ou SKU" className="pl-9" />
@@ -334,12 +236,12 @@ export default async function StockPage({ searchParams }: StockPageProps) {
               Filtrar
             </Button>
 
-            <Link href="/admin/stock" className={outlineLinkClass}>
+            <Link href="/admin/stock?panel=log" className={outlineLinkClass}>
               Limpar
             </Link>
           </form>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>{movements.length} registro(s) exibido(s)</p>
             <p>Filtros ativos: {hasMovementFilters ? "sim" : "nao"}</p>
           </div>
@@ -394,30 +296,140 @@ export default async function StockPage({ searchParams }: StockPageProps) {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
 
-      {canManage ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Movimentacao manual</CardTitle>
-            <CardDescription>
-              Acao opcional para ajustes pontuais. Fica fechada por padrao e abre somente quando necessario.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <details className="group rounded-xl border border-border/75 bg-card/50">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
-                <span>Abrir registro manual de estoque</span>
-                <span className="text-xs text-muted-foreground group-open:hidden">Fechado</span>
-                <span className="hidden text-xs text-muted-foreground group-open:inline">Aberto</span>
-              </summary>
-              <div className="border-t border-border/70 p-4">
-                <CreateStockMovementForm products={products} />
+      {isXmlPanelOpen ? (
+        <Sheet defaultOpen>
+          <SheetContent side="right" showCloseButton={false} className="w-[min(100vw,1100px)] overflow-y-auto p-0 sm:max-w-[1100px]">
+            <SheetHeader className="border-b border-border/70 p-4">
+              <div className="flex items-center justify-between gap-3 pr-1">
+                <div>
+                  <SheetTitle>XMLs</SheetTitle>
+                  <SheetDescription className="sr-only">XMLs carregados sob demanda.</SheetDescription>
+                </div>
+                <Link href="/admin/stock" className={outlineLinkClass}>
+                  Fechar
+                </Link>
               </div>
-            </details>
-          </CardContent>
-        </Card>
+            </SheetHeader>
+
+            <div className="p-4">
+              {xmlHistory?.setupPending ? (
+                <p className="text-sm text-amber-600">Tabela de XML pendente no banco.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Chave</TableHead>
+                      <TableHead>Fornecedor</TableHead>
+                      <TableHead>Nota</TableHead>
+                      <TableHead>Emissao</TableHead>
+                      <TableHead className="text-right">Itens</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Arquivo</TableHead>
+                      {canManage ? <TableHead className="text-right">Acao</TableHead> : null}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {xmlHistory?.entries.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={canManage ? 9 : 8} className="text-center text-sm text-zinc-500">
+                          Nenhum XML carregado.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+
+                    {xmlHistory?.entries.map((xmlEntry) => (
+                      <Fragment key={xmlEntry.id}>
+                        <TableRow>
+                          <TableCell className="max-w-[9rem] truncate font-mono text-xs text-muted-foreground">
+                            {xmlEntry.accessKey}
+                          </TableCell>
+                          <TableCell>{xmlEntry.supplierName ?? "-"}</TableCell>
+                          <TableCell>
+                            {xmlEntry.invoiceNumber ? `N${xmlEntry.invoiceNumber}` : "-"}
+                            {xmlEntry.invoiceSeries ? (
+                              <p className="text-xs text-muted-foreground">Serie {xmlEntry.invoiceSeries}</p>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>{xmlEntry.issuedAt ? dateOnlyFormatter.format(xmlEntry.issuedAt) : "-"}</TableCell>
+                          <TableCell className="text-right">{xmlEntry.itemCount}</TableCell>
+                          <TableCell className="text-right">
+                            {xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {xmlEntry.importedAt ? (
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Importado</Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pendente</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <p className="max-w-[12rem] truncate text-sm">{xmlEntry.sourceFileName}</p>
+                          </TableCell>
+                          {canManage ? (
+                            <TableCell className="text-right">
+                              {xmlEntry.importedAt ? (
+                                <span className="text-xs text-muted-foreground">Concluido</span>
+                              ) : (
+                                <Link
+                                  href={`/admin/stock/xml/${xmlEntry.id}`}
+                                  className="inline-flex h-8 items-center justify-center rounded-xl bg-primary px-3 text-[0.8rem] font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-xl hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                                >
+                                  Conferir
+                                </Link>
+                              )}
+                            </TableCell>
+                          ) : null}
+                        </TableRow>
+                        <TableRow className="bg-card/25">
+                          <TableCell colSpan={canManage ? 9 : 8}>
+                            <details className="group rounded-xl border border-border/70 bg-background/45 p-3">
+                              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                                <span>Previa</span>
+                                <span className="text-xs font-medium text-muted-foreground group-open:hidden">Abrir</span>
+                                <span className="hidden text-xs font-medium text-muted-foreground group-open:inline">Fechar</span>
+                              </summary>
+
+                              {xmlEntry.previewError ? (
+                                <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                  {xmlEntry.previewError}
+                                </p>
+                              ) : xmlEntry.preview ? (
+                                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                                  {xmlEntry.preview.shownItems.map((item) => (
+                                    <div key={`${xmlEntry.id}-${item.lineNumber}`} className="rounded-xl border border-border/70 bg-card/50 p-3">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <p className="line-clamp-2 text-sm font-semibold text-foreground">{item.description}</p>
+                                        <span className="rounded-full border border-primary/35 px-2 py-0.5 text-xs font-semibold text-primary">
+                                          {item.quantity} un
+                                        </span>
+                                      </div>
+                                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                        <span>NCM {item.ncm ?? "-"}</span>
+                                        <span>CFOP {item.cfop ?? "-"}</span>
+                                        <span>Custo {currencyFormatter.format(item.unitCost)}</span>
+                                        <span>Total {currencyFormatter.format(item.totalCost)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </details>
+                          </TableCell>
+                        </TableRow>
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       ) : null}
     </div>
   );

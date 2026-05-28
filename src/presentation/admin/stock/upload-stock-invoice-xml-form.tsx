@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { HelpCircle } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -22,19 +23,17 @@ export function UploadStockInvoiceXmlForm() {
   return (
     <form ref={formRef} action={formAction} className="grid gap-4">
       <div className="space-y-2">
-        <Label htmlFor="xmlFile">Arquivo XML da NF-e</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="xmlFile">Arquivo XML da NF-e</Label>
+          <span
+            title="Envie o XML recebido. Ele fica guardado para auditoria e so movimenta estoque quando voce confirmar a conferencia."
+            aria-label="Ajuda"
+            className="inline-flex"
+          >
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+          </span>
+        </div>
         <Input id="xmlFile" name="xmlFile" type="file" accept=".xml,text/xml,application/xml" required />
-        <p className="text-xs text-muted-foreground">
-          O sistema valida o CNPJ destinatario, guarda o XML para auditoria e usa a unidade tributavel do XML para
-          montar uma previa de quantidade/custo vendavel.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-foreground">
-        <p className="font-medium">Nada entra no estoque automaticamente</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          O arquivo fica guardado para auditoria e a entrada so acontece quando voce confirmar na lista de XMLs.
-        </p>
       </div>
 
       <div className="flex flex-col items-start gap-3">

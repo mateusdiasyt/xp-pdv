@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { HelpCircle } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -22,7 +23,16 @@ export function FetchStockInvoiceXmlByKeyForm() {
   return (
     <form ref={formRef} action={formAction} className="grid gap-4">
       <div className="space-y-2">
-        <Label htmlFor="accessKey">Chave de acesso da NF-e</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="accessKey">Chave de acesso da NF-e</Label>
+          <span
+            title="Escaneie ou digite a chave do DANFE. O sistema baixa e guarda o XML, mas a entrada no estoque so acontece depois da conferencia."
+            aria-label="Ajuda"
+            className="inline-flex"
+          >
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+          </span>
+        </div>
         <Input
           id="accessKey"
           name="accessKey"
@@ -31,19 +41,6 @@ export function FetchStockInvoiceXmlByKeyForm() {
           placeholder="Escaneie ou digite os 44 numeros do DANFE"
           required
         />
-        <p className="text-xs text-muted-foreground">
-          O leitor de barras funciona como teclado: ao escanear o DANFE, a chave entra aqui e o sistema busca o XML na
-          Focus sem movimentar o estoque automaticamente. Se a Focus ainda tiver so o resumo da nota, esta busca
-          solicita a Ciencia da Operacao para liberar o XML completo.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-foreground">
-        <p className="font-medium">Fluxo seguro de conferencia</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Primeiro o sistema baixa e guarda o XML. Depois voce confere a previa dos itens e confirma a importacao na
-          lista de XMLs guardados.
-        </p>
       </div>
 
       <div className="flex flex-col items-start gap-3">
