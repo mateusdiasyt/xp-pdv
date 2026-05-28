@@ -393,6 +393,7 @@ export function QuickSaleForm({
         subtotalInCents,
         lines: cartItems.map((item) => ({
           productId: item.productId,
+          categoryId: item.product.category.id,
           lineTotalInCents: Math.round(item.lineTotal * 100),
         })),
       })

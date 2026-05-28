@@ -6,6 +6,7 @@ import { parseDecimalInput } from "@/lib/decimal";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   listActiveCouponsForPdv,
+  listCouponCategories,
   listCouponProducts,
   listCoupons,
   updateCouponStatus,
@@ -25,8 +26,12 @@ function parseOptionalInt(value?: string) {
 }
 
 export async function getCouponsPageData() {
-  const [coupons, products] = await Promise.all([listCoupons(), listCouponProducts()]);
-  return { coupons, products };
+  const [coupons, products, categories] = await Promise.all([
+    listCoupons(),
+    listCouponProducts(),
+    listCouponCategories(),
+  ]);
+  return { coupons, products, categories };
 }
 
 export async function getPdvCoupons() {
@@ -50,6 +55,7 @@ export async function saveCouponRecord(input: FormData, actorId?: string) {
   });
 
   const productIds = [...new Set(input.getAll("productId").map((value) => String(value)).filter(Boolean))];
+  const categoryIds = [...new Set(input.getAll("categoryId").map((value) => String(value)).filter(Boolean))];
   const coupon = await upsertCoupon({
     couponId: emptyToUndefined(parsed.couponId),
     code: parsed.code,
@@ -64,6 +70,7 @@ export async function saveCouponRecord(input: FormData, actorId?: string) {
     endsAt: parseOptionalDate(parsed.endsAt),
     status: parsed.status,
     productIds,
+    categoryIds,
   });
 
   await createAuditLog({
@@ -76,6 +83,7 @@ export async function saveCouponRecord(input: FormData, actorId?: string) {
       discountType: coupon.discountType,
       discountValue: coupon.discountValue.toString(),
       productCount: productIds.length,
+      categoryCount: categoryIds.length,
     } satisfies Prisma.JsonObject,
   });
 }

@@ -294,6 +294,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     usageLimit: coupon.usageLimit,
     usedCount: coupon.usedCount,
     productIds: coupon.products.map((product) => product.productId),
+    categoryIds: coupon.categories.map((category) => category.categoryId),
   }));
 
   const groupedSales = sales.reduce<Array<{ dateKey: string; dateLabel: string; sales: typeof sales }>>(

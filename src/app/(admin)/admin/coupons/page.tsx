@@ -25,7 +25,7 @@ function formatDiscount(coupon: {
 
 export default async function CouponsPage() {
   await requirePermission(PERMISSIONS.PDV_VIEW);
-  const { coupons, products } = await getCouponsPageData();
+  const { coupons, products, categories } = await getCouponsPageData();
 
   return (
     <div className="space-y-5">
@@ -34,7 +34,7 @@ export default async function CouponsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">PDV</p>
           <h1 className="text-3xl font-semibold tracking-[-0.01em] text-foreground">Cupons</h1>
         </div>
-        <CouponFormDialog products={products} />
+        <CouponFormDialog products={products} categories={categories} />
       </section>
 
       <div className="grid gap-3">
@@ -50,6 +50,7 @@ export default async function CouponsPage() {
             const isActive = coupon.status === RecordStatus.ACTIVE;
             const nextStatus = isActive ? RecordStatus.INACTIVE : RecordStatus.ACTIVE;
             const productCount = coupon.products.length;
+            const categoryCount = coupon.categories.length;
 
             return (
               <Card key={coupon.id} className="border-border/75 bg-card/82">
@@ -67,13 +68,19 @@ export default async function CouponsPage() {
                       <span>{formatDiscount(coupon)}</span>
                       <span>Usos: {coupon.usageLimit ? `${coupon.usedCount}/${coupon.usageLimit}` : `${coupon.usedCount}/sem limite`}</span>
                       <span>{coupon.minSubtotalAmount ? `Min. ${formatCurrency(Number(coupon.minSubtotalAmount.toString()))}` : "Sem minimo"}</span>
-                      <span>{productCount > 0 ? `${productCount} produto(s)` : "Todos os produtos"}</span>
+                      <span>
+                        {categoryCount > 0
+                          ? `${categoryCount} categoria(s)`
+                          : productCount > 0
+                            ? `${productCount} produto(s)`
+                            : "Tudo"}
+                      </span>
                       {coupon.endsAt ? <span>Ate {dateFormatter.format(coupon.endsAt)}</span> : null}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 md:justify-end">
-                    <CouponFormDialog coupon={coupon} products={products} />
+                    <CouponFormDialog coupon={coupon} products={products} categories={categories} />
                     <form action={toggleCouponStatusAction}>
                       <input type="hidden" name="couponId" value={coupon.id} />
                       <input type="hidden" name="status" value={nextStatus} />

@@ -11,10 +11,12 @@ export type PdvCouponOption = {
   usageLimit?: number | null;
   usedCount: number;
   productIds: string[];
+  categoryIds: string[];
 };
 
 export type CouponLine = {
   productId: string;
+  categoryId: string;
   lineTotalInCents: number;
 };
 
@@ -29,11 +31,12 @@ export function calculateCouponDiscountInCents(input: {
 }) {
   const { coupon, subtotalInCents, lines } = input;
   const allowedProductIds = new Set(coupon.productIds);
+  const allowedCategoryIds = new Set(coupon.categoryIds);
   const eligibleSubtotalInCents =
-    allowedProductIds.size === 0
+    allowedProductIds.size === 0 && allowedCategoryIds.size === 0
       ? subtotalInCents
       : lines
-          .filter((line) => allowedProductIds.has(line.productId))
+          .filter((line) => allowedProductIds.has(line.productId) || allowedCategoryIds.has(line.categoryId))
           .reduce((sum, line) => sum + line.lineTotalInCents, 0);
 
   if (coupon.usageLimit !== null && coupon.usageLimit !== undefined && coupon.usedCount >= coupon.usageLimit) {

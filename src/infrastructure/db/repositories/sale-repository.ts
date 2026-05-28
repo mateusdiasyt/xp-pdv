@@ -608,6 +608,7 @@ async function runCreateSaleWithStockAdjustment(
       gameplayDurationMinutes: true,
       salePrice: true,
       happyHourPrice: true,
+      categoryId: true,
       costPrice: true,
       currentStock: true,
       status: true,
@@ -632,7 +633,7 @@ async function runCreateSaleWithStockAdjustment(
     (data.gameplaySelections ?? []).map((selection) => [selection.productId, selection.stationId.trim().toLowerCase()]),
   );
 
-  const productLineTotals: Array<{ productId: string; lineTotal: Prisma.Decimal }> = [];
+  const productLineTotals: Array<{ productId: string; categoryId: string; lineTotal: Prisma.Decimal }> = [];
   const subtotalAmount = data.items.reduce((acc, item) => {
     const product = productMap.get(item.productId);
     if (!product) {
@@ -671,10 +672,11 @@ async function runCreateSaleWithStockAdjustment(
     });
 
     const lineTotal = unitPrice.times(item.quantity);
-    productLineTotals.push({
-      productId: item.productId,
-      lineTotal,
-    });
+      productLineTotals.push({
+        productId: item.productId,
+        categoryId: product.categoryId,
+        lineTotal,
+      });
 
     return acc.plus(lineTotal);
   }, new Prisma.Decimal(0));

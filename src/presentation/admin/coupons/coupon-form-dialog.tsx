@@ -1,7 +1,7 @@
 "use client";
 
 import { CouponDiscountType, RecordStatus } from "@prisma/client";
-import { BadgePercent, HelpCircle, Pencil, Plus } from "lucide-react";
+import { BadgePercent, Boxes, Globe2, HelpCircle, Package, Pencil, Plus } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,12 @@ type ProductOption = {
   };
 };
 
+type CategoryOption = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 type CouponPayload = {
   id: string;
   code: string;
@@ -37,12 +43,18 @@ type CouponPayload = {
   products: Array<{
     productId: string;
   }>;
+  categories: Array<{
+    categoryId: string;
+  }>;
 };
 
 type CouponFormDialogProps = {
   coupon?: CouponPayload;
   products: ProductOption[];
+  categories: CategoryOption[];
 };
+
+type CouponScope = "all" | "categories" | "products";
 
 function dateInputValue(value?: Date | null) {
   if (!value) {
@@ -64,10 +76,14 @@ function Help({ title }: { title: string }) {
   );
 }
 
-export function CouponFormDialog({ coupon, products }: CouponFormDialogProps) {
+export function CouponFormDialog({ coupon, products, categories }: CouponFormDialogProps) {
   const [open, setOpen] = useState(false);
   const [state, action, isPending] = useActionState(saveCouponAction, initialActionState);
   const selectedProductIds = new Set(coupon?.products.map((product) => product.productId) ?? []);
+  const selectedCategoryIds = new Set(coupon?.categories.map((category) => category.categoryId) ?? []);
+  const initialScope: CouponScope =
+    selectedCategoryIds.size > 0 ? "categories" : selectedProductIds.size > 0 ? "products" : "all";
+  const [scope, setScope] = useState<CouponScope>(initialScope);
 
   useEffect(() => {
     if (state.status === "success") {
@@ -75,6 +91,13 @@ export function CouponFormDialog({ coupon, products }: CouponFormDialogProps) {
       return () => window.clearTimeout(timeoutId);
     }
   }, [state.status]);
+
+  useEffect(() => {
+    if (open) {
+      const timeoutId = window.setTimeout(() => setScope(initialScope), 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [initialScope, open]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -161,8 +184,45 @@ export function CouponFormDialog({ coupon, products }: CouponFormDialogProps) {
 
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
-              Produtos <Help title="Sem marcar nada, o cupom vale para todos os produtos." />
+              Aplicacao <Help title="Escolha se o cupom vale para tudo, categorias ou produtos especificos." />
             </Label>
+            <div className="grid gap-2 md:grid-cols-3">
+              {[
+                { value: "all" as const, label: "Tudo", icon: Globe2 },
+                { value: "categories" as const, label: "Categorias", icon: Boxes },
+                { value: "products" as const, label: "Produtos", icon: Package },
+              ].map((option) => {
+                const Icon = option.icon;
+                const active = scope === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setScope(option.value)}
+                    className={`flex items-center gap-3 rounded-[1rem] border p-3 text-left transition-colors ${
+                      active
+                        ? "border-primary/55 bg-primary/12 text-foreground"
+                        : "border-border/70 bg-background/24 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-sm font-semibold">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {scope === "categories" ? (
+              <div className="admin-scrollbar grid max-h-52 gap-2 overflow-y-auto rounded-[1rem] border border-border/70 bg-background/24 p-2 md:grid-cols-2">
+                {categories.map((category) => (
+                  <label key={category.id} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm hover:bg-background/45">
+                    <input name="categoryId" value={category.id} type="checkbox" defaultChecked={selectedCategoryIds.has(category.id)} className="h-4 w-4 accent-primary" />
+                    <span className="truncate text-foreground">{category.name}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {scope === "products" ? (
             <div className="admin-scrollbar grid max-h-52 gap-2 overflow-y-auto rounded-[1rem] border border-border/70 bg-background/24 p-2 md:grid-cols-2">
               {products.map((product) => (
                 <label key={product.id} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm hover:bg-background/45">
@@ -174,6 +234,7 @@ export function CouponFormDialog({ coupon, products }: CouponFormDialogProps) {
                 </label>
               ))}
             </div>
+            ) : null}
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-4">

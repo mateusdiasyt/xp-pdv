@@ -91,6 +91,7 @@ type CouponOption = {
   usageLimit?: number | null;
   usedCount: number;
   productIds: string[];
+  categoryIds: string[];
 };
 
 type PdvWorkspaceProps = {

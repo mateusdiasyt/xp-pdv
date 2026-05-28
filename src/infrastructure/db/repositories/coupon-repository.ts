@@ -16,6 +16,16 @@ export async function listCoupons() {
   return prisma.coupon.findMany({
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
+      categories: {
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
       products: {
         include: {
           product: {
@@ -27,6 +37,22 @@ export async function listCoupons() {
           },
         },
       },
+    },
+  });
+}
+
+export async function listCouponCategories() {
+  return prisma.productCategory.findMany({
+    where: {
+      status: RecordStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+    orderBy: {
+      name: "asc",
     },
   });
 }
@@ -76,6 +102,11 @@ export async function listActiveCouponsForPdv() {
           productId: true,
         },
       },
+      categories: {
+        select: {
+          categoryId: true,
+        },
+      },
     },
     orderBy: {
       code: "asc",
@@ -97,8 +128,10 @@ export async function upsertCoupon(data: {
   endsAt?: Date | null;
   status: RecordStatus;
   productIds: string[];
+  categoryIds: string[];
 }) {
   const productLinks = data.productIds.map((productId) => ({ productId }));
+  const categoryLinks = data.categoryIds.map((categoryId) => ({ categoryId }));
 
   if (data.couponId) {
     return prisma.coupon.update({
@@ -118,6 +151,10 @@ export async function upsertCoupon(data: {
         products: {
           deleteMany: {},
           create: productLinks,
+        },
+        categories: {
+          deleteMany: {},
+          create: categoryLinks,
         },
       },
     });
@@ -139,6 +176,9 @@ export async function upsertCoupon(data: {
       products: {
         create: productLinks,
       },
+      categories: {
+        create: categoryLinks,
+      },
     },
   });
 }
@@ -156,7 +196,7 @@ export async function resolveCouponRedemptionInTransaction(
   tx: PrismaTx,
   code: string,
   subtotalAmount: Prisma.Decimal,
-  productLineTotals: Array<{ productId: string; lineTotal: Prisma.Decimal }>,
+  productLineTotals: Array<{ productId: string; categoryId: string; lineTotal: Prisma.Decimal }>,
 ): Promise<CouponRedemptionInput | null> {
   const normalizedCode = code.trim().toUpperCase();
   if (!normalizedCode) {
@@ -170,6 +210,11 @@ export async function resolveCouponRedemptionInTransaction(
       products: {
         select: {
           productId: true,
+        },
+      },
+      categories: {
+        select: {
+          categoryId: true,
         },
       },
     },
@@ -196,11 +241,12 @@ export async function resolveCouponRedemptionInTransaction(
   }
 
   const allowedProductIds = new Set(coupon.products.map((product) => product.productId));
+  const allowedCategoryIds = new Set(coupon.categories.map((category) => category.categoryId));
   const eligibleSubtotal =
-    allowedProductIds.size === 0
+    allowedProductIds.size === 0 && allowedCategoryIds.size === 0
       ? subtotalAmount
       : productLineTotals
-          .filter((line) => allowedProductIds.has(line.productId))
+          .filter((line) => allowedProductIds.has(line.productId) || allowedCategoryIds.has(line.categoryId))
           .reduce((sum, line) => sum.plus(line.lineTotal), new Prisma.Decimal(0));
 
   if (eligibleSubtotal.lessThanOrEqualTo(0)) {

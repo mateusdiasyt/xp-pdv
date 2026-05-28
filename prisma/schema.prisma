@@ -213,6 +213,7 @@ model ProductCategory {
 
   unit     BusinessUnit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
   products Product[]
+  couponLinks CouponCategory[]
   entryGoals DailyGoal[]       @relation("GoalEntryCategory")
   consumptionGoals DailyGoal[] @relation("GoalConsumptionCategory")
 
@@ -321,10 +322,22 @@ model Coupon {
   updatedAt         DateTime           @updatedAt
 
   products CouponProduct[]
+  categories CouponCategory[]
   sales    SaleCoupon[]
 
   @@index([status])
   @@index([startsAt, endsAt])
+}
+
+model CouponCategory {
+  couponId   String
+  categoryId String
+
+  coupon   Coupon          @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  category ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, categoryId])
+  @@index([categoryId])
 }
 
 model CouponProduct {

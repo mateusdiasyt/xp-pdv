@@ -341,6 +341,7 @@ export function CreateSaleForm({
         subtotalInCents,
         lines: optimisticItems.map((item) => ({
           productId: item.productId,
+          categoryId: item.product.category.id,
           lineTotalInCents: Math.round(item.lineTotal * 100),
         })),
       })
