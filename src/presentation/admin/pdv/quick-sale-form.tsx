@@ -313,6 +313,7 @@ export function QuickSaleForm({
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     { id: 1, method: PaymentMethod.PIX, amount: "0.00" },
   ]);
+  const [paymentAutofillEnabled, setPaymentAutofillEnabled] = useState(true);
   const [stationByProduct, setStationByProduct] = useState<Record<string, string>>({});
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
@@ -400,7 +401,9 @@ export function QuickSaleForm({
     : null;
   const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
   const discountInCents = manualDiscountInCents + couponDiscountInCents;
+  const discountExceedsSubtotal = discountInCents > subtotalInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
+  const normalizedDiscountAmount = discountAmount.trim() || "0.00";
   const paymentsTotalInCents = paymentLines.reduce(
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
     0,
@@ -425,6 +428,7 @@ export function QuickSaleForm({
   const customerNameValue = selectedCustomer?.fullName ?? customerQuery.trim();
   const canProceedToPayment = cartItems.length > 0;
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
+  const canSubmitQuickSale = cartItems.length > 0 && !discountExceedsSubtotal;
 
   useEffect(() => {
     if (cartItems.length === 0 && quickSaleStep === "payment") {
@@ -432,6 +436,32 @@ export function QuickSaleForm({
       return () => window.clearTimeout(timeoutId);
     }
   }, [cartItems.length, quickSaleStep]);
+
+  useEffect(() => {
+    if (quickSaleStep !== "payment" || !paymentAutofillEnabled || paymentLines.length !== 1) {
+      return;
+    }
+
+    const nextAmount = (totalInCents / 100).toFixed(2);
+    if (paymentLines[0]?.amount === nextAmount) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPaymentLines((currentLines) =>
+        currentLines.length === 1
+          ? [
+              {
+                ...currentLines[0],
+                amount: nextAmount,
+              },
+            ]
+          : currentLines,
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [paymentAutofillEnabled, paymentLines, quickSaleStep, totalInCents]);
 
   function addToCart(productId: string, quantityRaw: string) {
     const quantity = Number(quantityRaw);
@@ -488,6 +518,10 @@ export function QuickSaleForm({
   }
 
   function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
+    if (field === "amount") {
+      setPaymentAutofillEnabled(false);
+    }
+
     setPaymentLines((currentLines) =>
       currentLines.map((line) =>
         line.id === id
@@ -503,6 +537,7 @@ export function QuickSaleForm({
   function addPaymentLine() {
     const nextSeed = paymentLineSeed + 1;
     setPaymentLineSeed(nextSeed);
+    setPaymentAutofillEnabled(false);
     setPaymentLines((currentLines) => [
       ...currentLines,
       {
@@ -521,6 +556,7 @@ export function QuickSaleForm({
   }
 
   function removePaymentLine(id: number) {
+    setPaymentAutofillEnabled(false);
     setPaymentLines((currentLines) => {
       if (currentLines.length === 1) {
         return currentLines;
@@ -555,7 +591,24 @@ export function QuickSaleForm({
         },
       ];
     });
+    setPaymentAutofillEnabled(true);
     setQuickSaleStep("payment");
+  }
+
+  function syncSinglePaymentWithTotal() {
+    setPaymentAutofillEnabled(true);
+    setPaymentLines((currentLines) => {
+      if (currentLines.length !== 1) {
+        return currentLines;
+      }
+
+      return [
+        {
+          ...currentLines[0],
+          amount: (totalInCents / 100).toFixed(2),
+        },
+      ];
+    });
   }
 
   return (
@@ -616,7 +669,7 @@ export function QuickSaleForm({
         <form id="quick-sale-form" action={saleFormAction} className="space-y-4">
           <input type="hidden" name="customerName" value={customerNameValue} />
           <input type="hidden" name="cashSessionId" value={selectedCashSessionId} />
-          <input type="hidden" name="discountAmount" value={discountAmount} />
+          <input type="hidden" name="discountAmount" value={normalizedDiscountAmount} />
           <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
           <fieldset className="hidden" aria-hidden="true">
             {cartItems.map((item) => (
@@ -707,7 +760,7 @@ export function QuickSaleForm({
                   </div>
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_168px_220px]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_168px]">
                   <div className="space-y-2">
                     <Label htmlFor="quick-sale-session">Caixa</Label>
                     <select
@@ -725,37 +778,6 @@ export function QuickSaleForm({
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="quick-sale-discount">Desconto (R$)</Label>
-                    <Input
-                      id="quick-sale-discount"
-                      value={discountAmount}
-                      onChange={(event) => setDiscountAmount(event.target.value)}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="quick-sale-coupon">Cupom</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="quick-sale-coupon"
-                        value={couponCode}
-                        onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                        placeholder="CODIGO"
-                      />
-                      <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
-                        <TicketPercent className="h-4 w-4" />
-                        <span className="sr-only">Aplicar cupom</span>
-                      </Button>
-                    </div>
-                    {appliedCouponCode ? (
-                      <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
-                    ) : couponCode ? (
-                      <p className="text-xs text-muted-foreground">Nao aplicado</p>
-                    ) : null}
-                  </div>
                 </div>
               </section>
 
@@ -1140,6 +1162,60 @@ export function QuickSaleForm({
               Fechamento rapido
             </p>
 
+            <div className="grid gap-3 rounded-[1.35rem] border border-primary/20 bg-primary/8 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(180px,220px)_180px] lg:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="quick-sale-payment-discount">Desconto da venda (R$)</Label>
+                <Input
+                  id="quick-sale-payment-discount"
+                  value={discountAmount}
+                  onChange={(event) => setDiscountAmount(event.target.value)}
+                  onBlur={() => {
+                    if (!discountAmount.trim()) {
+                      setDiscountAmount("0.00");
+                    }
+                  }}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-muted-foreground">
+                  O total e os pagamentos sao recalculados na hora para evitar divergencia no caixa.
+                </p>
+                {discountExceedsSubtotal ? (
+                  <p className="text-xs font-medium text-destructive">
+                    Desconto maior que o subtotal. Ajuste o valor para finalizar.
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quick-sale-payment-coupon">Cupom</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="quick-sale-payment-coupon"
+                    value={couponCode}
+                    onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                    placeholder="CODIGO"
+                  />
+                  <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
+                    <TicketPercent className="h-4 w-4" />
+                    <span className="sr-only">Aplicar cupom</span>
+                  </Button>
+                </div>
+                {appliedCouponCode ? (
+                  <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
+                ) : couponCode ? (
+                  <p className="text-xs text-muted-foreground">Nao aplicado</p>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={paymentLines.length !== 1}
+                onClick={syncSinglePaymentWithTotal}
+              >
+                Ajustar pagamento
+              </Button>
+            </div>
+
             <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -1377,11 +1453,15 @@ export function QuickSaleForm({
             <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
               <AlertDialogTrigger
                 render={
-                  <Button type="button" disabled={cartItems.length === 0} className="gap-2" />
+                  <Button type="button" disabled={!canSubmitQuickSale} className="gap-2" />
                 }
               >
                 <Check className="h-4 w-4" />
-                {cartItems.length === 0 ? "Selecione itens para fechar" : "Revisar e finalizar venda"}
+                {cartItems.length === 0
+                  ? "Selecione itens para fechar"
+                  : discountExceedsSubtotal
+                    ? "Ajuste o desconto"
+                    : "Revisar e finalizar venda"}
               </AlertDialogTrigger>
               <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
                 <AlertDialogHeader className="place-items-start text-left">
@@ -1399,6 +1479,10 @@ export function QuickSaleForm({
                   <div className="flex items-center justify-between gap-3 text-muted-foreground">
                     <span>Itens no pedido</span>
                     <span className="font-semibold text-foreground">{cartItems.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                    <span>Desconto</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-muted-foreground">
                     <span>Pagamentos</span>

@@ -141,6 +141,8 @@ type CategoryFilterOption = {
   slug: string;
 };
 
+type ComandaPanel = "items" | "checkout" | "danger";
+
 const paymentLabels: Record<PaymentMethod, string> = {
   CASH: "Dinheiro",
   PIX: "Pix",
@@ -311,6 +313,7 @@ export function CreateSaleForm({
   const [isAddingItem, startAddTransition] = useTransition();
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [discountAmount, setDiscountAmount] = useState("0.00");
   const [couponCode, setCouponCode] = useState("");
@@ -682,8 +685,37 @@ export function CreateSaleForm({
 
       <ActionFeedback state={customerState} />
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,368px)]">
-        <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          { id: "items" as const, label: "Itens", icon: Package2 },
+          { id: "checkout" as const, label: "Fechamento", icon: Wallet },
+          { id: "danger" as const, label: "Cancelar", icon: Trash2 },
+        ]
+          .filter((panel) => canManage || panel.id !== "danger")
+          .map((panel) => {
+            const Icon = panel.icon;
+            const active = activePanel === panel.id;
+
+            return (
+              <button
+                key={panel.id}
+                type="button"
+                onClick={() => setActivePanel(panel.id)}
+                className={`flex h-12 items-center justify-center gap-2 rounded-[1rem] border text-sm font-semibold transition-colors ${
+                  active
+                    ? "border-primary/55 bg-primary/12 text-foreground"
+                    : "border-border/70 bg-background/24 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {panel.label}
+              </button>
+            );
+          })}
+      </div>
+
+      <div className={activePanel === "items" ? "grid gap-4 2xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,368px)]" : "grid gap-4"}>
+        <div className={activePanel === "items" ? "space-y-4" : "hidden"}>
           <section className="admin-form-section space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -822,8 +854,8 @@ export function CreateSaleForm({
           </section>
         </div>
 
-        <div className="space-y-4">
-          <section className="admin-form-section space-y-4">
+        <div className={activePanel === "items" || activePanel === "checkout" || activePanel === "danger" ? "space-y-4" : "hidden"}>
+          <section className={activePanel === "items" ? "admin-form-section space-y-4" : "hidden"}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-foreground">Itens da comanda</p>
               <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-xs font-medium text-foreground">
@@ -897,7 +929,7 @@ export function CreateSaleForm({
             </div>
           </section>
 
-          <section className="admin-form-section space-y-4">
+          <section className={activePanel === "checkout" ? "admin-form-section space-y-4" : "hidden"}>
             <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Wallet className="h-4 w-4 text-primary" />
               Fechamento
@@ -1211,7 +1243,7 @@ export function CreateSaleForm({
             )}
           </section>
 
-          {canManage ? (
+          {canManage && activePanel === "danger" ? (
             <section className="space-y-3 rounded-[1.35rem] border border-destructive/25 bg-destructive/6 p-4">
               <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Trash2 className="h-4 w-4 text-destructive" />
