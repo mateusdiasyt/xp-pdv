@@ -1,16 +1,22 @@
 import { Prisma, SaleStatus } from "@prisma/client";
 
+import { getBrandCustomizationSnapshot } from "@/application/customization/brand-customization-service";
+import {
+  buildOperationalChartBuckets,
+  formatOperationalDateLabel,
+  getDaysInOperationalMonth,
+  getOperationalDayRange,
+  getOperationalMonthRange,
+  getPreviousOperationalDayRange,
+  toGoalDate,
+} from "@/domain/business-hours/operational-day";
 import { countCategories } from "@/infrastructure/db/repositories/category-repository";
-import { getDailyGoalProgress, getMonthlyGoalPlanByDate } from "@/infrastructure/db/repositories/goal-repository";
+import { getMonthlyGoalPlanByDate } from "@/infrastructure/db/repositories/goal-repository";
 import { countProducts, listLowStockProducts } from "@/infrastructure/db/repositories/product-repository";
 import { prisma } from "@/lib/prisma";
 import { countStockMovements } from "@/infrastructure/db/repositories/stock-repository";
 import { countSuppliers } from "@/infrastructure/db/repositories/supplier-repository";
 import { countUsers } from "@/infrastructure/db/repositories/user-repository";
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
 
 function toNumber(value: Prisma.Decimal | null | undefined) {
   if (!value) {
@@ -40,22 +46,15 @@ function roundCurrency(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function getDaysInMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-}
-
 export async function getDashboardSummary() {
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const chartStart = new Date(todayStart);
-  chartStart.setDate(chartStart.getDate() - 13);
+  const { customization } = await getBrandCustomizationSnapshot();
+  const operationalDay = getOperationalDayRange(now, customization);
+  const previousOperationalDay = getPreviousOperationalDayRange(operationalDay, customization);
+  const operationalMonth = getOperationalMonthRange(operationalDay, customization);
+  const chartBuckets = buildOperationalChartBuckets(operationalDay, 14, customization);
+  const firstChartBucket = chartBuckets[0] ?? operationalDay;
+  const goalDate = toGoalDate(operationalDay);
 
   const [
     users,
@@ -84,8 +83,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: todayStart,
-          lt: tomorrowStart,
+          gte: operationalDay.start,
+          lt: operationalDay.end,
         },
       },
       _sum: {
@@ -96,8 +95,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: yesterdayStart,
-          lt: todayStart,
+          gte: previousOperationalDay.start,
+          lt: previousOperationalDay.end,
         },
       },
       _sum: {
@@ -108,8 +107,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: todayStart,
-          lt: tomorrowStart,
+          gte: operationalDay.start,
+          lt: operationalDay.end,
         },
       },
     }),
@@ -117,8 +116,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: yesterdayStart,
-          lt: todayStart,
+          gte: previousOperationalDay.start,
+          lt: previousOperationalDay.end,
         },
       },
     }),
@@ -126,8 +125,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: monthStart,
-          lt: nextMonthStart,
+          gte: operationalMonth.start,
+          lt: operationalMonth.end,
         },
       },
       _sum: {
@@ -138,8 +137,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: prevMonthStart,
-          lt: monthStart,
+          gte: operationalMonth.previousStart,
+          lt: operationalMonth.start,
         },
       },
       _sum: {
@@ -150,8 +149,8 @@ export async function getDashboardSummary() {
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
-          gte: chartStart,
-          lt: tomorrowStart,
+          gte: firstChartBucket.start,
+          lt: operationalDay.end,
         },
       },
       select: {
@@ -168,8 +167,8 @@ export async function getDashboardSummary() {
         sale: {
           status: SaleStatus.COMPLETED,
           createdAt: {
-            gte: monthStart,
-            lt: nextMonthStart,
+            gte: operationalMonth.start,
+            lt: operationalMonth.end,
           },
         },
       },
@@ -184,7 +183,7 @@ export async function getDashboardSummary() {
       },
       take: 6,
     }),
-    getMonthlyGoalPlanByDate(now),
+    getMonthlyGoalPlanByDate(goalDate),
   ]);
 
   const todayRevenue = toNumber(todayRevenueAggregate._sum.totalAmount);
@@ -193,15 +192,18 @@ export async function getDashboardSummary() {
   const previousMonthRevenue = toNumber(previousMonthRevenueAggregate._sum.totalAmount);
 
   const chartMap = new Map<string, { revenue: number; orders: number }>();
-  for (let offset = 13; offset >= 0; offset -= 1) {
-    const date = new Date(todayStart);
-    date.setDate(todayStart.getDate() - offset);
-    const key = date.toISOString().slice(0, 10);
-    chartMap.set(key, { revenue: 0, orders: 0 });
+  for (const bucket of chartBuckets) {
+    chartMap.set(bucket.businessDateKey, { revenue: 0, orders: 0 });
   }
 
   for (const sale of recentSales) {
-    const key = startOfDay(sale.createdAt).toISOString().slice(0, 10);
+    const bucket = chartBuckets.find((item) => sale.createdAt >= item.start && sale.createdAt < item.end);
+
+    if (!bucket) {
+      continue;
+    }
+
+    const key = bucket.businessDateKey;
     const item = chartMap.get(key);
     if (!item) {
       continue;
@@ -213,10 +215,7 @@ export async function getDashboardSummary() {
 
   const chart = Array.from(chartMap.entries()).map(([date, values]) => ({
     date,
-    label: new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-    }),
+    label: formatOperationalDateLabel(date),
     revenue: Number(values.revenue.toFixed(2)),
     orders: values.orders,
   }));
@@ -250,23 +249,19 @@ export async function getDashboardSummary() {
     };
   });
 
-  const todayGoalProgress = await getDailyGoalProgress({
-      goalDate: now,
-    });
-
-  const totalDaysInCurrentMonth = getDaysInMonth(now);
-  const elapsedDaysInCurrentMonth = Math.min(now.getUTCDate(), totalDaysInCurrentMonth);
+  const totalDaysInCurrentMonth = getDaysInOperationalMonth(operationalDay);
+  const elapsedDaysInCurrentMonth = Math.min(operationalDay.businessDate.day, totalDaysInCurrentMonth);
 
   const goal = monthlyGoalPlan
     ? {
         monthStart: monthlyGoalPlan.monthStart,
         revenueTarget: Number(monthlyGoalPlan.dailyRevenueTarget),
-        revenueActual: todayGoalProgress.revenueActual,
+        revenueActual: todayRevenue,
         revenuePercent: percentOfTarget(
-          todayGoalProgress.revenueActual,
+          todayRevenue,
           Number(monthlyGoalPlan.dailyRevenueTarget),
         ),
-        dailyBalance: roundCurrency(todayGoalProgress.revenueActual - Number(monthlyGoalPlan.dailyRevenueTarget)),
+        dailyBalance: roundCurrency(todayRevenue - Number(monthlyGoalPlan.dailyRevenueTarget)),
         monthRevenueActual: monthRevenue,
         monthExpectedToDate: roundCurrency(Number(monthlyGoalPlan.dailyRevenueTarget) * elapsedDaysInCurrentMonth),
         monthBalanceToDate: roundCurrency(
@@ -295,6 +290,12 @@ export async function getDashboardSummary() {
     salesGrowthPercent: growthPercent(todaySalesCount, yesterdaySalesCount),
     monthRevenue,
     monthGrowthPercent: growthPercent(monthRevenue, previousMonthRevenue),
+    operationalDay: {
+      businessDate: operationalDay.businessDateKey,
+      startsAt: operationalDay.startsAt,
+      endsAt: operationalDay.endsAt,
+      timezone: operationalDay.timezone,
+    },
     chart,
     topProducts,
     goal,

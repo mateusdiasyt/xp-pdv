@@ -26,6 +26,9 @@ export async function ensureBrandCustomizationTable() {
       "foregroundColor" TEXT NOT NULL DEFAULT '#f4efe4',
       "logoDataUrl" TEXT,
       "faviconDataUrl" TEXT,
+      "businessTimezone" TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+      "businessDayStartsAt" TEXT NOT NULL DEFAULT '19:00',
+      "businessDayEndsAt" TEXT NOT NULL DEFAULT '01:00',
       "updatedById" TEXT,
       "updatedByName" TEXT,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -37,6 +40,13 @@ export async function ensureBrandCustomizationTable() {
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "BrandCustomization"
     ADD COLUMN IF NOT EXISTS "browserTitle" TEXT NOT NULL DEFAULT 'PDV - XP Arcade e Bar';
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "BrandCustomization"
+    ADD COLUMN IF NOT EXISTS "businessTimezone" TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+    ADD COLUMN IF NOT EXISTS "businessDayStartsAt" TEXT NOT NULL DEFAULT '19:00',
+    ADD COLUMN IF NOT EXISTS "businessDayEndsAt" TEXT NOT NULL DEFAULT '01:00';
   `);
 
   await prisma.$executeRawUnsafe(`
@@ -77,6 +87,9 @@ export async function upsertBrandCustomization(data: {
   foregroundColor: string;
   logoDataUrl?: string | null;
   faviconDataUrl?: string | null;
+  businessTimezone: string;
+  businessDayStartsAt: string;
+  businessDayEndsAt: string;
   updatedById?: string;
   updatedByName?: string;
 }) {

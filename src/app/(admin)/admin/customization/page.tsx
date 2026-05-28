@@ -43,6 +43,9 @@ export default async function CustomizationPage() {
                 foregroundColor: customization.foregroundColor,
                 logoDataUrl: customization.logoDataUrl,
                 faviconDataUrl: customization.faviconDataUrl,
+                businessTimezone: customization.businessTimezone,
+                businessDayStartsAt: customization.businessDayStartsAt,
+                businessDayEndsAt: customization.businessDayEndsAt,
               }}
             />
           )}

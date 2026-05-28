@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Palette, X } from "lucide-react";
+import { Clock, ImageIcon, Palette, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useState } from "react";
 
@@ -28,6 +28,9 @@ type UpdateBrandCustomizationFormProps = {
     foregroundColor: string;
     logoDataUrl?: string;
     faviconDataUrl?: string;
+    businessTimezone: string;
+    businessDayStartsAt: string;
+    businessDayEndsAt: string;
   };
 };
 
@@ -72,6 +75,9 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
   const [accentColor, setAccentColor] = useState(initialValues.accentColor);
   const [backgroundColor, setBackgroundColor] = useState(initialValues.backgroundColor);
   const [foregroundColor, setForegroundColor] = useState(initialValues.foregroundColor);
+  const [businessTimezone, setBusinessTimezone] = useState(initialValues.businessTimezone);
+  const [businessDayStartsAt, setBusinessDayStartsAt] = useState(initialValues.businessDayStartsAt);
+  const [businessDayEndsAt, setBusinessDayEndsAt] = useState(initialValues.businessDayEndsAt);
 
   const [logoDataUrl, setLogoDataUrl] = useState(initialValues.logoDataUrl ?? "");
   const [faviconDataUrl, setFaviconDataUrl] = useState(initialValues.faviconDataUrl ?? "");
@@ -115,6 +121,9 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
     setAccentColor(defaultBrandColors.accentColor);
     setBackgroundColor(defaultBrandColors.backgroundColor);
     setForegroundColor(defaultBrandColors.foregroundColor);
+    setBusinessTimezone("America/Sao_Paulo");
+    setBusinessDayStartsAt("19:00");
+    setBusinessDayEndsAt("01:00");
     setLogoDataUrl("");
     setFaviconDataUrl("");
     setProcessingError(null);
@@ -167,6 +176,47 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
           <div className="flex items-center gap-2">
             <Input id="foregroundColor" name="foregroundColor" type="color" value={foregroundColor} onChange={(event) => setForegroundColor(event.target.value)} className="h-10 w-14 p-1" />
             <Input value={foregroundColor.toUpperCase()} onChange={(event) => setForegroundColor(event.target.value)} className="uppercase" />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/75 bg-background/35 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Clock className="h-4 w-4 text-primary" />
+          Horario operacional
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="businessDayStartsAt">Abertura</Label>
+            <Input
+              id="businessDayStartsAt"
+              name="businessDayStartsAt"
+              type="time"
+              value={businessDayStartsAt}
+              onChange={(event) => setBusinessDayStartsAt(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="businessDayEndsAt">Fechamento</Label>
+            <Input
+              id="businessDayEndsAt"
+              name="businessDayEndsAt"
+              type="time"
+              value={businessDayEndsAt}
+              onChange={(event) => setBusinessDayEndsAt(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="businessTimezone">Fuso</Label>
+            <select
+              id="businessTimezone"
+              name="businessTimezone"
+              value={businessTimezone}
+              onChange={(event) => setBusinessTimezone(event.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="America/Sao_Paulo">Brasilia/Sao Paulo</option>
+            </select>
           </div>
         </div>
       </section>

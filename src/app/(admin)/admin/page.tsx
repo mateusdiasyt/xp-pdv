@@ -42,27 +42,28 @@ export default async function AdminDashboardPage() {
   await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
   const summary = await getDashboardSummary();
   const averageTicket = summary.todaySalesCount > 0 ? summary.todayRevenue / summary.todaySalesCount : 0;
+  const operationalHelper = `${summary.operationalDay.startsAt} as ${summary.operationalDay.endsAt} - Sao Paulo`;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Controle operacional"
         title="Painel"
-        description="Visao diaria de faturamento, volume de vendas, produtos lideres e progresso da meta geral do dia."
+        description={`Turno atual: ${operationalHelper}. Vendas apos meia-noite entram no mesmo dia operacional.`}
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Faturamento hoje"
+          title="Faturamento do turno"
           value={formatCurrency(summary.todayRevenue)}
-          helper={`${formatGrowth(summary.revenueGrowthPercent)} vs ontem`}
+          helper={`${formatGrowth(summary.revenueGrowthPercent)} vs turno anterior`}
         />
         <MetricCard
-          title="Vendas hoje"
+          title="Vendas do turno"
           value={summary.todaySalesCount}
-          helper={`${formatGrowth(summary.salesGrowthPercent)} vs ontem`}
+          helper={`${formatGrowth(summary.salesGrowthPercent)} vs turno anterior`}
         />
-        <MetricCard title="Ticket medio" value={formatCurrency(averageTicket)} helper="Media por venda no dia atual" />
+        <MetricCard title="Ticket medio" value={formatCurrency(averageTicket)} helper="Media por venda no turno atual" />
         <MetricCard
           title="Faturamento do mes"
           value={formatCurrency(summary.monthRevenue)}
