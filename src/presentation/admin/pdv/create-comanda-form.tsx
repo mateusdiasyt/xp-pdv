@@ -38,6 +38,7 @@ export function CreateComandaForm({
   const router = useRouter();
   const [state, formAction] = useActionState(createComandaAction, initialActionState);
   const [isWalkIn, setIsWalkIn] = useState(customers.length === 0);
+  const [walkInName, setWalkInName] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
@@ -95,6 +96,8 @@ export function CreateComandaForm({
       setSelectedCustomerId("");
       setCustomerQuery("");
       setIsCustomerSearchOpen(false);
+    } else {
+      setWalkInName("");
     }
   }
 
@@ -193,6 +196,22 @@ export function CreateComandaForm({
           </p>
         ) : null}
       </div>
+
+      {isWalkIn ? (
+        <div className="space-y-2 md:col-span-3">
+          <Label htmlFor="walkInName">Nome da comanda</Label>
+          <Input
+            id="walkInName"
+            name="customerName"
+            value={walkInName}
+            onChange={(event) => setWalkInName(event.target.value)}
+            placeholder="Ex.: Mesa 4, Joao, Aniversario"
+            maxLength={120}
+          />
+        </div>
+      ) : (
+        <input type="hidden" name="customerName" value="" />
+      )}
 
       <label className="inline-flex items-center gap-2 text-sm text-foreground md:col-span-3">
         <input

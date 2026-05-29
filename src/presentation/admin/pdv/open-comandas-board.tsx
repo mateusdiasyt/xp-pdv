@@ -85,6 +85,8 @@ export function OpenComandasBoard({
             <button
               key={comanda.id}
               type="button"
+              title={comanda.customerName}
+              aria-label={`Comanda ${comanda.number}: ${comanda.customerName}`}
               aria-pressed={isSelected}
               onClick={() => onSelectComanda(comanda.id)}
               className={cn(
@@ -104,6 +106,9 @@ export function OpenComandasBoard({
               />
 
               <div className="relative flex h-full flex-col">
+                <div className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-max max-w-48 -translate-x-1/2 -translate-y-[calc(100%+0.5rem)] rounded-xl border border-border/75 bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl group-hover:block">
+                  <span className="block truncate">{comanda.customerName}</span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span
                     className={cn(

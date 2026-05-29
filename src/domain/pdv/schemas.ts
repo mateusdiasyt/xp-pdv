@@ -57,6 +57,7 @@ export const createComandaSchema = z.object({
     },
     z.union([z.literal(""), z.string().cuid("Cliente selecionado invalido.")]),
   ),
+  customerName: z.string().trim().max(120, "Nome da comanda muito longo").optional().or(z.literal("")),
   isWalkIn: z.preprocess(
     (value) => value === true || value === "true" || value === "on" || value === "1",
     z.boolean(),
@@ -96,6 +97,7 @@ export const updateComandaCustomerSchema = z.object({
     },
     z.union([z.literal(""), z.string().cuid("Cliente selecionado invalido.")]),
   ),
+  customerName: z.string().trim().max(120, "Nome da comanda muito longo").optional().or(z.literal("")),
 });
 
 export const closeComandaSchema = z.object({

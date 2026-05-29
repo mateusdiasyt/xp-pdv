@@ -474,6 +474,7 @@ export async function createComandaRecord(input: FormData, actorId: string) {
   const parsed = createComandaSchema.parse({
     number: input.get("number"),
     customerId: input.get("customerId"),
+    customerName: input.get("customerName") ?? "",
     isWalkIn: input.get("isWalkIn"),
   });
 
@@ -486,6 +487,7 @@ export async function createComandaRecord(input: FormData, actorId: string) {
   const created = await createComanda({
     number: parsed.number,
     customerId,
+    customerName: parsed.customerName || undefined,
     isWalkIn: parsed.isWalkIn || !customerId,
     openedById: actorId,
   });
@@ -499,6 +501,7 @@ export async function createComandaRecord(input: FormData, actorId: string) {
       number: created.number,
       isWalkIn: created.isWalkIn,
       customerId: created.customerId,
+      customerName: created.customerNameSnapshot,
     },
   });
 }
@@ -568,11 +571,13 @@ export async function updateComandaCustomerRecord(input: FormData, actorId: stri
   const parsed = updateComandaCustomerSchema.parse({
     comandaId: input.get("comandaId"),
     customerId: input.get("customerId"),
+    customerName: input.get("customerName") ?? "",
   });
 
   const updated = await updateComandaCustomer({
     comandaId: parsed.comandaId,
     customerId: emptyToUndefined(parsed.customerId),
+    customerName: parsed.customerName || undefined,
   });
 
   await createAuditLog({
@@ -582,6 +587,7 @@ export async function updateComandaCustomerRecord(input: FormData, actorId: stri
     entityId: parsed.comandaId,
     metadata: {
       customerId: updated.customerId,
+      customerName: updated.customerNameSnapshot,
       isWalkIn: updated.isWalkIn,
     },
   });

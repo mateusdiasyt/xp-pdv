@@ -342,6 +342,7 @@ export function CreateSaleForm({
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
   const [customerQuery, setCustomerQuery] = useState(selectedCustomerInputValue);
+  const [walkInName, setWalkInName] = useState(selectedComanda.customerId ? "" : selectedComanda.customerName);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const customerFormRef = useRef<HTMLFormElement>(null);
   const customerIdInputRef = useRef<HTMLInputElement>(null);
@@ -651,6 +652,22 @@ export function CreateSaleForm({
 
     customerIdInputRef.current.value = customerId ?? "";
     setCustomerQuery(customerId ? label : "");
+    if (customerId) {
+      setWalkInName("");
+    } else {
+      setWalkInName(label === "Comanda avulsa" ? "" : label);
+    }
+    setIsCustomerSearchOpen(false);
+    customerFormRef.current.requestSubmit();
+  }
+
+  function submitWalkInName() {
+    if (!customerIdInputRef.current || !customerFormRef.current) {
+      return;
+    }
+
+    customerIdInputRef.current.value = "";
+    setCustomerQuery("");
     setIsCustomerSearchOpen(false);
     customerFormRef.current.requestSubmit();
   }
@@ -677,11 +694,12 @@ export function CreateSaleForm({
 
         <div className="flex w-full items-start justify-end gap-2 sm:w-auto">
           {canManage ? (
-            <div className="relative w-full max-w-md">
+            <div className="relative w-full max-w-xl">
               <form ref={customerFormRef} action={customerFormAction}>
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
                 <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
                 <input ref={customerIdInputRef} type="hidden" name="customerId" defaultValue={selectedComanda.customerId ?? ""} />
+                <input type="hidden" name="customerName" value={selectedComanda.customerId ? "" : walkInName} />
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
                   <Input
@@ -707,6 +725,33 @@ export function CreateSaleForm({
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                   ) : null}
                 </div>
+                {!selectedComanda.customerId ? (
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      value={walkInName}
+                      onChange={(event) => setWalkInName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          submitWalkInName();
+                        }
+                      }}
+                      placeholder="Nome da comanda"
+                      className="h-9 rounded-full border-border/70 bg-background/68 text-sm"
+                      maxLength={120}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0 rounded-full"
+                      onClick={submitWalkInName}
+                      disabled={isUpdatingCustomer}
+                    >
+                      Renomear
+                    </Button>
+                  </div>
+                ) : null}
               </form>
 
               {isCustomerSearchOpen ? (

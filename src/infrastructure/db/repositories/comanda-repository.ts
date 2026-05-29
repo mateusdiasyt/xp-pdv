@@ -212,6 +212,7 @@ export async function listOpenComandas() {
 export async function createComanda(data: {
   number: number;
   customerId?: string;
+  customerName?: string;
   isWalkIn: boolean;
   openedById: string;
 }) {
@@ -252,6 +253,8 @@ export async function createComanda(data: {
       }
 
       customerNameSnapshot = customer.fullName;
+    } else if (data.customerName?.trim()) {
+      customerNameSnapshot = data.customerName.trim();
     }
 
     return tx.comanda.create({
@@ -447,7 +450,7 @@ export async function removeItemFromComanda(data: { comandaId: string; productId
   });
 }
 
-export async function updateComandaCustomer(data: { comandaId: string; customerId?: string }) {
+export async function updateComandaCustomer(data: { comandaId: string; customerId?: string; customerName?: string }) {
   return prisma.$transaction(async (tx) => {
     const comanda = await tx.comanda.findUnique({
       where: {
@@ -488,6 +491,8 @@ export async function updateComandaCustomer(data: { comandaId: string; customerI
 
       customerNameSnapshot = customer.fullName;
       isWalkIn = false;
+    } else if (data.customerName?.trim()) {
+      customerNameSnapshot = data.customerName.trim();
     }
 
     return tx.comanda.update({
