@@ -149,7 +149,12 @@ export function ManualServiceControlForm({
 
   useEffect(() => {
     if (releaseState.status === "success" || extendState.status === "success" || paidState.status === "success") {
-      router.refresh();
+      const timeout = window.setTimeout(() => {
+        setOpen(false);
+        router.refresh();
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
     }
   }, [extendState.status, paidState.status, releaseState.status, router]);
 
