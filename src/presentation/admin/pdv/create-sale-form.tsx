@@ -324,6 +324,7 @@ export function CreateSaleForm({
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const customerFormRef = useRef<HTMLFormElement>(null);
   const customerIdInputRef = useRef<HTMLInputElement>(null);
+  const handledCancelSuccessRef = useRef(false);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     {
       id: 1,
@@ -404,10 +405,28 @@ export function CreateSaleForm({
   }, [customerState.status, removeItemState.status, router, updateItemState.status]);
 
   useEffect(() => {
-    if (cancelState.status === "success") {
-      onClose();
-      router.refresh();
+    if (cancelState.status !== "success") {
+      handledCancelSuccessRef.current = false;
+      return;
     }
+
+    if (handledCancelSuccessRef.current) {
+      return;
+    }
+
+    handledCancelSuccessRef.current = true;
+
+    const closeTimeout = window.setTimeout(() => {
+      onClose();
+    }, 0);
+    const refreshTimeout = window.setTimeout(() => {
+      router.refresh();
+    }, 220);
+
+    return () => {
+      window.clearTimeout(closeTimeout);
+      window.clearTimeout(refreshTimeout);
+    };
   }, [cancelState.status, onClose, router]);
 
   const normalizedSearch = deferredProductSearch.trim().toLowerCase();

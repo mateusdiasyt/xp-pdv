@@ -1489,7 +1489,6 @@ export function QuickSaleForm({
                     type="submit"
                     form="quick-sale-form"
                     className="gap-2"
-                    onClick={() => setIsFinalizeDialogOpen(false)}
                   >
                     <Check className="h-4 w-4" />
                     Confirmar e gerar ticket

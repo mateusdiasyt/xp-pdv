@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Search } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
@@ -41,12 +41,31 @@ export function CreateComandaForm({
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
+  const handledSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (state.status === "success") {
-      onSuccess?.();
-      router.refresh();
+    if (state.status !== "success") {
+      handledSuccessRef.current = false;
+      return;
     }
+
+    if (handledSuccessRef.current) {
+      return;
+    }
+
+    handledSuccessRef.current = true;
+
+    const closeTimeout = window.setTimeout(() => {
+      onSuccess?.();
+    }, 0);
+    const refreshTimeout = window.setTimeout(() => {
+      router.refresh();
+    }, 220);
+
+    return () => {
+      window.clearTimeout(closeTimeout);
+      window.clearTimeout(refreshTimeout);
+    };
   }, [onSuccess, router, state.status]);
 
   const filteredCustomers = useMemo(() => {
