@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { PaymentMethod, ProductKind } from "@prisma/client";
+import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
 import {
   Beef,
   Candy,
@@ -17,7 +17,6 @@ import {
   Receipt,
   Sandwich,
   Search,
-  TicketPercent,
   Trash2,
   Tv,
   Wallet,
@@ -46,7 +45,6 @@ import { initialActionState } from "@/presentation/admin/common/action-state";
 import { closeQuickSaleAction } from "@/presentation/admin/pdv/actions";
 import {
   calculateCouponDiscountInCents,
-  normalizeCouponCode,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
 
@@ -128,6 +126,14 @@ const paymentLabels: Record<PaymentMethod, string> = {
   CREDIT_CARD: "Cartao de credito",
   DEBIT_CARD: "Cartao de debito",
 };
+
+function formatCouponValue(coupon: PdvCouponOption) {
+  if (coupon.discountType === CouponDiscountType.PERCENTAGE) {
+    return `${Number(coupon.discountValue.toFixed(2))}%`;
+  }
+
+  return formatCurrency(coupon.discountValue);
+}
 
 function isCardPayment(method: PaymentMethod) {
   return method === PaymentMethod.CREDIT_CARD || method === PaymentMethod.DEBIT_CARD;
@@ -306,7 +312,6 @@ export function QuickSaleForm({
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
   const [discountAmount, setDiscountAmount] = useState("0.00");
-  const [couponCode, setCouponCode] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
   const [selectedCashSessionId, setSelectedCashSessionId] = useState(openSessions[0]?.id ?? "");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
@@ -548,11 +553,8 @@ export function QuickSaleForm({
     ]);
   }
 
-  function applyCoupon() {
-    const normalizedCode = normalizeCouponCode(couponCode);
-    const coupon = coupons.find((item) => item.code === normalizedCode);
-    setAppliedCouponCode(coupon ? coupon.code : "");
-    setCouponCode(normalizedCode);
+  function selectCoupon(code: string) {
+    setAppliedCouponCode(code);
   }
 
   function removePaymentLine(id: number) {
@@ -1040,26 +1042,22 @@ export function QuickSaleForm({
             </aside>
             </div>
           ) : (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
+            <div className="grid gap-4 animate-in fade-in slide-in-from-right-2 duration-200 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.65fr)]">
               <section className="admin-form-section space-y-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Conferencia do pedido</p>
-                  <p className="text-xs text-muted-foreground">
-                    Revise os itens, estacao de gameplay e total antes de finalizar o pagamento.
-                  </p>
+                  <p className="text-sm font-semibold text-foreground">Pedido</p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={() => setQuickSaleStep("items")}>
                   Voltar para produtos
                 </Button>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="space-y-2.5">
+              <div className="grid gap-3 md:grid-cols-2">
                   {cartItems.map((item) => (
                     <div
                       key={`quick-checkout-item-${item.productId}`}
-                      className="rounded-[1.25rem] border border-border/75 bg-background/30 p-3"
+                      className="rounded-[1.15rem] border border-border/75 bg-background/30 p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1128,9 +1126,11 @@ export function QuickSaleForm({
                       </div>
                     </div>
                   ))}
-                </div>
+              </div>
+              </section>
 
-                <div className="rounded-[1.35rem] border border-primary/25 bg-primary/8 p-4">
+              <aside className="space-y-4">
+                <section className="rounded-[1.35rem] border border-primary/25 bg-primary/8 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resumo</p>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -1152,19 +1152,17 @@ export function QuickSaleForm({
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-              </section>
+                </section>
 
-              <section className="admin-form-section space-y-4">
+                <section className="admin-form-section space-y-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Wallet className="h-4 w-4 text-primary" />
               Fechamento rapido
             </p>
 
-            <div className="grid gap-3 rounded-[1.35rem] border border-primary/20 bg-primary/8 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(180px,220px)_180px] lg:items-end">
+            <div className="grid gap-3">
               <div className="space-y-2">
-                <Label htmlFor="quick-sale-payment-discount">Desconto da venda (R$)</Label>
+                <Label htmlFor="quick-sale-payment-discount">Desconto manual (R$)</Label>
                 <Input
                   id="quick-sale-payment-discount"
                   value={discountAmount}
@@ -1176,9 +1174,6 @@ export function QuickSaleForm({
                   }}
                   placeholder="0.00"
                 />
-                <p className="text-xs text-muted-foreground">
-                  O total e os pagamentos sao recalculados na hora para evitar divergencia no caixa.
-                </p>
                 {discountExceedsSubtotal ? (
                   <p className="text-xs font-medium text-destructive">
                     Desconto maior que o subtotal. Ajuste o valor para finalizar.
@@ -1187,22 +1182,29 @@ export function QuickSaleForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="quick-sale-payment-coupon">Cupom</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="quick-sale-payment-coupon"
-                    value={couponCode}
-                    onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                    placeholder="CODIGO"
-                  />
-                  <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
-                    <TicketPercent className="h-4 w-4" />
-                    <span className="sr-only">Aplicar cupom</span>
-                  </Button>
-                </div>
+                <select
+                  id="quick-sale-payment-coupon"
+                  value={appliedCouponCode}
+                  onChange={(event) => selectCoupon(event.target.value)}
+                  className="admin-native-select"
+                >
+                  <option value="">Selecionar cupom</option>
+                  {coupons.map((coupon) => (
+                    <option key={coupon.id} value={coupon.code}>
+                      {coupon.name} - {formatCouponValue(coupon)}
+                    </option>
+                  ))}
+                </select>
                 {appliedCouponCode ? (
-                  <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
-                ) : couponCode ? (
-                  <p className="text-xs text-muted-foreground">Nao aplicado</p>
+                  <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium text-foreground">{appliedCoupon?.code}</span>
+                      <span className="font-semibold text-primary">
+                        {appliedCoupon ? formatCouponValue(appliedCoupon) : null}
+                      </span>
+                    </div>
+                    <p className="mt-1">{couponPreview?.message ?? `Desconto: ${formatCurrency(couponDiscountInCents / 100)}`}</p>
+                  </div>
                 ) : null}
               </div>
               <Button
@@ -1215,8 +1217,10 @@ export function QuickSaleForm({
                 Ajustar pagamento
               </Button>
             </div>
+                </section>
+              </aside>
 
-            <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
+              <section className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4 xl:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Receipt className="h-4 w-4 text-primary" />
@@ -1411,10 +1415,10 @@ export function QuickSaleForm({
                   );
                 })}
               </div>
-            </div>
-            <input type="hidden" name="cashReceived" value="" />
+              </section>
+              <input type="hidden" name="cashReceived" value="" />
 
-            <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
+            <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4 xl:col-span-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotalInCents / 100)}</span>
@@ -1517,7 +1521,6 @@ export function QuickSaleForm({
               </AlertDialogContent>
             </AlertDialog>
             <ActionFeedback state={saleState} />
-              </section>
             </div>
           )}
         </form>
