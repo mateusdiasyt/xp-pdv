@@ -2,11 +2,9 @@ import { Download, RefreshCw, Tv } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
 import { PageHeader } from "@/components/admin/page-header";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { tvAppUpdateManifest } from "@/domain/tv-app/update-manifest";
-import { cn } from "@/lib/utils";
 
 export default async function TvAppPage() {
   await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
@@ -40,12 +38,16 @@ export default async function TvAppPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a className={buttonVariants()} href={tvAppUpdateManifest.apkPath} download>
+              <a
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-transparent bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/92"
+                href={tvAppUpdateManifest.apkPath}
+                download
+              >
                 <Download className="size-4" />
                 Baixar APK
               </a>
               <a
-                className={cn(buttonVariants({ variant: "outline" }), "text-white")}
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-border/80 bg-background/85 px-3.5 text-sm font-medium text-white shadow-sm transition-all hover:border-border hover:bg-muted/70"
                 href="/api/tv-app/latest"
                 target="_blank"
                 rel="noreferrer"
