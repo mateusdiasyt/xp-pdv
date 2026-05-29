@@ -1352,29 +1352,21 @@ export function QuickSaleForm({
               </div>
               <div className="grid gap-2 border-t border-border/70 pt-3 text-sm text-muted-foreground sm:grid-cols-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span>Pagamentos</span>
+                  <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
                   <span>{formatCurrency(paymentsTotalInCents / 100)}</span>
                 </div>
-                {hasCashPayment ? (
-                  <div className="flex items-center justify-between gap-2">
+                {hasCashPayment && changeInCents > 0 ? (
+                  <div className="flex items-center justify-between gap-2 font-medium text-foreground">
                     <span>Troco</span>
                     <span>{formatCurrency(changeInCents / 100)}</span>
                   </div>
                 ) : null}
-                <div className="flex items-center justify-between gap-2 font-medium text-foreground">
-                  <span>
-                    {paymentShortfallInCents > 0
-                      ? "Falta"
-                      : nonCashExcessInCents > 0
-                        ? "Ajustar Pix/cartao"
-                        : "Status"}
-                  </span>
-                  <span>
-                    {paymentShortfallInCents === 0 && nonCashExcessInCents === 0
-                      ? "OK"
-                      : formatCurrency((paymentShortfallInCents || nonCashExcessInCents) / 100)}
-                  </span>
-                </div>
+                {paymentShortfallInCents > 0 || nonCashExcessInCents > 0 ? (
+                  <div className="flex items-center justify-between gap-2 font-medium text-foreground">
+                    <span>{paymentShortfallInCents > 0 ? "Falta" : "Ajustar Pix/cartao"}</span>
+                    <span>{formatCurrency((paymentShortfallInCents || nonCashExcessInCents) / 100)}</span>
+                  </div>
+                ) : null}
                 {nonCashExcessInCents > 0 ? (
                   <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 sm:col-span-3">
                     Pix/cartao nao pode passar do total.
@@ -1494,7 +1486,7 @@ export function QuickSaleForm({
                     <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                    <span>Pagamentos</span>
+                    <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
                     <span className="font-semibold text-foreground">
                       {formatCurrency(paymentsTotalInCents / 100)}
                     </span>

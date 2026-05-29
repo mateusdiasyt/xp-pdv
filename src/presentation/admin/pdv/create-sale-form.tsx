@@ -1441,7 +1441,7 @@ export function CreateSaleForm({
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-muted-foreground md:block">
-                    <span>Pagamentos</span>
+                    <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
                     <p className="font-semibold text-foreground">{formatCurrency(paymentsTotalInCents / 100)}</p>
                   </div>
                   <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-3 md:block md:border-l md:border-t-0 md:pl-3 md:pt-0">
@@ -1499,7 +1499,7 @@ export function CreateSaleForm({
                           <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                          <span>Pagamentos</span>
+                          <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
                           <span className="font-semibold text-foreground">{formatCurrency(paymentsTotalInCents / 100)}</span>
                         </div>
                         {hasCashPayment && changeInCents > 0 ? (
