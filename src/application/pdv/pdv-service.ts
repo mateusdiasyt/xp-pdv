@@ -504,6 +504,8 @@ export async function createComandaRecord(input: FormData, actorId: string) {
       customerName: created.customerNameSnapshot,
     },
   });
+
+  return created;
 }
 
 export async function addComandaItemRecord(input: FormData, actorId: string) {

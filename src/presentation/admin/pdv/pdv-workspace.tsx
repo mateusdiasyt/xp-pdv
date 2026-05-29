@@ -349,6 +349,18 @@ export function PdvWorkspace({
           onOpenChange={setIsCreateDialogOpen}
           presetNumber={createDialogPresetNumber}
           lockNumber={lockCreateDialogNumber}
+          onCreated={(created) => {
+            setLocalOpenComandas((currentComandas) => [
+              ...currentComandas.filter((comanda) => comanda.id !== created.id),
+              {
+                ...created,
+                subtotalAmount: 0,
+                itemCount: 0,
+                items: [],
+              },
+            ]);
+            setSelectedComandaId(created.id);
+          }}
         />
       </section>
     </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CreateComandaForm } from "@/presentation/admin/pdv/create-comanda-form";
+import { CreateComandaForm, type CreatedComandaData } from "@/presentation/admin/pdv/create-comanda-form";
 
 type CustomerOption = {
   id: string;
@@ -18,6 +18,7 @@ type CreateComandaDialogProps = {
   onOpenChange: (open: boolean) => void;
   presetNumber?: number;
   lockNumber?: boolean;
+  onCreated?: (created: CreatedComandaData) => void;
 };
 
 export function CreateComandaDialog({
@@ -26,6 +27,7 @@ export function CreateComandaDialog({
   onOpenChange,
   presetNumber,
   lockNumber = false,
+  onCreated,
 }: CreateComandaDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,7 +46,10 @@ export function CreateComandaDialog({
             customers={customers}
             presetNumber={presetNumber}
             lockNumber={lockNumber}
-            onSuccess={() => onOpenChange(false)}
+            onSuccess={(created) => {
+              onCreated?.(created);
+              onOpenChange(false);
+            }}
           />
           {customers.length === 0 ? (
             <div className="mt-3 rounded-xl border border-border/70 bg-card/55 px-4 py-3">

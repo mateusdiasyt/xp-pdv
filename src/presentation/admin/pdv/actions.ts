@@ -165,11 +165,26 @@ export async function createComandaAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return createComandaRequest(formData);
+}
+
+export async function createComandaRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
-    await createComandaRecord(formData, session.user.id);
+    const created = await createComandaRecord(formData, session.user.id);
     revalidatePdvPage();
-    return { status: "success", message: "Comanda criada com sucesso." };
+    return {
+      status: "success",
+      message: "Comanda criada com sucesso.",
+      data: {
+        id: created.id,
+        number: created.number,
+        isWalkIn: created.isWalkIn,
+        customerId: created.customerId,
+        customerName: created.customerNameSnapshot ?? (created.isWalkIn ? "Comanda avulsa" : "Sem cliente"),
+        openedAt: created.openedAt.toISOString(),
+      },
+    };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
   }

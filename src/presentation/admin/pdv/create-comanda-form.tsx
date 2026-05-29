@@ -1,15 +1,15 @@
 "use client";
 
 import { Check, Search } from "lucide-react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
-import { createComandaAction } from "@/presentation/admin/pdv/actions";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
+import { createComandaRequest } from "@/presentation/admin/pdv/actions";
 
 type CustomerOption = {
   id: string;
@@ -22,7 +22,16 @@ type CreateComandaFormProps = {
   customers: CustomerOption[];
   presetNumber?: number;
   lockNumber?: boolean;
-  onSuccess?: () => void;
+  onSuccess?: (created: CreatedComandaData) => void;
+};
+
+export type CreatedComandaData = {
+  id: string;
+  number: number;
+  isWalkIn: boolean;
+  customerId: string | null;
+  customerName: string;
+  openedAt: string;
 };
 
 function normalizeDigits(value: string) {
@@ -35,39 +44,13 @@ export function CreateComandaForm({
   lockNumber = false,
   onSuccess,
 }: CreateComandaFormProps) {
-  const router = useRouter();
-  const [state, formAction] = useActionState(createComandaAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, startTransition] = useTransition();
   const [isWalkIn, setIsWalkIn] = useState(customers.length === 0);
   const [walkInName, setWalkInName] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
-  const handledSuccessRef = useRef(false);
-
-  useEffect(() => {
-    if (state.status !== "success") {
-      handledSuccessRef.current = false;
-      return;
-    }
-
-    if (handledSuccessRef.current) {
-      return;
-    }
-
-    handledSuccessRef.current = true;
-
-    const closeTimeout = window.setTimeout(() => {
-      onSuccess?.();
-    }, 0);
-    const refreshTimeout = window.setTimeout(() => {
-      router.refresh();
-    }, 220);
-
-    return () => {
-      window.clearTimeout(closeTimeout);
-      window.clearTimeout(refreshTimeout);
-    };
-  }, [onSuccess, router, state.status]);
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = customerQuery.trim().toLowerCase();
@@ -107,8 +90,33 @@ export function CreateComandaForm({
     setIsCustomerSearchOpen(false);
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    formData.set("customerId", selectedCustomerId);
+    formData.set("customerName", isWalkIn ? walkInName : "");
+    if (isWalkIn) {
+      formData.set("isWalkIn", "on");
+    } else {
+      formData.delete("isWalkIn");
+    }
+
+    setState(initialActionState);
+    startTransition(async () => {
+      const result = await createComandaRequest(formData);
+      setState(result);
+
+      if (result.status !== "success") {
+        return;
+      }
+
+      onSuccess?.(result.data as CreatedComandaData);
+    });
+  }
+
   return (
-    <form action={formAction} className="grid gap-4 md:grid-cols-3">
+    <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
       <div className="space-y-2">
         <Label htmlFor="number">Numero da comanda</Label>
         <Input
@@ -225,7 +233,9 @@ export function CreateComandaForm({
       </label>
 
       <div className="md:col-span-3">
-        <FormSubmitButton>Criar comanda</FormSubmitButton>
+        <Button type="submit" className="w-full sm:w-auto" disabled={isPending}>
+          {isPending ? "Criando..." : "Criar comanda"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>
