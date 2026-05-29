@@ -343,10 +343,12 @@ export function CreateSaleForm({
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
   const [customerQuery, setCustomerQuery] = useState(selectedCustomerInputValue);
   const [walkInName, setWalkInName] = useState(selectedComanda.customerId ? "" : selectedComanda.customerName);
+  const [optimisticCustomerLabel, setOptimisticCustomerLabel] = useState(currentCustomerLabel);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const customerFormRef = useRef<HTMLFormElement>(null);
   const customerIdInputRef = useRef<HTMLInputElement>(null);
   const handledCancelSuccessRef = useRef(false);
+  const handledCustomerSuccessRef = useRef(false);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     {
       id: 1,
@@ -418,14 +420,26 @@ export function CreateSaleForm({
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
 
   useEffect(() => {
-    if (
-      updateItemState.status === "success" ||
-      removeItemState.status === "success" ||
-      customerState.status === "success"
-    ) {
-      router.refresh();
+    if (updateItemState.status === "success" || removeItemState.status === "success") {
+      const refreshTimeout = window.setTimeout(() => router.refresh(), 220);
+      return () => window.clearTimeout(refreshTimeout);
     }
-  }, [customerState.status, removeItemState.status, router, updateItemState.status]);
+  }, [removeItemState.status, router, updateItemState.status]);
+
+  useEffect(() => {
+    if (customerState.status !== "success") {
+      handledCustomerSuccessRef.current = false;
+      return;
+    }
+
+    if (handledCustomerSuccessRef.current) {
+      return;
+    }
+
+    handledCustomerSuccessRef.current = true;
+    const refreshTimeout = window.setTimeout(() => router.refresh(), 350);
+    return () => window.clearTimeout(refreshTimeout);
+  }, [customerState.status, router]);
 
   useEffect(() => {
     if (cancelState.status !== "success") {
@@ -652,6 +666,7 @@ export function CreateSaleForm({
 
     customerIdInputRef.current.value = customerId ?? "";
     setCustomerQuery(customerId ? label : "");
+    setOptimisticCustomerLabel(customerId ? label : (walkInName.trim() || "Comanda avulsa"));
     if (customerId) {
       setWalkInName("");
     } else {
@@ -668,6 +683,7 @@ export function CreateSaleForm({
 
     customerIdInputRef.current.value = "";
     setCustomerQuery("");
+    setOptimisticCustomerLabel(walkInName.trim() || "Comanda avulsa");
     setIsCustomerSearchOpen(false);
     customerFormRef.current.requestSubmit();
   }
@@ -685,7 +701,7 @@ export function CreateSaleForm({
             #{selectedComanda.number}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-base font-semibold text-foreground">{currentCustomerLabel}</p>
+            <p className="truncate text-base font-semibold text-foreground">{optimisticCustomerLabel}</p>
             <p className="text-xs text-muted-foreground">
               {optimisticItems.length} item(ns) - aberta em {dateFormatter.format(new Date(selectedComanda.openedAt))}
             </p>
