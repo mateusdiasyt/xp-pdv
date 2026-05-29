@@ -414,10 +414,21 @@ export function QuickSaleForm({
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
     0,
   );
-  const paymentDifferenceInCents = totalInCents - paymentsTotalInCents;
-  const hasCashPayment = paymentLines.some((paymentLine) => paymentLine.method === PaymentMethod.CASH);
-  const paymentExcessInCents = Math.max(paymentsTotalInCents - totalInCents, 0);
-  const changeInCents = hasCashPayment ? paymentExcessInCents : 0;
+  const cashPaymentTotalInCents = paymentLines.reduce(
+    (acc, paymentLine) =>
+      paymentLine.method === PaymentMethod.CASH
+        ? acc + Math.max(0, parseMoneyToCents(paymentLine.amount))
+        : acc,
+    0,
+  );
+  const nonCashPaymentTotalInCents = paymentsTotalInCents - cashPaymentTotalInCents;
+  const hasCashPayment = cashPaymentTotalInCents > 0;
+  const nonCashExcessInCents = Math.max(nonCashPaymentTotalInCents - totalInCents, 0);
+  const amountDueAfterNonCashInCents = Math.max(totalInCents - nonCashPaymentTotalInCents, 0);
+  const changeInCents = Math.max(cashPaymentTotalInCents - amountDueAfterNonCashInCents, 0);
+  const coveredTotalInCents =
+    nonCashPaymentTotalInCents + Math.min(cashPaymentTotalInCents, amountDueAfterNonCashInCents);
+  const paymentShortfallInCents = Math.max(totalInCents - coveredTotalInCents, 0);
   const normalizedCustomerQuery = customerQuery.trim().toLowerCase();
   const normalizedCustomerQueryDigits = normalizeDigits(customerQuery);
   const filteredCustomers = customers
@@ -434,7 +445,11 @@ export function QuickSaleForm({
   const customerNameValue = selectedCustomer?.fullName ?? customerQuery.trim();
   const canProceedToPayment = cartItems.length > 0;
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
-  const canSubmitQuickSale = cartItems.length > 0 && !discountExceedsSubtotal;
+  const canSubmitQuickSale =
+    cartItems.length > 0 &&
+    !discountExceedsSubtotal &&
+    nonCashExcessInCents === 0 &&
+    paymentShortfallInCents === 0;
 
   useEffect(() => {
     if (cartItems.length === 0 && quickSaleStep === "payment") {
@@ -1347,13 +1362,24 @@ export function QuickSaleForm({
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between gap-2 font-medium text-foreground">
-                  <span>{paymentDifferenceInCents > 0 ? "Falta" : paymentDifferenceInCents < 0 ? "Excesso" : "Status"}</span>
                   <span>
-                    {paymentDifferenceInCents === 0
+                    {paymentShortfallInCents > 0
+                      ? "Falta"
+                      : nonCashExcessInCents > 0
+                        ? "Ajustar Pix/cartao"
+                        : "Status"}
+                  </span>
+                  <span>
+                    {paymentShortfallInCents === 0 && nonCashExcessInCents === 0
                       ? "OK"
-                      : formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}
+                      : formatCurrency((paymentShortfallInCents || nonCashExcessInCents) / 100)}
                   </span>
                 </div>
+                {nonCashExcessInCents > 0 ? (
+                  <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 sm:col-span-3">
+                    Pix/cartao nao pode passar do total.
+                  </div>
+                ) : null}
               </div>
               </section>
               </section>
@@ -1442,7 +1468,9 @@ export function QuickSaleForm({
                   ? "Selecione itens para fechar"
                   : discountExceedsSubtotal
                     ? "Ajuste o desconto"
-                    : "Revisar e finalizar venda"}
+                    : nonCashExcessInCents > 0 || paymentShortfallInCents > 0
+                      ? "Ajuste o pagamento"
+                      : "Revisar e finalizar venda"}
               </AlertDialogTrigger>
               <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
                 <AlertDialogHeader className="place-items-start text-left">

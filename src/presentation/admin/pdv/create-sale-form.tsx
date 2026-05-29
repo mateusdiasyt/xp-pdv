@@ -390,10 +390,21 @@ export function CreateSaleForm({
     0,
   );
   const hasOpenSessions = openSessions.length > 0;
-  const hasCashPayment = paymentLines.some((paymentLine) => paymentLine.method === PaymentMethod.CASH);
-  const paymentExcessInCents = Math.max(paymentsTotalInCents - totalInCents, 0);
-  const changeInCents = hasCashPayment ? paymentExcessInCents : 0;
-  const paymentDifferenceInCents = totalInCents - paymentsTotalInCents;
+  const cashPaymentTotalInCents = paymentLines.reduce(
+    (acc, paymentLine) =>
+      paymentLine.method === PaymentMethod.CASH
+        ? acc + Math.max(0, parseMoneyToCents(paymentLine.amount))
+        : acc,
+    0,
+  );
+  const nonCashPaymentTotalInCents = paymentsTotalInCents - cashPaymentTotalInCents;
+  const hasCashPayment = cashPaymentTotalInCents > 0;
+  const nonCashExcessInCents = Math.max(nonCashPaymentTotalInCents - totalInCents, 0);
+  const amountDueAfterNonCashInCents = Math.max(totalInCents - nonCashPaymentTotalInCents, 0);
+  const changeInCents = Math.max(cashPaymentTotalInCents - amountDueAfterNonCashInCents, 0);
+  const coveredTotalInCents =
+    nonCashPaymentTotalInCents + Math.min(cashPaymentTotalInCents, amountDueAfterNonCashInCents);
+  const paymentShortfallInCents = Math.max(totalInCents - coveredTotalInCents, 0);
   const normalizedCustomerQuery = customerQuery.trim().toLowerCase();
   const normalizedCustomerQueryDigits = normalizeDigits(customerQuery);
   const categoryFilters = products.reduce<CategoryFilterOption[]>((categories, product) => {
@@ -489,7 +500,11 @@ export function CreateSaleForm({
     })
     .slice(0, 8);
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
-  const canSubmitComandaSale = optimisticItems.length > 0 && !discountExceedsSubtotal && paymentDifferenceInCents <= 0;
+  const canSubmitComandaSale =
+    optimisticItems.length > 0 &&
+    !discountExceedsSubtotal &&
+    nonCashExcessInCents === 0 &&
+    paymentShortfallInCents === 0;
 
   function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
     if (field === "amount") {
@@ -1438,16 +1453,16 @@ export function CreateSaleForm({
                       Troco: <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
                     </div>
                   ) : null}
-                  {paymentDifferenceInCents > 0 || discountExceedsSubtotal ? (
+                  {paymentShortfallInCents > 0 || discountExceedsSubtotal ? (
                     <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 md:col-span-4">
                       {discountExceedsSubtotal
                         ? "Desconto maior que o subtotal."
-                        : `Falta ${formatCurrency(paymentDifferenceInCents / 100)}.`}
+                        : `Falta ${formatCurrency(paymentShortfallInCents / 100)}.`}
                     </div>
                   ) : null}
-                  {paymentDifferenceInCents < 0 && !hasCashPayment ? (
+                  {nonCashExcessInCents > 0 ? (
                     <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 md:col-span-4">
-                      Excesso de {formatCurrency(Math.abs(paymentDifferenceInCents) / 100)} sem pagamento em dinheiro.
+                      Pix/cartao acima do total em {formatCurrency(nonCashExcessInCents / 100)}.
                     </div>
                   ) : null}
                 </div>
@@ -1461,7 +1476,7 @@ export function CreateSaleForm({
                       render={<Button type="button" disabled={!canSubmitComandaSale} className="flex-1 gap-2" />}
                     >
                       <Check className="h-4 w-4" />
-                      Fechar venda
+                      {nonCashExcessInCents > 0 || paymentShortfallInCents > 0 ? "Ajuste o pagamento" : "Fechar venda"}
                     </AlertDialogTrigger>
                     <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
                       <AlertDialogHeader className="place-items-start text-left">
