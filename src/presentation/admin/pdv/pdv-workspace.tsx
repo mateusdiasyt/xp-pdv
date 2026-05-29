@@ -3,8 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
-import { ProductKind } from "@prisma/client";
-import type { CouponDiscountType } from "@prisma/client";
+import type { CouponDiscountType, ProductKind } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -181,7 +180,6 @@ export function PdvWorkspace({
   }, [happyHourActive]);
 
   const selectedComanda = openComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
-  const comandaProducts = products.filter((product) => product.kind === ProductKind.STANDARD);
   const highestActiveNumber = openComandas.reduce(
     (currentMax, comanda) => Math.max(currentMax, comanda.number),
     DEFAULT_SLOT_COUNT,
@@ -316,7 +314,7 @@ export function PdvWorkspace({
                 canManage={canManage}
                 customers={customers}
                 openSessions={openSessions}
-                products={comandaProducts}
+                products={products}
                 coupons={coupons}
                 happyHourActive={isHappyHourActive}
                 selectedComanda={selectedComanda}

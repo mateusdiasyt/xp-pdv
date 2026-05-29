@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { PaymentMethod } from "@prisma/client";
+import { CouponDiscountType, PaymentMethod } from "@prisma/client";
 import {
   Beef,
   Candy,
@@ -27,7 +27,18 @@ import {
 import { useActionState, useDeferredValue, useEffect, useRef, useState, useTransition } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -149,6 +160,14 @@ const paymentLabels: Record<PaymentMethod, string> = {
   CREDIT_CARD: "Cartao de credito",
   DEBIT_CARD: "Cartao de debito",
 };
+
+function formatCouponValue(coupon: PdvCouponOption) {
+  if (coupon.discountType === CouponDiscountType.PERCENTAGE) {
+    return `${Number(coupon.discountValue.toFixed(2))}%`;
+  }
+
+  return formatCurrency(coupon.discountValue);
+}
 
 function isCardPayment(method: PaymentMethod) {
   return method === PaymentMethod.CREDIT_CARD || method === PaymentMethod.DEBIT_CARD;
@@ -316,8 +335,10 @@ export function CreateSaleForm({
   const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [discountAmount, setDiscountAmount] = useState("0.00");
-  const [couponCode, setCouponCode] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
+  const [couponPanelOpen, setCouponPanelOpen] = useState(false);
+  const [paymentAutofillEnabled, setPaymentAutofillEnabled] = useState(true);
+  const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
   const [customerQuery, setCustomerQuery] = useState(selectedCustomerInputValue);
@@ -352,6 +373,7 @@ export function CreateSaleForm({
     : null;
   const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
   const discountInCents = manualDiscountInCents + couponDiscountInCents;
+  const discountExceedsSubtotal = discountInCents > subtotalInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
   const paymentsTotalInCents = paymentLines.reduce(
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
@@ -429,6 +451,32 @@ export function CreateSaleForm({
     };
   }, [cancelState.status, onClose, router]);
 
+  useEffect(() => {
+    if (activePanel !== "checkout" || !paymentAutofillEnabled || paymentLines.length !== 1) {
+      return;
+    }
+
+    const nextAmount = formatMoneyInput(totalInCents);
+    if (paymentLines[0]?.amount === nextAmount) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPaymentLines((currentLines) =>
+        currentLines.length === 1
+          ? [
+              {
+                ...currentLines[0],
+                amount: nextAmount,
+              },
+            ]
+          : currentLines,
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activePanel, paymentAutofillEnabled, paymentLines, totalInCents]);
+
   const normalizedSearch = deferredProductSearch.trim().toLowerCase();
   const filteredProducts = products.filter((product) => {
     if (!selectedCategoryId || product.category.id !== selectedCategoryId) {
@@ -466,15 +514,13 @@ export function CreateSaleForm({
     })
     .slice(0, 8);
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
-
-  function applyCoupon() {
-    const normalizedCode = normalizeCouponCode(couponCode);
-    const coupon = coupons.find((item) => item.code === normalizedCode);
-    setAppliedCouponCode(coupon ? coupon.code : "");
-    setCouponCode(normalizedCode);
-  }
+  const canSubmitComandaSale = optimisticItems.length > 0 && !discountExceedsSubtotal && paymentDifferenceInCents <= 0;
 
   function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
+    if (field === "amount") {
+      setPaymentAutofillEnabled(false);
+    }
+
     setPaymentLines((currentLines) =>
       currentLines.map((line) =>
         line.id === id
@@ -490,6 +536,7 @@ export function CreateSaleForm({
   function addPaymentLine() {
     const nextSeed = paymentLineSeed + 1;
     setPaymentLineSeed(nextSeed);
+    setPaymentAutofillEnabled(false);
     setPaymentLines((currentLines) => [
       ...currentLines,
       {
@@ -567,12 +614,33 @@ export function CreateSaleForm({
   }
 
   function removePaymentLine(id: number) {
+    setPaymentAutofillEnabled(false);
     setPaymentLines((currentLines) => {
       if (currentLines.length === 1) {
         return currentLines;
       }
 
       return currentLines.filter((line) => line.id !== id);
+    });
+  }
+
+  function selectCoupon(code: string) {
+    setAppliedCouponCode(normalizeCouponCode(code));
+  }
+
+  function syncSinglePaymentWithTotal() {
+    setPaymentAutofillEnabled(true);
+    setPaymentLines((currentLines) => {
+      if (currentLines.length !== 1) {
+        return currentLines;
+      }
+
+      return [
+        {
+          ...currentLines[0],
+          amount: formatMoneyInput(totalInCents),
+        },
+      ];
     });
   }
 
@@ -969,58 +1037,89 @@ export function CreateSaleForm({
                 </Link>
               </div>
             ) : (
-              <form action={saleFormAction} className="space-y-4">
+              <form id={`close-comanda-form-${selectedComanda.id}`} action={saleFormAction} className="space-y-4">
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
+                <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
+                <input type="hidden" name="cashReceived" value="" />
 
-                <div className="space-y-2">
-                  <Label htmlFor={`cashSessionId-${selectedComanda.id}`}>Caixa</Label>
-                  <select
-                    id={`cashSessionId-${selectedComanda.id}`}
-                    name="cashSessionId"
-                    className="admin-native-select"
-                    defaultValue={openSessions[0]?.id}
-                    required
-                  >
-                    {openSessions.map((session) => (
-                      <option key={session.id} value={session.id}>
-                        {session.cashRegister.name} ({session.cashRegister.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
+                  <div className="space-y-2">
+                    <Label htmlFor={`cashSessionId-${selectedComanda.id}`}>Caixa</Label>
+                    <select
+                      id={`cashSessionId-${selectedComanda.id}`}
+                      name="cashSessionId"
+                      className="admin-native-select"
+                      defaultValue={openSessions[0]?.id}
+                      required
+                    >
+                      {openSessions.map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {session.cashRegister.name} ({session.cashRegister.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`discountAmount-${selectedComanda.id}`}>Desconto (R$)</Label>
-                  <Input
-                    id={`discountAmount-${selectedComanda.id}`}
-                    name="discountAmount"
-                    value={discountAmount}
-                    onChange={(event) => setDiscountAmount(event.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`couponCode-${selectedComanda.id}`}>Cupom</Label>
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor={`discountAmount-${selectedComanda.id}`}>Desconto</Label>
                     <Input
-                      id={`couponCode-${selectedComanda.id}`}
-                      value={couponCode}
-                      onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                      placeholder="CODIGO"
+                      id={`discountAmount-${selectedComanda.id}`}
+                      name="discountAmount"
+                      value={discountAmount}
+                      onChange={(event) => setDiscountAmount(event.target.value)}
+                      placeholder="0.00"
+                      required
                     />
-                    <Button type="button" variant="outline" size="icon-sm" onClick={applyCoupon}>
-                      <TicketPercent className="h-4 w-4" />
-                      <span className="sr-only">Aplicar cupom</span>
+                  </div>
+                </div>
+
+                <section className="rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <TicketPercent className="h-4 w-4 text-primary" />
+                      Cupom
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCouponPanelOpen((current) => !current)}
+                    >
+                      {couponPanelOpen || appliedCouponCode ? "Ocultar" : "Aplicar cupom"}
                     </Button>
                   </div>
-                  {appliedCouponCode ? (
-                    <p className="text-xs text-primary">{couponPreview?.message ?? appliedCoupon?.name}</p>
-                  ) : couponCode ? (
-                    <p className="text-xs text-muted-foreground">Nao aplicado</p>
+
+                  {couponPanelOpen || appliedCouponCode ? (
+                    <div className="mt-3 space-y-2">
+                      <select
+                        id={`couponCode-${selectedComanda.id}`}
+                        value={appliedCouponCode}
+                        onChange={(event) => selectCoupon(event.target.value)}
+                        className="admin-native-select"
+                      >
+                        <option value="">Selecionar cupom</option>
+                        {coupons.map((coupon) => (
+                          <option key={coupon.id} value={coupon.code}>
+                            {coupon.name} - {formatCouponValue(coupon)}
+                          </option>
+                        ))}
+                      </select>
+                      {appliedCouponCode ? (
+                        <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-foreground">{appliedCoupon?.code}</span>
+                            <span className="font-semibold text-primary">
+                              {appliedCoupon ? formatCouponValue(appliedCoupon) : null}
+                            </span>
+                          </div>
+                          <p className="mt-1">
+                            {couponPreview?.message ?? `Desconto: ${formatCurrency(couponDiscountInCents / 100)}`}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
-                </div>
+                </section>
 
                 <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -1088,10 +1187,10 @@ export function CreateSaleForm({
                           </div>
 
                           {traceablePayment ? (
-                            <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                Auditoria da transacao
-                              </p>
+                            <details className="mt-3 rounded-[1rem] border border-border/60 bg-background/24 p-3">
+                              <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground">
+                                Auditoria
+                              </summary>
                               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                 <div className="space-y-2">
                                   <Label htmlFor={`payment-approved-${paymentLine.id}`}>Valor aprovado (R$)</Label>
@@ -1200,7 +1299,7 @@ export function CreateSaleForm({
                                   />
                                 </div>
                               </div>
-                            </div>
+                            </details>
                           ) : (
                             <>
                               <input type="hidden" name="paymentApprovedAmount" value="" />
@@ -1218,45 +1317,101 @@ export function CreateSaleForm({
                     })}
                   </div>
                 </div>
-                <input type="hidden" name="cashReceived" value="" />
-
-                <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="grid gap-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4 text-sm md:grid-cols-4">
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground md:block">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(subtotalInCents / 100)}</span>
+                    <p className="font-semibold text-foreground">{formatCurrency(subtotalInCents / 100)}</p>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground md:block">
                     <span>Desconto</span>
-                    <span>{formatCurrency(discountInCents / 100)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Pagamentos</span>
-                    <span>{formatCurrency(paymentsTotalInCents / 100)}</span>
-                  </div>
-                  {hasCashPayment ? (
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Troco</span>
-                      <span>{formatCurrency(changeInCents / 100)}</span>
-                    </div>
-                  ) : null}
-                  <div className="border-t border-border/70 pt-3">
-                    <div className="flex items-center justify-between text-base font-semibold text-foreground">
-                      <span>Total</span>
-                      <span>{formatCurrency(totalInCents / 100)}</span>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {paymentDifferenceInCents === 0
-                        ? "Pagamentos conferem com o total da comanda."
-                        : paymentDifferenceInCents > 0
-                          ? `Falta ${formatCurrency(paymentDifferenceInCents / 100)} para fechar a venda.`
-                          : hasCashPayment
-                            ? `Troco previsto de ${formatCurrency(changeInCents / 100)}.`
-                            : `Pagamentos excedem em ${formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}. Troco so pode ser calculado em pagamento com dinheiro.`}
+                    <p className={discountExceedsSubtotal ? "font-semibold text-destructive" : "font-semibold text-foreground"}>
+                      {formatCurrency(discountInCents / 100)}
                     </p>
                   </div>
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground md:block">
+                    <span>Pagamentos</span>
+                    <p className="font-semibold text-foreground">{formatCurrency(paymentsTotalInCents / 100)}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-3 md:block md:border-l md:border-t-0 md:pl-3 md:pt-0">
+                    <span className="text-muted-foreground">Total</span>
+                    <p className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</p>
+                  </div>
+                  {hasCashPayment && changeInCents > 0 ? (
+                    <div className="rounded-xl border border-border/70 bg-background/35 px-3 py-2 text-muted-foreground md:col-span-4">
+                      Troco: <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
+                    </div>
+                  ) : null}
+                  {paymentDifferenceInCents > 0 || discountExceedsSubtotal ? (
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 md:col-span-4">
+                      {discountExceedsSubtotal
+                        ? "Desconto maior que o subtotal."
+                        : `Falta ${formatCurrency(paymentDifferenceInCents / 100)}.`}
+                    </div>
+                  ) : null}
+                  {paymentDifferenceInCents < 0 && !hasCashPayment ? (
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-amber-100 md:col-span-4">
+                      Excesso de {formatCurrency(Math.abs(paymentDifferenceInCents) / 100)} sem pagamento em dinheiro.
+                    </div>
+                  ) : null}
                 </div>
 
-                <FormSubmitButton>Fechar venda</FormSubmitButton>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" variant="outline" className="sm:w-auto" onClick={syncSinglePaymentWithTotal}>
+                    Ajustar pagamento
+                  </Button>
+                  <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
+                    <AlertDialogTrigger
+                      render={<Button type="button" disabled={!canSubmitComandaSale} className="flex-1 gap-2" />}
+                    >
+                      <Check className="h-4 w-4" />
+                      Fechar venda
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
+                      <AlertDialogHeader className="place-items-start text-left">
+                        <AlertDialogMedia className="mb-1 rounded-2xl border border-primary/20 bg-primary/12 text-primary">
+                          <Receipt className="h-5 w-5" />
+                        </AlertDialogMedia>
+                        <AlertDialogTitle className="text-lg font-semibold">Fechar comanda #{selectedComanda.number}?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-left">
+                          A venda sera registrada, o estoque atualizado e o ticket fiscal iniciado.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <div className="grid gap-2 rounded-[1.2rem] border border-border/75 bg-background/40 p-3 text-sm">
+                        <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                          <span>Itens</span>
+                          <span className="font-semibold text-foreground">{optimisticItems.length}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                          <span>Desconto</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                          <span>Pagamentos</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(paymentsTotalInCents / 100)}</span>
+                        </div>
+                        {hasCashPayment && changeInCents > 0 ? (
+                          <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                            <span>Troco</span>
+                            <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
+                          </div>
+                        ) : null}
+                        <div className="mt-1 flex items-center justify-between gap-3 border-t border-border/70 pt-2">
+                          <span className="font-semibold text-foreground">Total</span>
+                          <span className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</span>
+                        </div>
+                      </div>
+
+                      <AlertDialogFooter className="-mx-5 -mb-5 mt-1 rounded-b-[1.5rem] border-border/70 bg-background/45 p-4">
+                        <AlertDialogCancel>Voltar</AlertDialogCancel>
+                        <AlertDialogAction type="submit" form={`close-comanda-form-${selectedComanda.id}`} className="gap-2">
+                          <Check className="h-4 w-4" />
+                          Confirmar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
                 <ActionFeedback state={saleState} />
               </form>
             )}
