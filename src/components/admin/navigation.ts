@@ -17,6 +17,7 @@ import {
   Target,
   LifeBuoy,
   PaintbrushVertical,
+  Tv,
   Warehouse,
 } from "lucide-react";
 
@@ -136,6 +137,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "Personalizacao",
     href: "/admin/customization",
     icon: PaintbrushVertical,
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+  },
+  {
+    label: "App TV",
+    href: "/admin/app",
+    icon: Tv,
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
 ];
