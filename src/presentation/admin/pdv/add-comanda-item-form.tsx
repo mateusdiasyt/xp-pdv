@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -22,14 +21,7 @@ type AddComandaItemFormProps = {
 };
 
 export function AddComandaItemForm({ comandaId, products }: AddComandaItemFormProps) {
-  const router = useRouter();
   const [state, formAction] = useActionState(addComandaItemAction, initialActionState);
-
-  useEffect(() => {
-    if (state.status === "success") {
-      router.refresh();
-    }
-  }, [router, state.status]);
 
   return (
     <form action={formAction} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto]">

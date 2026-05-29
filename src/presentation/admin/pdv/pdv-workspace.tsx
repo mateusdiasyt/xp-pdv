@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import type { CouponDiscountType, ProductKind } from "@prisma/client";
 
@@ -114,7 +113,6 @@ function HappyHourToggle({
   canManage: boolean;
   onStateChange: (active: boolean) => void;
 }) {
-  const router = useRouter();
   const [state, action, isPending] = useActionState(updatePdvHappyHourAction, initialActionState);
 
   useEffect(() => {
@@ -124,8 +122,7 @@ function HappyHourToggle({
 
     const nextActive = Boolean((state.data as { happyHourActive?: boolean }).happyHourActive);
     onStateChange(nextActive);
-    router.refresh();
-  }, [onStateChange, router, state]);
+  }, [onStateChange, state]);
 
   if (!canManage) {
     return active ? (
@@ -324,6 +321,12 @@ export function PdvWorkspace({
                 happyHourActive={isHappyHourActive}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}
+                onComandaCancelled={(comandaId) => {
+                  setLocalOpenComandas((currentComandas) =>
+                    currentComandas.filter((comanda) => comanda.id !== comandaId),
+                  );
+                  setSelectedComandaId(null);
+                }}
                 onComandaCustomerLabelChange={(comandaId, customerName, customerId, isWalkIn) => {
                   setLocalOpenComandas((currentComandas) =>
                     currentComandas.map((comanda) =>

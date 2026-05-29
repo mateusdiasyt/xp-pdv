@@ -1,8 +1,8 @@
 "use client";
 
 import { CircleX } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import { useState, useTransition } from "react";
 
 import { PaymentMethod, RefundStatus } from "@prisma/client";
 
@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { initialActionState } from "@/presentation/admin/common/action-state";
-import { cancelSaleAction } from "@/presentation/admin/pdv/actions";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
+import { cancelSaleRequest } from "@/presentation/admin/pdv/actions";
 
 type CancelSaleFormProps = {
   saleId: string;
@@ -35,36 +35,26 @@ const refundMethodLabels: Record<PaymentMethod, string> = {
 };
 
 export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(cancelSaleAction, initialActionState);
-  const handledSuccessRef = useRef(false);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, startTransition] = useTransition();
   const suggestedRefundAmount = totalAmount.toFixed(2);
 
-  useEffect(() => {
-    if (state.status !== "success") {
-      handledSuccessRef.current = false;
-      return;
-    }
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    if (handledSuccessRef.current) {
-      return;
-    }
+    const formData = new FormData(event.currentTarget);
+    setState(initialActionState);
 
-    handledSuccessRef.current = true;
+    startTransition(async () => {
+      const result = await cancelSaleRequest(formData);
+      setState(result);
 
-    const closeTimeout = window.setTimeout(() => {
-      setOpen(false);
-    }, 0);
-    const refreshTimeout = window.setTimeout(() => {
-      router.refresh();
-    }, 220);
-
-    return () => {
-      window.clearTimeout(closeTimeout);
-      window.clearTimeout(refreshTimeout);
-    };
-  }, [router, state.status]);
+      if (result.status === "success") {
+        setOpen(false);
+      }
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -78,7 +68,7 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
             Registre o motivo, o estorno e os dados de conferencia. A venda sera cancelada sem apagar o historico.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-3 p-5">
+        <form onSubmit={handleSubmit} className="space-y-3 p-5">
           <input type="hidden" name="saleId" value={saleId} />
 
           <div className="space-y-2">
@@ -163,8 +153,8 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
             />
           </div>
 
-          <Button type="submit" variant="destructive" size="sm">
-            Cancelar venda e registrar estorno
+          <Button type="submit" variant="destructive" size="sm" disabled={isPending}>
+            {isPending ? "Cancelando..." : "Cancelar venda e registrar estorno"}
           </Button>
           <ActionFeedback state={state} />
         </form>

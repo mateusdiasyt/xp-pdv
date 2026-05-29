@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { CouponDiscountType, PaymentMethod } from "@prisma/client";
 import {
@@ -24,7 +23,8 @@ import {
   Coffee,
   GlassWater,
 } from "lucide-react";
-import { useActionState, useDeferredValue, useEffect, useRef, useState, useTransition } from "react";
+import type { FormEvent } from "react";
+import { useActionState, useDeferredValue, useEffect, useState, useTransition } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import {
@@ -47,7 +47,7 @@ import { formatCurrency } from "@/lib/format";
 import { initialActionState } from "@/presentation/admin/common/action-state";
 import {
   addComandaItemRequest,
-  cancelComandaAction,
+  cancelComandaRequest,
   closeComandaAction,
   removeComandaItemRequest,
   updateComandaCustomerRequest,
@@ -128,6 +128,7 @@ type CreateSaleFormProps = {
   canManage: boolean;
   happyHourActive: boolean;
   onClose: () => void;
+  onComandaCancelled?: (comandaId: string) => void;
   onComandaCustomerLabelChange?: (
     comandaId: string,
     customerName: string,
@@ -321,9 +322,9 @@ export function CreateSaleForm({
   canManage,
   happyHourActive,
   onClose,
+  onComandaCancelled,
   onComandaCustomerLabelChange,
 }: CreateSaleFormProps) {
-  const router = useRouter();
   const selectedCustomerInputValue = selectedComanda.customerId ? (selectedComanda.customerName ?? "") : "";
   const currentCustomerLabel =
     selectedComanda.customerName || (selectedComanda.isWalkIn ? "Comanda avulsa" : "Sem cliente");
@@ -331,11 +332,12 @@ export function CreateSaleForm({
   const [updateItemState, setUpdateItemState] = useState(initialActionState);
   const [removeItemState, setRemoveItemState] = useState(initialActionState);
   const [customerState, setCustomerState] = useState(initialActionState);
+  const [cancelState, setCancelState] = useState(initialActionState);
   const [saleState, saleFormAction] = useActionState(closeComandaAction, initialActionState);
-  const [cancelState, cancelFormAction] = useActionState(cancelComandaAction, initialActionState);
   const [isAddingItem, startAddTransition] = useTransition();
   const [isMutatingItem, startItemMutationTransition] = useTransition();
   const [isUpdatingCustomer, startCustomerTransition] = useTransition();
+  const [isCancellingComanda, startCancelTransition] = useTransition();
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
@@ -354,7 +356,6 @@ export function CreateSaleForm({
   const [walkInName, setWalkInName] = useState(selectedComanda.customerId ? "" : selectedComanda.customerName);
   const [optimisticCustomerLabel, setOptimisticCustomerLabel] = useState(currentCustomerLabel);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
-  const handledCancelSuccessRef = useRef(false);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     {
       id: 1,
@@ -424,31 +425,6 @@ export function CreateSaleForm({
       return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
-
-  useEffect(() => {
-    if (cancelState.status !== "success") {
-      handledCancelSuccessRef.current = false;
-      return;
-    }
-
-    if (handledCancelSuccessRef.current) {
-      return;
-    }
-
-    handledCancelSuccessRef.current = true;
-
-    const closeTimeout = window.setTimeout(() => {
-      onClose();
-    }, 0);
-    const refreshTimeout = window.setTimeout(() => {
-      router.refresh();
-    }, 220);
-
-    return () => {
-      window.clearTimeout(closeTimeout);
-      window.clearTimeout(refreshTimeout);
-    };
-  }, [cancelState.status, onClose, router]);
 
   useEffect(() => {
     if (activePanel !== "checkout" || !paymentAutofillEnabled || paymentLines.length !== 1) {
@@ -732,6 +708,25 @@ export function CreateSaleForm({
 
   function submitWalkInName() {
     updateComandaCustomerLocal(null, walkInName);
+  }
+
+  function handleCancelComandaSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    setCancelState(initialActionState);
+
+    startCancelTransition(async () => {
+      const result = await cancelComandaRequest(formData);
+      setCancelState(result);
+
+      if (result.status !== "success") {
+        return;
+      }
+
+      onComandaCancelled?.(selectedComanda.id);
+      onClose();
+    });
   }
 
   function resetCustomerSearch() {
@@ -1525,7 +1520,7 @@ export function CreateSaleForm({
                 <Trash2 className="h-4 w-4 text-destructive" />
                 Cancelar comanda
               </p>
-              <form action={cancelFormAction} className="space-y-3">
+              <form onSubmit={handleCancelComandaSubmit} className="space-y-3">
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
                 <div className="space-y-2">
                   <Label htmlFor={`cancelReason-${selectedComanda.id}`}>Motivo</Label>
@@ -1537,8 +1532,8 @@ export function CreateSaleForm({
                     required
                   />
                 </div>
-                <Button type="submit" variant="destructive" className="gap-2">
-                  Cancelar comanda
+                <Button type="submit" variant="destructive" className="gap-2" disabled={isCancellingComanda}>
+                  {isCancellingComanda ? "Cancelando..." : "Cancelar comanda"}
                 </Button>
               </form>
               <ActionFeedback state={cancelState} />

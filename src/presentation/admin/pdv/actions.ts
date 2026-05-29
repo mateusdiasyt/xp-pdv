@@ -81,6 +81,10 @@ export async function cancelSaleAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return cancelSaleRequest(formData);
+}
+
+export async function cancelSaleRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_CANCEL);
     const result = await cancelSaleRecord(formData, session.user.id);
@@ -300,6 +304,10 @@ export async function cancelComandaAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return cancelComandaRequest(formData);
+}
+
+export async function cancelComandaRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await cancelComandaRecord(formData, session.user.id);
