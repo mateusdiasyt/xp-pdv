@@ -1,7 +1,8 @@
-import { GameplayReleaseStatus } from "@prisma/client";
+import { GameplayReleaseStatus, ProductKind } from "@prisma/client";
 
 import { requirePermission } from "@/application/auth/guards";
 import { getGameplayReleaseData } from "@/application/gameplay/gameplay-release-service";
+import { getPdvData } from "@/application/pdv/pdv-service";
 import { MetricCard } from "@/components/admin/metric-card";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -27,11 +28,13 @@ const stationCatalog = [
 ];
 
 const dateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
   dateStyle: "short",
   timeStyle: "short",
 });
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
   hour: "2-digit",
   minute: "2-digit",
 });
@@ -88,7 +91,7 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
   if (isPreparing) {
     return {
       label: "PREPARANDO",
-      helper: `Comeca as ${timeFormatter.format(serviceStartsAt)}`,
+      helper: `Começa às ${timeFormatter.format(serviceStartsAt)}`,
       className: "border-amber-300/45 bg-amber-400/10",
       badgeClassName: "bg-amber-100 text-amber-800 hover:bg-amber-100",
     };
@@ -96,14 +99,14 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
 
   return {
     label: "EM USO",
-    helper: isFreeMode ? "Modo livre ate encerramento manual" : `Ocupada ate ${timeFormatter.format(release.releasedUntil)}`,
+    helper: isFreeMode ? "Modo livre até encerramento manual" : `Ocupada até ${timeFormatter.format(release.releasedUntil)}`,
     className: "border-emerald-300/45 bg-emerald-400/10",
     badgeClassName: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
   };
 }
 
 function getReleaseOriginLabel(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number]) {
-  return release.sale?.saleNumber ?? "Liberacao manual";
+  return release.sale?.saleNumber ?? "Liberação manual";
 }
 
 function getReleaseDurationLabel(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number]) {
@@ -119,10 +122,47 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
   const params = await searchParams;
   const status = normalizeStatus(params.status);
   const query = params.query?.trim() || undefined;
-  const [{ summary, releases }, serviceSnapshot] = await Promise.all([
+  const [{ summary, releases }, serviceSnapshot, pdvData] = await Promise.all([
     getGameplayReleaseData({ status, query }),
     getGameplayReleaseData(),
+    getPdvData(),
   ]);
+  const openSessionOptions = pdvData.openSessions.map((openSession) => ({
+    id: openSession.id,
+    cashRegister: {
+      name: openSession.cashRegister.name,
+      code: openSession.cashRegister.code,
+    },
+  }));
+  const gameplayProducts = pdvData.products
+    .filter((product) => product.kind === ProductKind.GAMEPLAY)
+    .map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      kind: product.kind,
+      gameplayPlanCode: product.gameplayPlanCode,
+      gameplayDurationMinutes: product.gameplayDurationMinutes,
+      salePrice: Number(product.salePrice),
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+        slug: product.category.slug,
+      },
+    }));
+  const couponOptions = pdvData.coupons.map((coupon) => ({
+    id: coupon.id,
+    code: coupon.code,
+    name: coupon.name,
+    discountType: coupon.discountType,
+    discountValue: Number(coupon.discountValue),
+    maxDiscountAmount: coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : null,
+    minSubtotalAmount: coupon.minSubtotalAmount ? Number(coupon.minSubtotalAmount) : null,
+    usageLimit: coupon.usageLimit,
+    usedCount: coupon.usedCount,
+    productIds: coupon.products.map((product) => product.productId),
+    categoryIds: coupon.categories.map((category) => category.categoryId),
+  }));
   const now = new Date();
   const activeReleases = serviceSnapshot.releases.filter(
     (release) =>
@@ -134,9 +174,9 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Controle de servicos"
-        title="Servicos ativos"
-        description="Acompanhe PS5 e simulador, evite venda duplicada e reenvie liberacoes quando precisar."
+        eyebrow="Controle de serviços"
+        title="Serviços ativos"
+        description="Acompanhe PS5 e simulador, evite venda duplicada e reenvie liberações quando precisar."
       />
       <ServicesAutoRefresh />
 
@@ -172,12 +212,15 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                     />
                   </>
                 ) : (
-                  <p>Nenhuma venda ativa nesta estacao.</p>
+                  <p>Nenhuma venda ativa nesta estação.</p>
                 )}
                 <ManualServiceControlForm
                   key={`${station.id}-${release?.id ?? "free"}`}
                   stationId={station.id}
                   isBusy={Boolean(release)}
+                  openSessions={openSessionOptions}
+                  gameplayProducts={gameplayProducts}
+                  coupons={couponOptions}
                 />
               </CardContent>
             </Card>
@@ -186,14 +229,14 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
       </section>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <MetricCard title="Liberadas" value={String(summary.released)} helper="Servico confirmado pelo PDV" />
+        <MetricCard title="Liberadas" value={String(summary.released)} helper="Serviço confirmado pelo PDV" />
         <MetricCard title="Pendentes" value={String(summary.pending)} helper="Aguardando tentativa de envio" />
         <MetricCard title="Falhas" value={String(summary.failed)} helper="Precisam de reenvio manual" />
       </section>
 
       <Card>
         <CardHeader className="border-b border-border/70 pb-4">
-          <CardTitle>Filtro de liberacoes</CardTitle>
+          <CardTitle>Filtro de liberações</CardTitle>
           <CardDescription>Busque por venda, TV, plano ou operador.</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
@@ -227,7 +270,7 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
         <CardHeader>
           <CardTitle>Status por venda</CardTitle>
           <CardDescription>
-            Cada venda de servico mantem payload, resposta, tentativas e ultimo erro para auditoria.
+            Cada venda de serviço mantém payload, resposta, tentativas e último erro para auditoria.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -247,7 +290,7 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
               {releases.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                    Nenhuma liberacao encontrada com os filtros selecionados.
+                    Nenhuma liberação encontrada com os filtros selecionados.
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -275,12 +318,12 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                       <Badge className={badge.className}>{badge.label}</Badge>
                       {release.serviceStartsAt ? (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          inicio {timeFormatter.format(release.serviceStartsAt)}
+                          início {timeFormatter.format(release.serviceStartsAt)}
                         </p>
                       ) : null}
                       {release.releasedUntil ? (
                         <p className="text-xs text-muted-foreground">
-                          ate {timeFormatter.format(release.releasedUntil)}
+                          até {timeFormatter.format(release.releasedUntil)}
                         </p>
                       ) : null}
                     </TableCell>

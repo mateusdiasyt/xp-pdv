@@ -8,6 +8,7 @@ import {
   releaseManualGameplayStation,
   triggerGameplayReleaseForSale,
 } from "@/application/gameplay/gameplay-release-service";
+import { createSaleRecord } from "@/application/pdv/pdv-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
@@ -66,6 +67,34 @@ export async function manualServiceReleaseAction(
     return {
       status: "success",
       message: result.message,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function paidServiceReleaseAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+
+  try {
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const result = await createSaleRecord(formData, session.user.id);
+
+    revalidatePath("/admin/services");
+    revalidatePath("/admin/pdv");
+
+    return {
+      status: "success",
+      message: result.gameplayMessage || "Venda registrada e serviço liberado.",
+      data: {
+        saleId: result.saleId,
+      },
     };
   } catch (error) {
     return {

@@ -82,6 +82,7 @@ function formatReleaseTime(date?: Date | null) {
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
@@ -93,11 +94,11 @@ function formatPreparationMessage(stationId: string, serviceStartsAt?: Date | nu
   const endTime = formatReleaseTime(releasedUntil);
 
   if (startTime && endTime) {
-    return `TV ${stationLabel} prepara por 30s, inicia as ${startTime} e termina as ${endTime}.`;
+    return `TV ${stationLabel} prepara por 30s, inicia às ${startTime} e termina às ${endTime}.`;
   }
 
   if (endTime) {
-    return `TV ${stationLabel} liberada ate ${endTime}.`;
+    return `TV ${stationLabel} liberada até ${endTime}.`;
   }
 
   return `TV ${stationLabel} liberada.`;
@@ -111,10 +112,10 @@ function formatManualReleaseMessage(stationId: string, label: string, releasedUn
   const stationLabel = stationId.toUpperCase();
 
   if (label === "Livre") {
-    return `${stationLabel} liberada em modo livre ate encerramento manual.`;
+    return `${stationLabel} liberada em modo livre até encerramento manual.`;
   }
 
-  return `${stationLabel} liberada por ${label}, ate ${formatReleaseTime(releasedUntil)}.`;
+  return `${stationLabel} liberada por ${label}, até ${formatReleaseTime(releasedUntil)}.`;
 }
 
 function buildReleaseDraft(

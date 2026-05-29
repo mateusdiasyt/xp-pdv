@@ -18,13 +18,21 @@ import { ReceiptPrintMode } from "@/presentation/admin/pdv/receipt-print-mode";
 import { ReceiptPreviewCard } from "@/presentation/admin/pdv/receipt-preview-card";
 
 const dayFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 });
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
   hour: "2-digit",
   minute: "2-digit",
+});
+const dateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
 });
 
 const paymentLabels: Record<PaymentMethod, string> = {
@@ -299,7 +307,7 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
 
   const groupedSales = sales.reduce<Array<{ dateKey: string; dateLabel: string; sales: typeof sales }>>(
     (accumulator, sale) => {
-      const dateKey = sale.createdAt.toISOString().slice(0, 10);
+      const dateKey = dateKeyFormatter.format(sale.createdAt);
       const group = accumulator.find((entry) => entry.dateKey === dateKey);
       if (group) {
         group.sales.push(sale);

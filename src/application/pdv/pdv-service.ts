@@ -52,9 +52,14 @@ import {
 
 function createSaleNumber() {
   const now = new Date();
-  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
-    now.getDate(),
-  ).padStart(2, "0")}`;
+  const datePart = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(now)
+    .replace(/-/g, "");
   const randomPart = Math.random().toString(36).slice(2, 7).toUpperCase();
   return `VEN-${datePart}-${randomPart}`;
 }
@@ -196,14 +201,15 @@ async function assertGameplayStationsAvailable(
 
   const serviceStartsAt = busyRelease.serviceStartsAt ?? busyRelease.paidAt;
   const isPreparing = serviceStartsAt.getTime() > Date.now();
-  const statusLabel = isPreparing ? "em preparacao" : "em uso";
+  const statusLabel = isPreparing ? "em preparação" : "em uso";
   const releasedUntil = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     hour: "2-digit",
     minute: "2-digit",
   }).format(busyRelease.releasedUntil);
 
   throw new Error(
-    `${busyRelease.stationId.toUpperCase()} ja esta ${statusLabel} ate ${releasedUntil}. Aguarde finalizar antes de vender novamente. Contate o Mateus.`,
+    `${busyRelease.stationId.toUpperCase()} já está ${statusLabel} até ${releasedUntil}. Aguarde finalizar antes de vender novamente. Contate o Mateus.`,
   );
 }
 

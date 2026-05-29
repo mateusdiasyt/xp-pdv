@@ -115,7 +115,7 @@ export function ServiceCountdown({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-muted-foreground">
-            {isPreparing ? "Preparacao" : "Tempo restante"}
+            {isPreparing ? "Preparação" : "Tempo restante"}
           </p>
           <p className="mt-1 font-mono text-3xl font-black text-foreground tabular-nums">
             {isEnded ? "00:00" : formatRemaining(remaining)}
@@ -135,7 +135,7 @@ export function ServiceCountdown({
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         {isPreparing
-          ? "O tempo de jogo ainda nao comecou."
+          ? "O tempo de jogo ainda não começou."
           : isEnded
             ? "Tempo encerrado. Atualizando disponibilidade..."
             : "Acompanhe aqui para evitar venda duplicada."}
