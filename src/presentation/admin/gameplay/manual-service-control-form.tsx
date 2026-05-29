@@ -2,7 +2,7 @@
 
 import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
 import { CreditCard, Gift, Play, Square, Ticket } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
@@ -112,6 +112,7 @@ export function ManualServiceControlForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
+  const handledSuccessRef = useRef(false);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
@@ -148,14 +149,30 @@ export function ManualServiceControlForm({
   const canPaidSubmit = Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
 
   useEffect(() => {
-    if (releaseState.status === "success" || extendState.status === "success" || paidState.status === "success") {
-      const timeout = window.setTimeout(() => {
-        setOpen(false);
-        router.refresh();
-      }, 0);
+    const succeeded = releaseState.status === "success" || extendState.status === "success" || paidState.status === "success";
 
-      return () => window.clearTimeout(timeout);
+    if (!succeeded) {
+      handledSuccessRef.current = false;
+      return;
     }
+
+    if (handledSuccessRef.current) {
+      return;
+    }
+
+    handledSuccessRef.current = true;
+
+    const closeTimeout = window.setTimeout(() => {
+      setOpen(false);
+    }, 0);
+    const refreshTimeout = window.setTimeout(() => {
+      router.refresh();
+    }, 220);
+
+    return () => {
+      window.clearTimeout(closeTimeout);
+      window.clearTimeout(refreshTimeout);
+    };
   }, [extendState.status, paidState.status, releaseState.status, router]);
 
   function openReleaseDialog() {
