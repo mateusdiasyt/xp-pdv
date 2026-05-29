@@ -50,7 +50,7 @@ import {
   cancelComandaAction,
   closeComandaAction,
   removeComandaItemRequest,
-  updateComandaCustomerAction,
+  updateComandaCustomerRequest,
   updateComandaItemRequest,
 } from "@/presentation/admin/pdv/actions";
 import {
@@ -128,6 +128,12 @@ type CreateSaleFormProps = {
   canManage: boolean;
   happyHourActive: boolean;
   onClose: () => void;
+  onComandaCustomerLabelChange?: (
+    comandaId: string,
+    customerName: string,
+    customerId: string | null,
+    isWalkIn: boolean,
+  ) => void;
 };
 
 type PaymentLine = {
@@ -315,6 +321,7 @@ export function CreateSaleForm({
   canManage,
   happyHourActive,
   onClose,
+  onComandaCustomerLabelChange,
 }: CreateSaleFormProps) {
   const router = useRouter();
   const selectedCustomerInputValue = selectedComanda.customerId ? (selectedComanda.customerName ?? "") : "";
@@ -323,14 +330,12 @@ export function CreateSaleForm({
   const [addState, setAddState] = useState(initialActionState);
   const [updateItemState, setUpdateItemState] = useState(initialActionState);
   const [removeItemState, setRemoveItemState] = useState(initialActionState);
-  const [customerState, customerFormAction, isUpdatingCustomer] = useActionState(
-    updateComandaCustomerAction,
-    initialActionState,
-  );
+  const [customerState, setCustomerState] = useState(initialActionState);
   const [saleState, saleFormAction] = useActionState(closeComandaAction, initialActionState);
   const [cancelState, cancelFormAction] = useActionState(cancelComandaAction, initialActionState);
   const [isAddingItem, startAddTransition] = useTransition();
   const [isMutatingItem, startItemMutationTransition] = useTransition();
+  const [isUpdatingCustomer, startCustomerTransition] = useTransition();
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
@@ -349,10 +354,7 @@ export function CreateSaleForm({
   const [walkInName, setWalkInName] = useState(selectedComanda.customerId ? "" : selectedComanda.customerName);
   const [optimisticCustomerLabel, setOptimisticCustomerLabel] = useState(currentCustomerLabel);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
-  const customerFormRef = useRef<HTMLFormElement>(null);
-  const customerIdInputRef = useRef<HTMLInputElement>(null);
   const handledCancelSuccessRef = useRef(false);
-  const handledCustomerSuccessRef = useRef(false);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([
     {
       id: 1,
@@ -422,21 +424,6 @@ export function CreateSaleForm({
       return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
-
-  useEffect(() => {
-    if (customerState.status !== "success") {
-      handledCustomerSuccessRef.current = false;
-      return;
-    }
-
-    if (handledCustomerSuccessRef.current) {
-      return;
-    }
-
-    handledCustomerSuccessRef.current = true;
-    const refreshTimeout = window.setTimeout(() => router.refresh(), 350);
-    return () => window.clearTimeout(refreshTimeout);
-  }, [customerState.status, router]);
 
   useEffect(() => {
     if (cancelState.status !== "success") {
@@ -717,33 +704,34 @@ export function CreateSaleForm({
     });
   }
 
-  function submitCustomerSelection(customerId: string | null, label: string) {
-    if (!customerIdInputRef.current || !customerFormRef.current) {
-      return;
-    }
+  function updateComandaCustomerLocal(customerId: string | null, label: string) {
+    const nextWalkInName = customerId ? "" : label.trim();
+    const nextLabel = customerId ? label : (nextWalkInName || "Comanda avulsa");
 
-    customerIdInputRef.current.value = customerId ?? "";
     setCustomerQuery(customerId ? label : "");
-    setOptimisticCustomerLabel(customerId ? label : (walkInName.trim() || "Comanda avulsa"));
-    if (customerId) {
-      setWalkInName("");
-    } else {
-      setWalkInName(label === "Comanda avulsa" ? "" : label);
-    }
+    setOptimisticCustomerLabel(nextLabel);
+    setWalkInName(customerId ? "" : nextWalkInName);
     setIsCustomerSearchOpen(false);
-    customerFormRef.current.requestSubmit();
+    setCustomerState(initialActionState);
+    onComandaCustomerLabelChange?.(selectedComanda.id, nextLabel, customerId, !customerId);
+
+    const formData = new FormData();
+    formData.set("comandaId", selectedComanda.id);
+    formData.set("customerId", customerId ?? "");
+    formData.set("customerName", customerId ? "" : nextWalkInName);
+
+    startCustomerTransition(async () => {
+      const result = await updateComandaCustomerRequest(formData);
+      setCustomerState(result);
+    });
+  }
+
+  function submitCustomerSelection(customerId: string | null, label: string) {
+    updateComandaCustomerLocal(customerId, label === "Comanda avulsa" ? "" : label);
   }
 
   function submitWalkInName() {
-    if (!customerIdInputRef.current || !customerFormRef.current) {
-      return;
-    }
-
-    customerIdInputRef.current.value = "";
-    setCustomerQuery("");
-    setOptimisticCustomerLabel(walkInName.trim() || "Comanda avulsa");
-    setIsCustomerSearchOpen(false);
-    customerFormRef.current.requestSubmit();
+    updateComandaCustomerLocal(null, walkInName);
   }
 
   function resetCustomerSearch() {
@@ -769,64 +757,58 @@ export function CreateSaleForm({
         <div className="flex w-full items-start justify-end gap-2 sm:w-auto">
           {canManage ? (
             <div className="relative w-full max-w-xl">
-              <form ref={customerFormRef} action={customerFormAction}>
-                <input type="hidden" name="comandaId" value={selectedComanda.id} />
-                <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
-                <input ref={customerIdInputRef} type="hidden" name="customerId" defaultValue={selectedComanda.customerId ?? ""} />
-                <input type="hidden" name="customerName" value={selectedComanda.customerId ? "" : walkInName} />
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-                  <Input
-                    value={customerQuery}
-                    onChange={(event) => {
-                      setCustomerQuery(event.target.value);
-                      setIsCustomerSearchOpen(true);
-                    }}
-                    onFocus={() => setIsCustomerSearchOpen(true)}
-                    onBlur={() => {
-                      window.setTimeout(resetCustomerSearch, 120);
-                    }}
-                    placeholder={
-                      !selectedComanda.customerId && !isCustomerSearchOpen
-                        ? "Comanda avulsa"
-                        : "Buscar cliente ou CPF"
-                    }
-                    className="h-10 rounded-full border-border/70 bg-background/68 pl-9 pr-10 text-sm"
-                    disabled={isUpdatingCustomer}
-                    autoComplete="off"
-                  />
-                  {isUpdatingCustomer ? (
-                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                  ) : null}
-                </div>
-                {!selectedComanda.customerId ? (
-                  <div className="mt-2 flex gap-2">
-                    <Input
-                      value={walkInName}
-                      onChange={(event) => setWalkInName(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          submitWalkInName();
-                        }
-                      }}
-                      placeholder="Nome da comanda"
-                      className="h-9 rounded-full border-border/70 bg-background/68 text-sm"
-                      maxLength={120}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 shrink-0 rounded-full"
-                      onClick={submitWalkInName}
-                      disabled={isUpdatingCustomer}
-                    >
-                      Renomear
-                    </Button>
-                  </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+                <Input
+                  value={customerQuery}
+                  onChange={(event) => {
+                    setCustomerQuery(event.target.value);
+                    setIsCustomerSearchOpen(true);
+                  }}
+                  onFocus={() => setIsCustomerSearchOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(resetCustomerSearch, 120);
+                  }}
+                  placeholder={
+                    !selectedComanda.customerId && !isCustomerSearchOpen
+                      ? "Comanda avulsa"
+                      : "Buscar cliente ou CPF"
+                  }
+                  className="h-10 rounded-full border-border/70 bg-background/68 pl-9 pr-10 text-sm"
+                  disabled={isUpdatingCustomer}
+                  autoComplete="off"
+                />
+                {isUpdatingCustomer ? (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                 ) : null}
-              </form>
+              </div>
+              {!selectedComanda.customerId ? (
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    value={walkInName}
+                    onChange={(event) => setWalkInName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        submitWalkInName();
+                      }
+                    }}
+                    placeholder="Nome da comanda"
+                    className="h-9 rounded-full border-border/70 bg-background/68 text-sm"
+                    maxLength={120}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-full"
+                    onClick={submitWalkInName}
+                    disabled={isUpdatingCustomer}
+                  >
+                    Renomear
+                  </Button>
+                </div>
+              ) : null}
 
               {isCustomerSearchOpen ? (
                 <div className="absolute right-0 top-[calc(100%+0.55rem)] z-20 w-full overflow-hidden rounded-[1.25rem] border border-border/80 bg-popover/96 shadow-2xl shadow-black/30 backdrop-blur">

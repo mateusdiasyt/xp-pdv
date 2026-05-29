@@ -266,6 +266,10 @@ export async function updateComandaCustomerAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return updateComandaCustomerRequest(formData);
+}
+
+export async function updateComandaCustomerRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await updateComandaCustomerRecord(formData, session.user.id);

@@ -174,13 +174,18 @@ export function PdvWorkspace({
   const [createDialogPresetNumber, setCreateDialogPresetNumber] = useState<number | undefined>(undefined);
   const [lockCreateDialogNumber, setLockCreateDialogNumber] = useState(false);
   const [isHappyHourActive, setIsHappyHourActive] = useState(happyHourActive);
+  const [localOpenComandas, setLocalOpenComandas] = useState(openComandas);
 
   useEffect(() => {
     setIsHappyHourActive(happyHourActive);
   }, [happyHourActive]);
 
-  const selectedComanda = openComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
-  const highestActiveNumber = openComandas.reduce(
+  useEffect(() => {
+    setLocalOpenComandas(openComandas);
+  }, [openComandas]);
+
+  const selectedComanda = localOpenComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
+  const highestActiveNumber = localOpenComandas.reduce(
     (currentMax, comanda) => Math.max(currentMax, comanda.number),
     DEFAULT_SLOT_COUNT,
   );
@@ -284,7 +289,7 @@ export function PdvWorkspace({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3.5">
               <div>
                 <CardTitle>Comandas abertas</CardTitle>
-                <p className="text-sm text-muted-foreground">{openComandas.length} ativas em {visibleSlotCount} slots.</p>
+                <p className="text-sm text-muted-foreground">{localOpenComandas.length} ativas em {visibleSlotCount} slots.</p>
               </div>
               {canManage ? (
                 <Button type="button" size="sm" className="gap-2" onClick={handleOpenManualCreateDialog}>
@@ -296,7 +301,7 @@ export function PdvWorkspace({
 
             <OpenComandasBoard
               canManage={canManage}
-              openComandas={openComandas}
+              openComandas={localOpenComandas}
               slotCount={visibleSlotCount}
               selectedComandaId={selectedComandaId}
               onAddSlot={handleAddSlot}
@@ -319,6 +324,20 @@ export function PdvWorkspace({
                 happyHourActive={isHappyHourActive}
                 selectedComanda={selectedComanda}
                 onClose={() => setSelectedComandaId(null)}
+                onComandaCustomerLabelChange={(comandaId, customerName, customerId, isWalkIn) => {
+                  setLocalOpenComandas((currentComandas) =>
+                    currentComandas.map((comanda) =>
+                      comanda.id === comandaId
+                        ? {
+                            ...comanda,
+                            customerName,
+                            customerId,
+                            isWalkIn,
+                          }
+                        : comanda,
+                    ),
+                  );
+                }}
               />
             </CardContent>
           </Card>
