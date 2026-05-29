@@ -311,7 +311,7 @@ export function QuickSaleForm({
   const deferredProductSearch = useDeferredValue(productSearch);
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
-  const [discountAmount, setDiscountAmount] = useState("0.00");
+  const discountAmount = "0.00";
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
   const [selectedCashSessionId, setSelectedCashSessionId] = useState(openSessions[0]?.id ?? "");
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
@@ -325,6 +325,7 @@ export function QuickSaleForm({
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [quickSaleStep, setQuickSaleStep] = useState<QuickSaleStep>("items");
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
+  const [couponPanelOpen, setCouponPanelOpen] = useState(false);
 
   const hasOpenSessions = openSessions.length > 0;
   const hasProducts = products.length > 0;
@@ -1127,109 +1128,28 @@ export function QuickSaleForm({
                     </div>
                   ))}
               </div>
-              </section>
 
-              <aside className="space-y-4">
-                <section className="rounded-[1.35rem] border border-primary/25 bg-primary/8 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resumo</p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Itens</span>
-                      <span>{cartItems.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Subtotal</span>
-                      <span>{formatCurrency(subtotalInCents / 100)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Desconto</span>
-                      <span>{formatCurrency(discountInCents / 100)}</span>
-                    </div>
-                    <div className="border-t border-primary/20 pt-3">
-                      <div className="flex items-center justify-between text-lg font-semibold text-foreground">
-                        <span>Total</span>
-                        <span>{formatCurrency(totalInCents / 100)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="admin-form-section space-y-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Wallet className="h-4 w-4 text-primary" />
-              Fechamento rapido
-            </p>
-
-            <div className="grid gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="quick-sale-payment-discount">Desconto manual (R$)</Label>
-                <Input
-                  id="quick-sale-payment-discount"
-                  value={discountAmount}
-                  onChange={(event) => setDiscountAmount(event.target.value)}
-                  onBlur={() => {
-                    if (!discountAmount.trim()) {
-                      setDiscountAmount("0.00");
-                    }
-                  }}
-                  placeholder="0.00"
-                />
-                {discountExceedsSubtotal ? (
-                  <p className="text-xs font-medium text-destructive">
-                    Desconto maior que o subtotal. Ajuste o valor para finalizar.
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quick-sale-payment-coupon">Cupom</Label>
-                <select
-                  id="quick-sale-payment-coupon"
-                  value={appliedCouponCode}
-                  onChange={(event) => selectCoupon(event.target.value)}
-                  className="admin-native-select"
-                >
-                  <option value="">Selecionar cupom</option>
-                  {coupons.map((coupon) => (
-                    <option key={coupon.id} value={coupon.code}>
-                      {coupon.name} - {formatCouponValue(coupon)}
-                    </option>
-                  ))}
-                </select>
-                {appliedCouponCode ? (
-                  <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-muted-foreground">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium text-foreground">{appliedCoupon?.code}</span>
-                      <span className="font-semibold text-primary">
-                        {appliedCoupon ? formatCouponValue(appliedCoupon) : null}
-                      </span>
-                    </div>
-                    <p className="mt-1">{couponPreview?.message ?? `Desconto: ${formatCurrency(couponDiscountInCents / 100)}`}</p>
-                  </div>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={paymentLines.length !== 1}
-                onClick={syncSinglePaymentWithTotal}
-              >
-                Ajustar pagamento
-              </Button>
-            </div>
-                </section>
-              </aside>
-
-              <section className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4 xl:col-span-2">
+              <section className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Receipt className="h-4 w-4 text-primary" />
-                  Formas de pagamento
+                  Pagamento
                 </p>
-                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={addPaymentLine}>
-                  <Plus className="h-4 w-4" />
-                  Adicionar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={paymentLines.length !== 1}
+                    onClick={syncSinglePaymentWithTotal}
+                  >
+                    Ajustar
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="gap-2" onClick={addPaymentLine}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -1260,7 +1180,7 @@ export function QuickSaleForm({
 
                         <div className="space-y-2">
                           <Label htmlFor={`quick-payment-amount-${paymentLine.id}`}>
-                            {paymentLine.method === PaymentMethod.CASH ? "Valor recebido (R$)" : "Valor (R$)"}
+                            {paymentLine.method === PaymentMethod.CASH ? "Recebido (R$)" : "Valor (R$)"}
                           </Label>
                           <Input
                             id={`quick-payment-amount-${paymentLine.id}`}
@@ -1288,11 +1208,11 @@ export function QuickSaleForm({
                       {traceablePayment ? (
                         <details className="mt-3 rounded-[1rem] border border-border/60 bg-background/24 p-3">
                           <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground">
-                            Auditoria da transacao
+                            Auditoria
                           </summary>
                           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                             <div className="space-y-2">
-                              <Label htmlFor={`quick-payment-approved-${paymentLine.id}`}>Valor aprovado (R$)</Label>
+                              <Label htmlFor={`quick-payment-approved-${paymentLine.id}`}>Aprovado (R$)</Label>
                               <Input
                                 id={`quick-payment-approved-${paymentLine.id}`}
                                 name="paymentApprovedAmount"
@@ -1322,7 +1242,7 @@ export function QuickSaleForm({
                                 onChange={(event) =>
                                   updatePaymentLine(paymentLine.id, "authorizationCode", event.target.value)
                                 }
-                                placeholder="Codigo da maquininha"
+                                placeholder="Codigo"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1352,7 +1272,7 @@ export function QuickSaleForm({
                                   />
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor={`quick-payment-last4-${paymentLine.id}`}>Final do cartao</Label>
+                                  <Label htmlFor={`quick-payment-last4-${paymentLine.id}`}>Final</Label>
                                   <Input
                                     id={`quick-payment-last4-${paymentLine.id}`}
                                     name="paymentCardLast4"
@@ -1373,7 +1293,7 @@ export function QuickSaleForm({
                               </>
                             )}
                             <div className="space-y-2 md:col-span-2">
-                              <Label htmlFor={`quick-payment-external-${paymentLine.id}`}>ID unico da transacao</Label>
+                              <Label htmlFor={`quick-payment-external-${paymentLine.id}`}>ID da transacao</Label>
                               <Input
                                 id={`quick-payment-external-${paymentLine.id}`}
                                 name="paymentExternalTransactionId"
@@ -1381,11 +1301,11 @@ export function QuickSaleForm({
                                 onChange={(event) =>
                                   updatePaymentLine(paymentLine.id, "externalTransactionId", event.target.value)
                                 }
-                                placeholder="ID do TEF, Pix ou comprovante"
+                                placeholder="TEF, Pix ou comprovante"
                               />
                             </div>
                             <div className="space-y-2 md:col-span-2">
-                              <Label htmlFor={`quick-payment-receipt-${paymentLine.id}`}>Comprovante / observacao</Label>
+                              <Label htmlFor={`quick-payment-receipt-${paymentLine.id}`}>Observacao</Label>
                               <Textarea
                                 id={`quick-payment-receipt-${paymentLine.id}`}
                                 name="paymentReceiptText"
@@ -1394,7 +1314,7 @@ export function QuickSaleForm({
                                   updatePaymentLine(paymentLine.id, "receiptText", event.target.value)
                                 }
                                 rows={2}
-                                placeholder="Opcional: cole dados do comprovante"
+                                placeholder="Opcional"
                               />
                             </div>
                           </div>
@@ -1415,49 +1335,106 @@ export function QuickSaleForm({
                   );
                 })}
               </div>
+              <div className="grid gap-2 border-t border-border/70 pt-3 text-sm text-muted-foreground sm:grid-cols-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Pagamentos</span>
+                  <span>{formatCurrency(paymentsTotalInCents / 100)}</span>
+                </div>
+                {hasCashPayment ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Troco</span>
+                    <span>{formatCurrency(changeInCents / 100)}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-2 font-medium text-foreground">
+                  <span>{paymentDifferenceInCents > 0 ? "Falta" : paymentDifferenceInCents < 0 ? "Excesso" : "Status"}</span>
+                  <span>
+                    {paymentDifferenceInCents === 0
+                      ? "OK"
+                      : formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}
+                  </span>
+                </div>
+              </div>
               </section>
-              <input type="hidden" name="cashReceived" value="" />
+              </section>
 
-            <div className="space-y-3 rounded-[1.35rem] border border-border/75 bg-background/32 p-4 xl:col-span-2">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Subtotal</span>
-                <span>{formatCurrency(subtotalInCents / 100)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Desconto</span>
-                <span>{formatCurrency(discountInCents / 100)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Pagamentos</span>
-                <span>{formatCurrency(paymentsTotalInCents / 100)}</span>
-              </div>
-              {hasCashPayment ? (
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>Troco</span>
-                  <span>{formatCurrency(changeInCents / 100)}</span>
-                </div>
-              ) : null}
-              <div className="border-t border-border/70 pt-3">
-                <div className="flex items-center justify-between text-base font-semibold text-foreground">
-                  <span>Total</span>
-                  <span>{formatCurrency(totalInCents / 100)}</span>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {paymentDifferenceInCents === 0
-                    ? "Pagamentos conferem com o total da venda."
-                    : paymentDifferenceInCents > 0
-                      ? `Falta ${formatCurrency(paymentDifferenceInCents / 100)} para fechar a venda.`
-                      : hasCashPayment
-                        ? `Troco previsto de ${formatCurrency(changeInCents / 100)}.`
-                        : `Pagamentos excedem em ${formatCurrency(Math.abs(paymentDifferenceInCents) / 100)}. Troco so pode ser calculado em pagamento com dinheiro.`}
-                </p>
-              </div>
-            </div>
+              <aside className="space-y-4">
+                <section className="rounded-[1.35rem] border border-primary/25 bg-primary/8 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resumo</p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Itens</span>
+                      <span>{cartItems.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>{formatCurrency(subtotalInCents / 100)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Desconto</span>
+                      <span>{formatCurrency(discountInCents / 100)}</span>
+                    </div>
+                    <div className="border-t border-primary/20 pt-3">
+                      <div className="flex items-center justify-between text-lg font-semibold text-foreground">
+                        <span>Total</span>
+                        <span>{formatCurrency(totalInCents / 100)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="admin-form-section space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      Cupom
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCouponPanelOpen((current) => !current)}
+                    >
+                      {couponPanelOpen || appliedCouponCode ? "Ocultar" : "Aplicar cupom"}
+                    </Button>
+                  </div>
+
+                  {couponPanelOpen || appliedCouponCode ? (
+                    <div className="space-y-2">
+                      <select
+                        id="quick-sale-payment-coupon"
+                        value={appliedCouponCode}
+                        onChange={(event) => selectCoupon(event.target.value)}
+                        className="admin-native-select"
+                      >
+                        <option value="">Selecionar cupom</option>
+                        {coupons.map((coupon) => (
+                          <option key={coupon.id} value={coupon.code}>
+                            {coupon.name} - {formatCouponValue(coupon)}
+                          </option>
+                        ))}
+                      </select>
+                      {appliedCouponCode ? (
+                        <div className="rounded-xl border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-foreground">{appliedCoupon?.code}</span>
+                            <span className="font-semibold text-primary">
+                              {appliedCoupon ? formatCouponValue(appliedCoupon) : null}
+                            </span>
+                          </div>
+                          <p className="mt-1">
+                            {couponPreview?.message ?? `Desconto: ${formatCurrency(couponDiscountInCents / 100)}`}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </section>
 
             <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
               <AlertDialogTrigger
                 render={
-                  <Button type="button" disabled={!canSubmitQuickSale} className="gap-2" />
+                  <Button type="button" disabled={!canSubmitQuickSale} className="w-full gap-2" />
                 }
               >
                 <Check className="h-4 w-4" />
@@ -1520,6 +1497,8 @@ export function QuickSaleForm({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+              </aside>
+
             <ActionFeedback state={saleState} />
             </div>
           )}
