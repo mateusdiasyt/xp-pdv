@@ -438,6 +438,12 @@ export function CreateSaleForm({
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
 
   useEffect(() => {
+    if (saleState.status === "error") {
+      setIsFinalizeDialogOpen(false);
+    }
+  }, [saleState.status]);
+
+  useEffect(() => {
     if (activePanel !== "checkout" || !paymentAutofillEnabled || paymentLines.length !== 1) {
       return;
     }
@@ -1513,6 +1519,8 @@ export function CreateSaleForm({
                           <span className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</span>
                         </div>
                       </div>
+
+                      {saleState.status === "error" ? <ActionFeedback state={saleState} /> : null}
 
                       <AlertDialogFooter className="-mx-5 -mb-5 mt-1 rounded-b-[1.5rem] border-border/70 bg-background/45 p-4">
                         <AlertDialogCancel>Voltar</AlertDialogCancel>
