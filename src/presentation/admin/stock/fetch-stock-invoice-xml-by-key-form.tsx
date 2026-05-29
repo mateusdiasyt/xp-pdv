@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { HelpCircle } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
@@ -11,14 +12,24 @@ import { initialActionState } from "@/presentation/admin/common/action-state";
 import { fetchStockInvoiceXmlByAccessKeyAction } from "@/presentation/admin/stock/actions";
 
 export function FetchStockInvoiceXmlByKeyForm() {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction] = useActionState(fetchStockInvoiceXmlByAccessKeyAction, initialActionState);
 
   useEffect(() => {
     if (state.status === "success") {
       formRef.current?.reset();
+
+      const reviewUrl =
+        state.data && typeof state.data === "object" && "reviewUrl" in state.data
+          ? String((state.data as { reviewUrl?: unknown }).reviewUrl ?? "")
+          : "";
+
+      if (reviewUrl) {
+        router.push(reviewUrl);
+      }
     }
-  }, [state]);
+  }, [router, state]);
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-4">

@@ -60,6 +60,7 @@ export async function uploadStockInvoiceXmlAction(
     if (result.imported) {
       revalidatePath("/admin/products");
     }
+    revalidatePath("/admin/stock");
 
     return {
       status: "success",
@@ -70,6 +71,12 @@ export async function uploadStockInvoiceXmlAction(
         },
         result,
       ),
+      data: result.stockInvoiceXmlId
+        ? {
+            stockInvoiceXmlId: result.stockInvoiceXmlId,
+            reviewUrl: `/admin/stock/xml/${result.stockInvoiceXmlId}`,
+          }
+        : undefined,
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -87,6 +94,7 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
     if (result.imported) {
       revalidatePath("/admin/products");
     }
+    revalidatePath("/admin/stock");
 
     return {
       status: "success",
@@ -97,6 +105,12 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
         },
         result,
       ),
+      data: result.stockInvoiceXmlId
+        ? {
+            stockInvoiceXmlId: result.stockInvoiceXmlId,
+            reviewUrl: `/admin/stock/xml/${result.stockInvoiceXmlId}`,
+          }
+        : undefined,
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -118,6 +132,8 @@ export async function importStockInvoiceXmlItemsAction(
 
     const result = await importStockInvoiceXmlById(stockInvoiceXmlId, session.user.id);
     revalidatePath("/admin/products");
+    revalidatePath("/admin/stock");
+    revalidatePath(`/admin/stock/xml/${stockInvoiceXmlId}`);
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,
@@ -147,6 +163,10 @@ export async function importReviewedStockInvoiceXmlAction(
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
     const result = await importReviewedStockInvoiceXmlRecord(formData, session.user.id);
     revalidatePath("/admin/products");
+    revalidatePath("/admin/stock");
+    if (result.stockInvoiceXmlId) {
+      revalidatePath(`/admin/stock/xml/${result.stockInvoiceXmlId}`);
+    }
 
     const summaryParts = [
       `${result.stockMovements} entrada(s)`,
@@ -161,6 +181,10 @@ export async function importReviewedStockInvoiceXmlAction(
     return {
       status: "success",
       message: `Entrada XML confirmada: ${summaryParts.join(" | ")}.`,
+      data: {
+        stockInvoiceXmlId: result.stockInvoiceXmlId,
+        stockUrl: "/admin/stock?panel=xml",
+      },
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

@@ -320,6 +320,77 @@ export default async function StockPage({ searchParams }: StockPageProps) {
               {xmlHistory?.setupPending ? (
                 <p className="text-sm text-amber-600">Tabela de XML pendente no banco.</p>
               ) : (
+                <>
+                <div className="space-y-3 md:hidden">
+                  {xmlHistory?.entries.length === 0 ? (
+                    <p className="rounded-xl border border-border/70 bg-card/50 p-4 text-center text-sm text-muted-foreground">
+                      Nenhum XML carregado.
+                    </p>
+                  ) : null}
+
+                  {xmlHistory?.entries.map((xmlEntry) => (
+                    <div key={`mobile-${xmlEntry.id}`} className="space-y-3 rounded-2xl border border-border/75 bg-card/55 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {xmlEntry.supplierName ?? "Fornecedor nao identificado"}
+                          </p>
+                          <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                            {xmlEntry.accessKey.slice(0, 12)}...
+                          </p>
+                        </div>
+                        {xmlEntry.importedAt ? (
+                          <Badge className="shrink-0 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Importado</Badge>
+                        ) : (
+                          <Badge className="shrink-0 bg-amber-100 text-amber-700 hover:bg-amber-100">Pendente</Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <span>Nota {xmlEntry.invoiceNumber ? `N${xmlEntry.invoiceNumber}` : "-"}</span>
+                        <span>{xmlEntry.issuedAt ? dateOnlyFormatter.format(xmlEntry.issuedAt) : "-"}</span>
+                        <span>{xmlEntry.itemCount} item(ns)</span>
+                        <span>{xmlEntry.totalAmount ? currencyFormatter.format(Number(xmlEntry.totalAmount)) : "-"}</span>
+                      </div>
+
+                      {canManage && !xmlEntry.importedAt ? (
+                        <Link
+                          href={`/admin/stock/xml/${xmlEntry.id}`}
+                          className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25"
+                        >
+                          Conferir entrada
+                        </Link>
+                      ) : null}
+
+                      {xmlEntry.previewError ? (
+                        <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                          {xmlEntry.previewError}
+                        </p>
+                      ) : xmlEntry.preview ? (
+                        <details className="group rounded-xl border border-border/70 bg-background/45 p-3">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                            <span>Ver itens lidos</span>
+                            <span className="text-xs font-medium text-muted-foreground group-open:hidden">Abrir</span>
+                            <span className="hidden text-xs font-medium text-muted-foreground group-open:inline">Fechar</span>
+                          </summary>
+                          <div className="mt-3 space-y-2">
+                            {xmlEntry.preview.shownItems.map((item) => (
+                              <div key={`${xmlEntry.id}-mobile-${item.lineNumber}`} className="rounded-xl border border-border/70 bg-card/50 p-3">
+                                <p className="line-clamp-2 text-sm font-semibold text-foreground">{item.description}</p>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {item.quantity} un | Custo {currencyFormatter.format(item.unitCost)} | Total{" "}
+                                  {currencyFormatter.format(item.totalCost)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -426,6 +497,8 @@ export default async function StockPage({ searchParams }: StockPageProps) {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </div>
           </SheetContent>

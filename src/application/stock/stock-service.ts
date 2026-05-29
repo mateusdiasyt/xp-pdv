@@ -57,6 +57,7 @@ type ParsedStockInvoiceXml = {
 
 type StockXmlImportSummary = {
   imported: boolean;
+  stockInvoiceXmlId?: string;
   createdProducts: number;
   updatedProducts: number;
   stockMovements: number;
@@ -1072,6 +1073,7 @@ async function storeRawStockInvoiceXmlRecord(params: {
 
   const importSummary: StockXmlImportSummary = {
     imported: false,
+    stockInvoiceXmlId: created.id,
     createdProducts: 0,
     updatedProducts: 0,
     stockMovements: 0,
@@ -1142,6 +1144,7 @@ export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actor
 
   return {
     imported: true,
+    stockInvoiceXmlId: xmlRecord.id,
     createdProducts: summary.createdProducts,
     updatedProducts: summary.updatedProducts,
     stockMovements: summary.stockMovements,
@@ -1204,6 +1207,7 @@ export async function importReviewedStockInvoiceXmlRecord(input: FormData, actor
 
   return {
     imported: true,
+    stockInvoiceXmlId: xmlRecord.id,
     ...summary,
   };
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { StockUnit } from "@prisma/client";
 import { ImageIcon, PackageCheck } from "lucide-react";
 import type { ChangeEvent } from "react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { FormSubmitButton } from "@/components/admin/form-submit-button";
@@ -659,7 +660,23 @@ export function StockInvoiceXmlReviewForm({
   products,
   items,
 }: StockInvoiceXmlReviewFormProps) {
+  const router = useRouter();
   const [state, formAction] = useActionState(importReviewedStockInvoiceXmlAction, initialActionState);
+
+  useEffect(() => {
+    if (state.status !== "success") {
+      return;
+    }
+
+    const stockUrl =
+      state.data && typeof state.data === "object" && "stockUrl" in state.data
+        ? String((state.data as { stockUrl?: unknown }).stockUrl ?? "")
+        : "";
+
+    if (stockUrl) {
+      router.push(stockUrl);
+    }
+  }, [router, state]);
 
   return (
     <form
