@@ -12,7 +12,10 @@ export async function saveCouponAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return saveCouponRequest(formData);
+}
 
+export async function saveCouponRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await saveCouponRecord(formData, session.user.id);

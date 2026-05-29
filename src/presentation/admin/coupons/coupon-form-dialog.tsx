@@ -2,7 +2,7 @@
 
 import { CouponDiscountType, RecordStatus } from "@prisma/client";
 import { BadgePercent, Boxes, Globe2, HelpCircle, Package, Pencil, Plus } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { initialActionState } from "@/presentation/admin/common/action-state";
-import { saveCouponAction } from "@/presentation/admin/coupons/actions";
+import { saveCouponRequest } from "@/presentation/admin/coupons/actions";
 
 type ProductOption = {
   id: string;
@@ -78,7 +78,8 @@ function Help({ title }: { title: string }) {
 
 export function CouponFormDialog({ coupon, products, categories }: CouponFormDialogProps) {
   const [open, setOpen] = useState(false);
-  const [state, action, isPending] = useActionState(saveCouponAction, initialActionState);
+  const [state, setState] = useState(initialActionState);
+  const [isPending, startTransition] = useTransition();
   const selectedProductIds = new Set(coupon?.products.map((product) => product.productId) ?? []);
   const selectedCategoryIds = new Set(coupon?.categories.map((category) => category.categoryId) ?? []);
   const initialScope: CouponScope =
@@ -99,6 +100,17 @@ export function CouponFormDialog({ coupon, products, categories }: CouponFormDia
     }
   }, [initialScope, open]);
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    setState(initialActionState);
+    startTransition(async () => {
+      const result = await saveCouponRequest(formData);
+      setState(result);
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button type="button" size={coupon ? "icon-sm" : "sm"} variant={coupon ? "ghost" : "default"} />}>
@@ -113,7 +125,7 @@ export function CouponFormDialog({ coupon, products, categories }: CouponFormDia
           </DialogTitle>
         </DialogHeader>
 
-        <form action={action} className="admin-scrollbar max-h-[78vh] space-y-4 overflow-y-auto p-5">
+        <form onSubmit={handleSubmit} className="admin-scrollbar max-h-[78vh] space-y-4 overflow-y-auto p-5">
           <input type="hidden" name="couponId" value={coupon?.id ?? ""} />
 
           <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_150px]">

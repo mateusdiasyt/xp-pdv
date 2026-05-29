@@ -342,6 +342,9 @@ export function CreateSaleForm({
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
+  const [quantityByItem, setQuantityByItem] = useState<Record<string, string>>(
+    Object.fromEntries(selectedComanda.items.map((item) => [item.productId, String(item.quantity)])),
+  );
   const [customerQuery, setCustomerQuery] = useState(selectedCustomerInputValue);
   const [walkInName, setWalkInName] = useState(selectedComanda.customerId ? "" : selectedComanda.customerName);
   const [optimisticCustomerLabel, setOptimisticCustomerLabel] = useState(currentCustomerLabel);
@@ -621,14 +624,8 @@ export function CreateSaleForm({
     });
   }
 
-  function handleUpdateItemSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-    item: SelectedComanda["items"][number],
-  ) {
-    event.preventDefault();
-
-    const formData = new FormData(event.currentTarget);
-    const quantity = Number(formData.get("quantity") ?? 0);
+  function handleUpdateItem(item: SelectedComanda["items"][number]) {
+    const quantity = Number(quantityByItem[item.productId] ?? item.quantity);
 
     if (!Number.isFinite(quantity) || quantity < 1) {
       setUpdateItemState({
@@ -640,6 +637,10 @@ export function CreateSaleForm({
 
     const previousItems = optimisticItems;
     const unitPrice = item.quantity > 0 ? item.lineTotal / item.quantity : item.lineTotal;
+    const formData = new FormData();
+    formData.set("comandaId", selectedComanda.id);
+    formData.set("productId", item.productId);
+    formData.set("quantity", String(quantity));
 
     setUpdateItemState(initialActionState);
     setOptimisticItems((currentItems) =>
@@ -665,13 +666,10 @@ export function CreateSaleForm({
     });
   }
 
-  function handleRemoveItemSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-    item: SelectedComanda["items"][number],
-  ) {
-    event.preventDefault();
-
-    const formData = new FormData(event.currentTarget);
+  function handleRemoveItem(item: SelectedComanda["items"][number]) {
+    const formData = new FormData();
+    formData.set("comandaId", selectedComanda.id);
+    formData.set("productId", item.productId);
     const previousItems = optimisticItems;
 
     setRemoveItemState(initialActionState);
@@ -1090,37 +1088,38 @@ export function CreateSaleForm({
                     <div className="mt-3 flex flex-wrap items-end gap-2">
                       {canManage ? (
                         <>
-                          <form onSubmit={(event) => handleUpdateItemSubmit(event, item)} className="flex flex-wrap items-end gap-2">
-                            <input type="hidden" name="comandaId" value={selectedComanda.id} />
-                            <input type="hidden" name="productId" value={item.productId} />
+                          <div className="flex flex-wrap items-end gap-2">
                             <div className="space-y-1">
                               <Label htmlFor={`item-quantity-${selectedComanda.id}-${item.productId}`}>Qtd</Label>
                               <Input
                                 id={`item-quantity-${selectedComanda.id}-${item.productId}`}
-                                name="quantity"
                                 type="number"
                                 min={1}
                                 step={1}
-                                defaultValue={item.quantity}
+                                value={quantityByItem[item.productId] ?? String(item.quantity)}
+                                onChange={(event) =>
+                                  setQuantityByItem((currentMap) => ({
+                                    ...currentMap,
+                                    [item.productId]: event.target.value,
+                                  }))
+                                }
                                 inputMode="numeric"
                                 className={`w-24 ${quantityInputClassName}`}
                                 required
                               />
                             </div>
-                            <Button type="submit" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem}>
+                            <Button type="button" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem} onClick={() => handleUpdateItem(item)}>
                               {isMutatingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                               <span className="sr-only">Atualizar quantidade do item</span>
                             </Button>
-                          </form>
+                          </div>
 
-                          <form onSubmit={(event) => handleRemoveItemSubmit(event, item)}>
-                            <input type="hidden" name="comandaId" value={selectedComanda.id} />
-                            <input type="hidden" name="productId" value={item.productId} />
-                            <Button type="submit" variant="outline" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem}>
+                          <div>
+                            <Button type="button" variant="outline" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem} onClick={() => handleRemoveItem(item)}>
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Remover item da comanda</span>
                             </Button>
-                          </form>
+                          </div>
                         </>
                       ) : (
                         <span className="text-xs text-muted-foreground">{item.quantity} unidade(s)</span>
