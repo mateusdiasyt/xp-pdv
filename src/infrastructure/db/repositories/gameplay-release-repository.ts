@@ -288,6 +288,58 @@ export async function endActiveGameplayReleaseByStationId(stationId: string, now
   });
 }
 
+export async function extendActiveGameplayReleaseByStationId(data: {
+  stationId: string;
+  minutesToAdd: number;
+  operator: string;
+  saleId?: string;
+  now?: Date;
+}) {
+  const now = data.now ?? new Date();
+  const activeRelease = await prisma.gameplayRelease.findFirst({
+    where: {
+      stationId: data.stationId,
+      status: GameplayReleaseStatus.LIBERADA,
+      releasedUntil: {
+        gt: now,
+      },
+      ...completedSaleOrManualReleaseWhere,
+    },
+    orderBy: {
+      releasedUntil: "desc",
+    },
+  });
+
+  if (!activeRelease?.releasedUntil) {
+    return null;
+  }
+
+  const releasedUntil = new Date(activeRelease.releasedUntil.getTime() + data.minutesToAdd * 60_000);
+
+  return prisma.gameplayRelease.update({
+    where: {
+      id: activeRelease.id,
+    },
+    data: {
+      durationMinutes: activeRelease.durationMinutes + data.minutesToAdd,
+      releasedUntil,
+      responsePayload: {
+        status: "EXTENDED",
+        extendedAt: now.toISOString(),
+        previousReleasedUntil: activeRelease.releasedUntil.toISOString(),
+        releasedUntil: releasedUntil.toISOString(),
+        stationId: activeRelease.stationId,
+        planCode: activeRelease.planCode,
+        minutesAdded: data.minutesToAdd,
+        operator: data.operator,
+        saleId: data.saleId ?? null,
+      },
+      lastError: null,
+      lastAttemptAt: now,
+    },
+  });
+}
+
 export async function markGameplayReleaseFailureWithoutRequest(data: {
   saleId: string;
   requestPayload: Prisma.InputJsonValue;

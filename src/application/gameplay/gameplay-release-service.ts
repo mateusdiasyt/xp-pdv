@@ -5,6 +5,7 @@ import {
   countGameplayReleasesByStatus,
   createManualGameplayRelease,
   endActiveGameplayReleaseByStationId,
+  extendActiveGameplayReleaseByStationId,
   getBusyGameplayReleasesByStationIds,
   getSaleGameplaySnapshot,
   listGameplayReleases,
@@ -538,6 +539,53 @@ export async function releaseManualGameplayStation(data: {
   return {
     release,
     message: formatManualReleaseMessage(stationId, option.label, releasedUntil),
+  };
+}
+
+export async function extendManualGameplayStation(data: {
+  stationId: string;
+  durationPreset: string;
+  operator: string;
+  actorId?: string;
+  saleId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para adicionar tempo.");
+  }
+
+  if (!isManualReleaseDurationKey(data.durationPreset) || data.durationPreset === "FREE") {
+    throw new Error("Selecione um tempo válido para adicionar.");
+  }
+
+  const option = manualReleaseDurations[data.durationPreset];
+  const release = await extendActiveGameplayReleaseByStationId({
+    stationId,
+    minutesToAdd: option.durationMinutes,
+    operator: data.operator,
+    saleId: data.saleId,
+  });
+
+  if (!release?.releasedUntil) {
+    throw new Error(`${stationId.toUpperCase()} está livre. Use Liberar para iniciar um tempo novo.`);
+  }
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_extend",
+    entity: "GameplayRelease",
+    entityId: release.id,
+    metadata: {
+      stationId,
+      minutesAdded: option.durationMinutes,
+      saleId: data.saleId,
+    },
+  });
+
+  return {
+    release,
+    message: `${stationId.toUpperCase()} recebeu +${option.label}. Agora vai até ${formatReleaseTime(release.releasedUntil)}.`,
   };
 }
 

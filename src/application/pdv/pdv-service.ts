@@ -383,6 +383,7 @@ export async function createSaleRecord(input: FormData, actorId: string) {
   const items = parseItems(input);
   const payments = parsePayments(input);
   const gameplaySelections = parseGameplaySelections(input);
+  const skipGameplayRelease = input.get("skipGameplayRelease") === "true";
   const pdvConfiguration = await getPdvConfiguration();
   const discountAmount = parseDecimalInput(parsed.discountAmount || "0");
 
@@ -405,7 +406,9 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     throw new Error("Valor recebido em dinheiro nao pode ser menor que a parte paga em dinheiro.");
   }
 
-  await assertGameplayStationsAvailable(gameplaySelections);
+  if (!skipGameplayRelease) {
+    await assertGameplayStationsAvailable(gameplaySelections);
+  }
 
   const sale = await createSaleWithStockAdjustment({
     saleNumber: createSaleNumber(),
@@ -432,13 +435,16 @@ export async function createSaleRecord(input: FormData, actorId: string) {
     },
   });
 
-  const [fiscalResult, gameplayResult] = await Promise.all([
-    queueSaleNfceIssue({
-      saleId: sale.id,
-      actorId,
-    }),
-    prepareGameplayReleaseForSale(sale.id, actorId),
-  ]);
+  const fiscalResult = await queueSaleNfceIssue({
+    saleId: sale.id,
+    actorId,
+  });
+  const gameplayResult = skipGameplayRelease
+    ? {
+        status: "SKIPPED" as const,
+        message: "Venda registrada sem nova liberação de gameplay.",
+      }
+    : await prepareGameplayReleaseForSale(sale.id, actorId);
 
   scheduleSalePostProcessing({
     saleId: sale.id,

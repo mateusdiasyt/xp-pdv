@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/presentation/admin/common/action-state";
 import {
   endServiceSessionAction,
+  extendServiceSessionAction,
   manualServiceReleaseAction,
   paidServiceReleaseAction,
 } from "@/presentation/admin/gameplay/actions";
@@ -100,7 +101,8 @@ export function ManualServiceControlForm({
   coupons,
 }: ManualServiceControlFormProps) {
   const router = useRouter();
-  const [releaseState, releaseAction, isFreePending] = useActionState(manualServiceReleaseAction, initialActionState);
+  const [releaseState, releaseAction, isReleasePending] = useActionState(manualServiceReleaseAction, initialActionState);
+  const [extendState, extendAction, isExtendPending] = useActionState(extendServiceSessionAction, initialActionState);
   const [paidState, paidAction, isPaidPending] = useActionState(paidServiceReleaseAction, initialActionState);
   const [endState, endAction] = useActionState(endServiceSessionAction, initialActionState);
   const [open, setOpen] = useState(false);
@@ -111,7 +113,9 @@ export function ManualServiceControlForm({
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
 
-  const durationMinutes = durationPreset === "FREE" ? 0 : Number(durationPreset);
+  const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
+  const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
+  const durationChoices = isBusy ? durationOptions.filter((option) => option.value !== "FREE") : durationOptions;
   const paidProducts = useMemo(
     () =>
       gameplayProducts.filter(
@@ -144,13 +148,13 @@ export function ManualServiceControlForm({
   const canPaidSubmit = Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
 
   useEffect(() => {
-    if (releaseState.status === "success" || paidState.status === "success") {
+    if (releaseState.status === "success" || extendState.status === "success" || paidState.status === "success") {
       router.refresh();
     }
-  }, [paidState.status, releaseState.status, router]);
+  }, [extendState.status, paidState.status, releaseState.status, router]);
 
   function openReleaseDialog() {
-    setMode(durationPreset === "FREE" ? "free" : "paid");
+    setMode(isBusy ? "paid" : effectiveDurationPreset === "FREE" ? "free" : "paid");
     setOpen(true);
   }
 
@@ -159,29 +163,31 @@ export function ManualServiceControlForm({
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <select
           className="admin-native-select h-9"
-          value={durationPreset}
+          value={effectiveDurationPreset}
           onChange={(event) => setDurationPreset(event.target.value)}
-          disabled={isBusy}
-          aria-label="Tempo para liberação manual"
+          aria-label={isBusy ? "Tempo para adicionar" : "Tempo para liberação manual"}
         >
-          {durationOptions.map((option) => (
+          {durationChoices.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
         </select>
-        <Button type="button" size="sm" className="gap-2" disabled={isBusy} onClick={openReleaseDialog}>
+        <Button type="button" size="sm" className="gap-2" onClick={openReleaseDialog}>
           <Play className="h-4 w-4" />
-          Liberar
+          {isBusy ? "Adicionar tempo" : "Liberar"}
         </Button>
       </div>
       <ActionFeedback state={releaseState} />
+      <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[min(560px,94vw)] border-border/80 bg-card p-0 sm:max-w-[min(560px,94vw)]">
           <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
-            <DialogTitle>Liberar {stationId.toUpperCase()}</DialogTitle>
+            <DialogTitle>
+              {isBusy ? "Adicionar tempo" : "Liberar"} {stationId.toUpperCase()}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 px-5 pb-5">
@@ -194,7 +200,7 @@ export function ManualServiceControlForm({
                 onClick={() => setMode("free")}
               >
                 <Gift className="mb-2 h-4 w-4 text-primary" />
-                <span className="block text-sm font-bold text-foreground">Grátis</span>
+                <span className="block text-sm font-bold text-foreground">{isBusy ? "Grátis +" : "Grátis"}</span>
               </button>
               <button
                 type="button"
@@ -202,24 +208,27 @@ export function ManualServiceControlForm({
                   mode === "paid" ? "border-primary/55 bg-primary/12" : "border-border/75 bg-background/45"
                 }`}
                 onClick={() => setMode("paid")}
-                disabled={durationPreset === "FREE"}
+                disabled={effectiveDurationPreset === "FREE"}
               >
                 <CreditCard className="mb-2 h-4 w-4 text-primary" />
-                <span className="block text-sm font-bold text-foreground">Pago</span>
+                <span className="block text-sm font-bold text-foreground">{isBusy ? "Pago +" : "Pago"}</span>
               </button>
             </div>
 
             {mode === "free" ? (
-              <form action={releaseAction} className="space-y-3">
+              <form action={isBusy ? extendAction : releaseAction} className="space-y-3">
                 <input type="hidden" name="stationId" value={stationId} />
-                <input type="hidden" name="durationPreset" value={durationPreset} />
-                <Button type="submit" className="w-full gap-2" disabled={isFreePending}>
+                <input type="hidden" name="durationPreset" value={effectiveDurationPreset} />
+                <Button type="submit" className="w-full gap-2" disabled={isBusy ? isExtendPending : isReleasePending}>
                   <Play className="h-4 w-4" />
-                  Confirmar grátis
+                  {isBusy ? "Adicionar grátis" : "Confirmar grátis"}
                 </Button>
               </form>
             ) : (
               <form action={paidAction} className="space-y-3">
+                <input type="hidden" name="stationId" value={stationId} />
+                <input type="hidden" name="durationPreset" value={effectiveDurationPreset} />
+                <input type="hidden" name="extendActiveSession" value={isBusy ? "true" : "false"} />
                 <input type="hidden" name="customerName" value="" />
                 <input type="hidden" name="discountAmount" value="0.00" />
                 <input type="hidden" name="cashReceived" value={paymentMethod === PaymentMethod.CASH ? moneyFromCents(totalInCents) : ""} />
@@ -247,7 +256,7 @@ export function ManualServiceControlForm({
                       value={selectedProduct?.id ?? ""}
                       onChange={(event) => setSelectedProductId(event.target.value)}
                     >
-                      {paidProducts.length === 0 ? <option value="">Sem produto para {durationPreset} min</option> : null}
+                      {paidProducts.length === 0 ? <option value="">Sem produto para {effectiveDurationPreset} min</option> : null}
                       {paidProducts.map((product) => (
                         <option key={product.id} value={product.id}>
                           {product.name}
@@ -328,7 +337,7 @@ export function ManualServiceControlForm({
 
                 <Button type="submit" className="w-full gap-2" disabled={!canPaidSubmit || isPaidPending}>
                   <Play className="h-4 w-4" />
-                  Confirmar pago
+                  {isBusy ? "Confirmar tempo pago" : "Confirmar pago"}
                 </Button>
               </form>
             )}
