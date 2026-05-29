@@ -228,6 +228,10 @@ export async function removeComandaItemAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return removeComandaItemRequest(formData);
+}
+
+export async function removeComandaItemRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await removeComandaItemRecord(formData, session.user.id);
@@ -243,6 +247,10 @@ export async function updateComandaItemAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  return updateComandaItemRequest(formData);
+}
+
+export async function updateComandaItemRequest(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await updateComandaItemRecord(formData, session.user.id);

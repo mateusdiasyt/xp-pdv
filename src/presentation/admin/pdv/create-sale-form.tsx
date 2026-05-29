@@ -49,9 +49,9 @@ import {
   addComandaItemRequest,
   cancelComandaAction,
   closeComandaAction,
-  removeComandaItemAction,
+  removeComandaItemRequest,
   updateComandaCustomerAction,
-  updateComandaItemAction,
+  updateComandaItemRequest,
 } from "@/presentation/admin/pdv/actions";
 import {
   calculateCouponDiscountInCents,
@@ -321,8 +321,8 @@ export function CreateSaleForm({
   const currentCustomerLabel =
     selectedComanda.customerName || (selectedComanda.isWalkIn ? "Comanda avulsa" : "Sem cliente");
   const [addState, setAddState] = useState(initialActionState);
-  const [updateItemState, updateItemFormAction] = useActionState(updateComandaItemAction, initialActionState);
-  const [removeItemState, removeItemFormAction] = useActionState(removeComandaItemAction, initialActionState);
+  const [updateItemState, setUpdateItemState] = useState(initialActionState);
+  const [removeItemState, setRemoveItemState] = useState(initialActionState);
   const [customerState, customerFormAction, isUpdatingCustomer] = useActionState(
     updateComandaCustomerAction,
     initialActionState,
@@ -330,6 +330,7 @@ export function CreateSaleForm({
   const [saleState, saleFormAction] = useActionState(closeComandaAction, initialActionState);
   const [cancelState, cancelFormAction] = useActionState(cancelComandaAction, initialActionState);
   const [isAddingItem, startAddTransition] = useTransition();
+  const [isMutatingItem, startItemMutationTransition] = useTransition();
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
@@ -418,13 +419,6 @@ export function CreateSaleForm({
       return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
-
-  useEffect(() => {
-    if (updateItemState.status === "success" || removeItemState.status === "success") {
-      const refreshTimeout = window.setTimeout(() => router.refresh(), 220);
-      return () => window.clearTimeout(refreshTimeout);
-    }
-  }, [removeItemState.status, router, updateItemState.status]);
 
   useEffect(() => {
     if (customerState.status !== "success") {
@@ -621,10 +615,76 @@ export function CreateSaleForm({
         setOptimisticItems(previousItems);
       } else {
         form.reset();
-        router.refresh();
       }
 
       setAddState(result);
+    });
+  }
+
+  function handleUpdateItemSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+    item: SelectedComanda["items"][number],
+  ) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    const quantity = Number(formData.get("quantity") ?? 0);
+
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      setUpdateItemState({
+        status: "error",
+        message: "Informe uma quantidade valida.",
+      });
+      return;
+    }
+
+    const previousItems = optimisticItems;
+    const unitPrice = item.quantity > 0 ? item.lineTotal / item.quantity : item.lineTotal;
+
+    setUpdateItemState(initialActionState);
+    setOptimisticItems((currentItems) =>
+      currentItems.map((currentItem) =>
+        currentItem.productId === item.productId
+          ? {
+              ...currentItem,
+              quantity,
+              lineTotal: unitPrice * quantity,
+            }
+          : currentItem,
+      ),
+    );
+
+    startItemMutationTransition(async () => {
+      const result = await updateComandaItemRequest(formData);
+
+      if (result.status === "error") {
+        setOptimisticItems(previousItems);
+      }
+
+      setUpdateItemState(result);
+    });
+  }
+
+  function handleRemoveItemSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+    item: SelectedComanda["items"][number],
+  ) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    const previousItems = optimisticItems;
+
+    setRemoveItemState(initialActionState);
+    setOptimisticItems((currentItems) => currentItems.filter((currentItem) => currentItem.productId !== item.productId));
+
+    startItemMutationTransition(async () => {
+      const result = await removeComandaItemRequest(formData);
+
+      if (result.status === "error") {
+        setOptimisticItems(previousItems);
+      }
+
+      setRemoveItemState(result);
     });
   }
 
@@ -1030,7 +1090,7 @@ export function CreateSaleForm({
                     <div className="mt-3 flex flex-wrap items-end gap-2">
                       {canManage ? (
                         <>
-                          <form action={updateItemFormAction} className="flex flex-wrap items-end gap-2">
+                          <form onSubmit={(event) => handleUpdateItemSubmit(event, item)} className="flex flex-wrap items-end gap-2">
                             <input type="hidden" name="comandaId" value={selectedComanda.id} />
                             <input type="hidden" name="productId" value={item.productId} />
                             <div className="space-y-1">
@@ -1047,16 +1107,16 @@ export function CreateSaleForm({
                                 required
                               />
                             </div>
-                            <Button type="submit" size="icon-sm" className="rounded-2xl">
-                              <Plus className="h-4 w-4" />
+                            <Button type="submit" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem}>
+                              {isMutatingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                               <span className="sr-only">Atualizar quantidade do item</span>
                             </Button>
                           </form>
 
-                          <form action={removeItemFormAction}>
+                          <form onSubmit={(event) => handleRemoveItemSubmit(event, item)}>
                             <input type="hidden" name="comandaId" value={selectedComanda.id} />
                             <input type="hidden" name="productId" value={item.productId} />
-                            <Button type="submit" variant="outline" size="icon-sm" className="rounded-2xl">
+                            <Button type="submit" variant="outline" size="icon-sm" className="rounded-2xl" disabled={isMutatingItem}>
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Remover item da comanda</span>
                             </Button>
