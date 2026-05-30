@@ -261,12 +261,12 @@ function OpenCashForm({
   if (operators.length === 0) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Cadastre um operador antes de abrir o caixa.</p>
+        <p className="text-sm text-muted-foreground">Cadastre um administrador antes de abrir o caixa.</p>
         <Link
-          href="/admin/operators"
+          href="/admin/users"
           className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3.5 text-sm font-medium text-primary-foreground"
         >
-          Cadastrar operador
+          Cadastrar administrador
         </Link>
       </div>
     );

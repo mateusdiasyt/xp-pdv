@@ -49,14 +49,6 @@ export async function listActiveOperators() {
   });
 }
 
-export async function findOperatorRole() {
-  return prisma.role.findUnique({
-    where: {
-      slug: "operador",
-    },
-  });
-}
-
 export async function listRoles() {
   return prisma.role.findMany({
     include: {

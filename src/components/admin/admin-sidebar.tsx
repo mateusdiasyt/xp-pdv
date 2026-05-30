@@ -18,12 +18,15 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
   const items = adminNavigation.filter((item) => isAdmin || permissions.includes(item.permission));
 
   return (
-    <aside className="sticky top-0 z-[80] flex h-screen w-[5.25rem] shrink-0 flex-col overflow-visible border-r border-sidebar-border/45 bg-sidebar/58 text-sidebar-foreground shadow-[22px_0_70px_-48px_rgba(0,0,0,0.9)] backdrop-blur-2xl supports-[backdrop-filter]:bg-sidebar/46">
-      <div className="flex h-[5.25rem] items-center justify-center border-b border-sidebar-border/35 px-3">
-        <BrandLogo priority className="max-h-11 w-11" />
+    <aside className="group/sidebar sticky top-3 z-[80] my-3 ml-3 flex h-[calc(100vh-1.5rem)] w-[4.75rem] shrink-0 flex-col overflow-hidden rounded-[1.45rem] border border-sidebar-border/45 bg-sidebar/58 text-sidebar-foreground shadow-[24px_0_72px_-54px_rgba(0,0,0,0.95)] backdrop-blur-2xl transition-[width,background-color,border-color] duration-300 ease-out hover:w-[17rem] hover:border-sidebar-border/70 supports-[backdrop-filter]:bg-sidebar/46">
+      <div className="flex h-[4.75rem] shrink-0 items-center px-3">
+        <BrandLogo
+          priority
+          className="h-10 w-10 shrink-0 overflow-hidden transition-[width] duration-300 ease-out group-hover/sidebar:w-36"
+        />
       </div>
 
-      <nav className="flex-1 space-y-2 overflow-visible px-3 py-4">
+      <nav className="admin-scrollbar flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-3 pb-4">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -36,16 +39,15 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
               key={item.href}
               href={item.href}
               aria-label={item.label}
-              title={item.label}
               className={cn(
-                "group relative flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+                "flex h-12 w-full items-center justify-center gap-3 rounded-2xl text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar group-hover/sidebar:justify-start group-hover/sidebar:px-3",
                 isActive
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_16px_28px_-16px_color-mix(in_oklab,var(--sidebar-primary)_78%,transparent)]"
                   : "border border-sidebar-border/35 bg-sidebar-accent/28 text-sidebar-foreground/72 hover:border-sidebar-border/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-[120] -translate-y-1/2 whitespace-nowrap rounded-xl border border-sidebar-border/50 bg-sidebar/92 px-3 py-2 text-xs font-semibold text-sidebar-foreground opacity-0 shadow-[0_18px_42px_-24px_rgba(0,0,0,0.88)] backdrop-blur-xl transition-all duration-150 group-hover:translate-x-1 group-hover:opacity-100 group-focus-visible:translate-x-1 group-focus-visible:opacity-100">
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
                 {item.label}
               </span>
             </a>

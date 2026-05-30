@@ -17,7 +17,6 @@ import {
   LifeBuoy,
   PaintbrushVertical,
   Tv,
-  UsersRound,
   Warehouse,
 } from "lucide-react";
 
@@ -80,15 +79,9 @@ export const adminNavigation: AdminNavigationItem[] = [
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
   {
-    label: "Usuarios",
+    label: "Administradores",
     href: "/admin/users",
     icon: ShieldUser,
-    permission: PERMISSIONS.USERS_VIEW,
-  },
-  {
-    label: "Operadores",
-    href: "/admin/operators",
-    icon: UsersRound,
     permission: PERMISSIONS.USERS_VIEW,
   },
   {
