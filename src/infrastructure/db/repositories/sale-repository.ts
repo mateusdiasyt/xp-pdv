@@ -462,6 +462,24 @@ export async function listPdvOpenSessions() {
         select: {
           id: true,
           name: true,
+          email: true,
+        },
+      },
+      movements: true,
+      sales: {
+        select: {
+          id: true,
+          status: true,
+          totalAmount: true,
+          payments: {
+            where: {
+              status: PaymentStatus.APPROVED,
+            },
+            select: {
+              method: true,
+              amount: true,
+            },
+          },
         },
       },
     },

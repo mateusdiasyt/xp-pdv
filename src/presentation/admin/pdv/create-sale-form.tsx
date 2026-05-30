@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 
 import { CouponDiscountType, PaymentMethod } from "@prisma/client";
 import {
@@ -439,7 +438,8 @@ export function CreateSaleForm({
 
   useEffect(() => {
     if (saleState.status === "error") {
-      setIsFinalizeDialogOpen(false);
+      const timeoutId = window.setTimeout(() => setIsFinalizeDialogOpen(false), 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [saleState.status]);
 
@@ -1146,13 +1146,7 @@ export function CreateSaleForm({
               </p>
             ) : !hasOpenSessions ? (
               <div className="space-y-3 rounded-2xl border border-amber-400/30 bg-amber-400/8 px-4 py-4">
-                <p className="text-sm text-amber-100">Abra um caixa para finalizar esta comanda.</p>
-                <Link
-                  href="/admin/cash"
-                  className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25"
-                >
-                  Abrir caixa
-                </Link>
+                <p className="text-sm text-amber-100">Abra o caixa acima para finalizar esta comanda.</p>
               </div>
             ) : (
               <form id={`close-comanda-form-${selectedComanda.id}`} action={saleFormAction} className="space-y-4">

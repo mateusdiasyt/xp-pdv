@@ -224,7 +224,18 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
     );
   }
 
-  const { openSessions, products, sales, customers, openComandas, pdvConfiguration, coupons, issues } = await getPdvData();
+  const {
+    openSessions,
+    cashRegisters,
+    operators,
+    products,
+    sales,
+    customers,
+    openComandas,
+    pdvConfiguration,
+    coupons,
+    issues,
+  } = await getPdvData();
   const canManage = hasPermission(session.user.permissions, PERMISSIONS.PDV_MANAGE);
   const canCancel = hasPermission(session.user.permissions, PERMISSIONS.PDV_CANCEL);
 
@@ -237,10 +248,85 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
 
   const openSessionOptions = openSessions.map((openSession) => ({
     id: openSession.id,
+    status: openSession.status,
+    openedAt: openSession.openedAt.toISOString(),
+    closedAt: openSession.closedAt?.toISOString() ?? null,
+    openingAmount: Number(openSession.openingAmount),
+    cashSalesAmount: openSession.sales.reduce((sessionTotal, sale) => {
+      const cashTotal = sale.payments
+        .filter((payment) => payment.method === PaymentMethod.CASH)
+        .reduce((paymentTotal, payment) => paymentTotal + Number(payment.amount), 0);
+
+      return sessionTotal + cashTotal;
+    }, 0),
+    supplyAmount: openSession.movements
+      .filter((movement) => movement.type === "SUPPLY")
+      .reduce((total, movement) => total + Number(movement.amount), 0),
+    withdrawalAmount: openSession.movements
+      .filter((movement) => movement.type === "WITHDRAWAL")
+      .reduce((total, movement) => total + Number(movement.amount), 0),
+    expectedAmount:
+      Number(openSession.openingAmount) +
+      openSession.sales.reduce((sessionTotal, sale) => {
+        const cashTotal = sale.payments
+          .filter((payment) => payment.method === PaymentMethod.CASH)
+          .reduce((paymentTotal, payment) => paymentTotal + Number(payment.amount), 0);
+
+        return sessionTotal + cashTotal;
+      }, 0) +
+      openSession.movements
+        .filter((movement) => movement.type === "SUPPLY")
+        .reduce((total, movement) => total + Number(movement.amount), 0) -
+      openSession.movements
+        .filter((movement) => movement.type === "WITHDRAWAL")
+        .reduce((total, movement) => total + Number(movement.amount), 0),
+    closingAmount: null,
+    differenceAmount: null,
+    note: openSession.note ?? "",
+    salesCount: openSession.sales.length,
+    salesTotalAmount: openSession.sales.reduce((total, sale) => total + Number(sale.totalAmount), 0),
+    paymentTotals: Object.values(PaymentMethod).map((method) => ({
+      method,
+      amount: openSession.sales.reduce((sessionTotal, sale) => {
+        const methodTotal = sale.payments
+          .filter((payment) => payment.method === method)
+          .reduce((paymentTotal, payment) => paymentTotal + Number(payment.amount), 0);
+
+        return sessionTotal + methodTotal;
+      }, 0),
+    })),
     cashRegister: {
+      id: openSession.cashRegister.id,
       name: openSession.cashRegister.name,
       code: openSession.cashRegister.code,
     },
+    operator: {
+      id: openSession.operator.id,
+      name: openSession.operator.name,
+      email: openSession.operator.email ?? "",
+    },
+    movements: openSession.movements
+      .map((movement) => ({
+        id: movement.id,
+        type: movement.type,
+        amount: Number(movement.amount),
+        reason: movement.reason,
+        createdAt: movement.createdAt.toISOString(),
+      }))
+      .sort((first, second) => second.createdAt.localeCompare(first.createdAt)),
+  }));
+
+  const cashRegisterOptions = cashRegisters.map((cashRegister) => ({
+    id: cashRegister.id,
+    name: cashRegister.name,
+    code: cashRegister.code,
+  }));
+
+  const operatorOptions = operators.map((operator) => ({
+    id: operator.id,
+    name: operator.name,
+    email: operator.email,
+    roleName: operator.role.name,
   }));
 
   const productOptions = products.map((product) => ({
@@ -340,6 +426,8 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
       <div>
         <PdvWorkspace
           canManage={canManage}
+          cashRegisters={cashRegisterOptions}
+          operators={operatorOptions}
           customers={customerOptions}
           openSessions={openSessionOptions}
           openComandas={openComandasView}

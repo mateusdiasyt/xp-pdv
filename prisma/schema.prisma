@@ -30,6 +30,7 @@ enum CashSessionStatus {
 
 enum CashMovementType {
   WITHDRAWAL
+  SUPPLY
 }
 
 enum PaymentMethod {

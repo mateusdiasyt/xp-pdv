@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { Flame, LayoutGrid, Plus, Receipt } from "lucide-react";
 import type { CouponDiscountType, ProductKind } from "@prisma/client";
 
@@ -9,6 +9,7 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { initialActionState } from "@/presentation/admin/common/action-state";
+import { CashDrawerPanel, type PdvCashSession } from "@/presentation/admin/pdv/cash-drawer-panel";
 import { CreateComandaDialog } from "@/presentation/admin/pdv/create-comanda-dialog";
 import { CreateSaleForm } from "@/presentation/admin/pdv/create-sale-form";
 import { OpenComandasBoard } from "@/presentation/admin/pdv/open-comandas-board";
@@ -22,12 +23,19 @@ type CustomerOption = {
   documentNumber: string;
 };
 
-type OpenSessionOption = {
+type OpenSessionOption = PdvCashSession;
+
+type CashRegisterOption = {
   id: string;
-  cashRegister: {
-    name: string;
-    code: string;
-  };
+  name: string;
+  code: string;
+};
+
+type OperatorOption = {
+  id: string;
+  name: string;
+  email: string;
+  roleName: string;
 };
 
 type ProductOption = {
@@ -94,6 +102,8 @@ type CouponOption = {
 
 type PdvWorkspaceProps = {
   customers: CustomerOption[];
+  cashRegisters: CashRegisterOption[];
+  operators: OperatorOption[];
   openSessions: OpenSessionOption[];
   products: ProductOption[];
   coupons: CouponOption[];
@@ -157,6 +167,8 @@ function HappyHourToggle({
 
 export function PdvWorkspace({
   customers,
+  cashRegisters,
+  operators,
   openSessions,
   products,
   coupons,
@@ -171,11 +183,16 @@ export function PdvWorkspace({
   const [createDialogPresetNumber, setCreateDialogPresetNumber] = useState<number | undefined>(undefined);
   const [lockCreateDialogNumber, setLockCreateDialogNumber] = useState(false);
   const [isHappyHourActive, setIsHappyHourActive] = useState(happyHourActive);
+  const [localOpenSessions, setLocalOpenSessions] = useState(openSessions);
   const [localOpenComandas, setLocalOpenComandas] = useState(openComandas);
 
   useEffect(() => {
     setIsHappyHourActive(happyHourActive);
   }, [happyHourActive]);
+
+  useEffect(() => {
+    setLocalOpenSessions(openSessions);
+  }, [openSessions]);
 
   useEffect(() => {
     setLocalOpenComandas(openComandas);
@@ -208,9 +225,46 @@ export function PdvWorkspace({
     setManualSlotCount((currentValue) => Math.max(currentValue, visibleSlotCount) + 1);
   }
 
+  const handleSessionUpsert = useCallback((session: PdvCashSession) => {
+    setLocalOpenSessions((currentSessions) => [
+      session,
+      ...currentSessions.filter((currentSession) => currentSession.id !== session.id),
+    ]);
+  }, []);
+
+  const handleSessionClosed = useCallback((session: PdvCashSession) => {
+    setLocalOpenSessions((currentSessions) =>
+      currentSessions.filter((currentSession) => currentSession.id !== session.id),
+    );
+  }, []);
+
+  const cashDrawerPanel = (
+    <CashDrawerPanel
+      canManage={canManage}
+      cashRegisters={cashRegisters}
+      operators={operators}
+      openSessions={localOpenSessions}
+      onSessionOpened={handleSessionUpsert}
+      onSessionUpdated={handleSessionUpsert}
+      onSessionClosed={handleSessionClosed}
+    />
+  );
+
+  if (localOpenSessions.length === 0) {
+    return (
+      <div className="space-y-4">
+        {cashDrawerPanel}
+        <section className="rounded-[1.35rem] border border-dashed border-border/75 bg-background/32 px-4 py-5 text-sm text-muted-foreground">
+          PDV bloqueado ate abrir o caixa.
+        </section>
+      </div>
+    );
+  }
+
   if (workspaceMode === "quick") {
     return (
       <div className="space-y-4">
+        {cashDrawerPanel}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
             <button
@@ -238,7 +292,7 @@ export function PdvWorkspace({
             <QuickSaleForm
               canManage={canManage}
               customers={customers}
-              openSessions={openSessions}
+              openSessions={localOpenSessions}
               products={products}
               coupons={coupons}
               happyHourActive={isHappyHourActive}
@@ -251,6 +305,7 @@ export function PdvWorkspace({
 
   return (
     <div className="space-y-4">
+      {cashDrawerPanel}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/75 bg-card/70 p-1">
           <button
@@ -315,7 +370,7 @@ export function PdvWorkspace({
                 key={`${selectedComanda.id}-${selectedComanda.customerId ?? "walkin"}-${selectedComanda.itemCount}-${selectedComanda.subtotalAmount}`}
                 canManage={canManage}
                 customers={customers}
-                openSessions={openSessions}
+                openSessions={localOpenSessions}
                 products={products}
                 coupons={coupons}
                 happyHourActive={isHappyHourActive}

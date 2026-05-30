@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   Boxes,
   BadgePercent,
-  Calculator,
   ChartColumnBig,
   ContactRound,
   CreditCard,
@@ -18,6 +17,7 @@ import {
   LifeBuoy,
   PaintbrushVertical,
   Tv,
+  UsersRound,
   Warehouse,
 } from "lucide-react";
 
@@ -86,6 +86,12 @@ export const adminNavigation: AdminNavigationItem[] = [
     permission: PERMISSIONS.USERS_VIEW,
   },
   {
+    label: "Operadores",
+    href: "/admin/operators",
+    icon: UsersRound,
+    permission: PERMISSIONS.USERS_VIEW,
+  },
+  {
     label: "Categorias",
     href: "/admin/categories",
     icon: Boxes,
@@ -114,12 +120,6 @@ export const adminNavigation: AdminNavigationItem[] = [
     href: "/admin/stock",
     icon: Warehouse,
     permission: PERMISSIONS.STOCK_VIEW,
-  },
-  {
-    label: "Caixa",
-    href: "/admin/cash",
-    icon: Calculator,
-    permission: PERMISSIONS.CASH_VIEW,
   },
   {
     label: "Suporte",

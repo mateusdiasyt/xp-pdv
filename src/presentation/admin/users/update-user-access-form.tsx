@@ -121,7 +121,7 @@ const permissionDictionary: Record<string, { module: string; title: string; desc
   "cash:manage": {
     module: "Caixa",
     title: "Gerenciar caixa",
-    description: "Permite abrir/fechar caixa e registrar sangria.",
+    description: "Permite abrir/fechar caixa e registrar sangria e suprimento.",
   },
   "pdv:view": {
     module: "PDV",

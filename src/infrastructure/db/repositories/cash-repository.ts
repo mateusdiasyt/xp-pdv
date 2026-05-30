@@ -1,4 +1,4 @@
-import { CashMovementType, CashSessionStatus, PaymentStatus, Prisma, RecordStatus } from "@prisma/client";
+import { CashMovementType, CashSessionStatus, PaymentStatus, Prisma, RecordStatus, SaleStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -59,6 +59,24 @@ export async function listOpenCashSessions() {
         select: {
           id: true,
           name: true,
+          email: true,
+        },
+      },
+      movements: true,
+      sales: {
+        select: {
+          id: true,
+          status: true,
+          totalAmount: true,
+          payments: {
+            where: {
+              status: PaymentStatus.APPROVED,
+            },
+            select: {
+              method: true,
+              amount: true,
+            },
+          },
         },
       },
     },
@@ -72,8 +90,52 @@ export async function getCashSessionForClosing(cashSessionId: string) {
   return prisma.cashSession.findUnique({
     where: { id: cashSessionId },
     include: {
+      cashRegister: true,
+      operator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       movements: true,
       sales: {
+        select: {
+          id: true,
+          status: true,
+          totalAmount: true,
+          payments: {
+            where: {
+              status: PaymentStatus.APPROVED,
+            },
+            select: {
+              method: true,
+              amount: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getCashSessionSnapshot(cashSessionId: string) {
+  return prisma.cashSession.findUnique({
+    where: { id: cashSessionId },
+    include: {
+      cashRegister: true,
+      operator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      movements: true,
+      sales: {
+        where: {
+          status: SaleStatus.COMPLETED,
+        },
         include: {
           payments: {
             where: {
@@ -114,6 +176,33 @@ export async function openCashSession(data: {
         openingAmount: data.openingAmount,
         note: data.note,
       },
+      include: {
+        cashRegister: true,
+        operator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        movements: true,
+        sales: {
+          select: {
+            id: true,
+            status: true,
+            totalAmount: true,
+            payments: {
+              where: {
+                status: PaymentStatus.APPROVED,
+              },
+              select: {
+                method: true,
+                amount: true,
+              },
+            },
+          },
+        },
+      },
     });
   });
 }
@@ -138,9 +227,10 @@ export async function closeCashSession(data: {
   });
 }
 
-export async function registerCashWithdrawal(data: {
+export async function registerCashMovement(data: {
   cashSessionId: string;
   operatorId?: string;
+  type: CashMovementType;
   amount: Prisma.Decimal;
   reason: string;
 }) {
@@ -154,17 +244,29 @@ export async function registerCashWithdrawal(data: {
     });
 
     if (session.status !== CashSessionStatus.OPEN) {
-      throw new Error("Nao e possivel registrar sangria em sessao fechada.");
+      throw new Error("Nao e possivel movimentar sessao de caixa fechada.");
     }
 
     return tx.cashMovement.create({
       data: {
         cashSessionId: data.cashSessionId,
         operatorId: data.operatorId,
-        type: CashMovementType.WITHDRAWAL,
+        type: data.type,
         amount: data.amount,
         reason: data.reason,
       },
     });
+  });
+}
+
+export async function registerCashWithdrawal(data: {
+  cashSessionId: string;
+  operatorId?: string;
+  amount: Prisma.Decimal;
+  reason: string;
+}) {
+  return registerCashMovement({
+    ...data,
+    type: CashMovementType.WITHDRAWAL,
   });
 }

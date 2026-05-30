@@ -26,7 +26,6 @@ function revalidatePdvPage() {
 
 function revalidateSaleSurfaces() {
   revalidatePath("/admin/pdv");
-  revalidatePath("/admin/cash");
   revalidatePath("/admin/stock");
   revalidatePath("/admin/products");
   revalidatePath("/admin");

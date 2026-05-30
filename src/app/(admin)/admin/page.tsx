@@ -42,28 +42,27 @@ export default async function AdminDashboardPage() {
   await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
   const summary = await getDashboardSummary();
   const averageTicket = summary.todaySalesCount > 0 ? summary.todayRevenue / summary.todaySalesCount : 0;
-  const operationalHelper = `${summary.operationalDay.startsAt} as ${summary.operationalDay.endsAt} - Sao Paulo`;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Controle operacional"
         title="Painel"
-        description={`Turno atual: ${operationalHelper}. Vendas apos meia-noite entram no mesmo dia operacional.`}
+        description="Visao operacional das vendas. A abertura e o fechamento real do caixa agora ficam dentro do PDV."
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Faturamento do turno"
+          title="Faturamento operacional"
           value={formatCurrency(summary.todayRevenue)}
-          helper={`${formatGrowth(summary.revenueGrowthPercent)} vs turno anterior`}
+          helper={`${formatGrowth(summary.revenueGrowthPercent)} vs periodo anterior`}
         />
         <MetricCard
-          title="Vendas do turno"
+          title="Vendas operacionais"
           value={summary.todaySalesCount}
-          helper={`${formatGrowth(summary.salesGrowthPercent)} vs turno anterior`}
+          helper={`${formatGrowth(summary.salesGrowthPercent)} vs periodo anterior`}
         />
-        <MetricCard title="Ticket medio" value={formatCurrency(averageTicket)} helper="Media por venda no turno atual" />
+        <MetricCard title="Ticket medio" value={formatCurrency(averageTicket)} helper="Media por venda operacional" />
         <MetricCard
           title="Faturamento do mes"
           value={formatCurrency(summary.monthRevenue)}
@@ -241,8 +240,8 @@ export default async function AdminDashboardPage() {
                 Abrir PDV
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/admin/cash" className={quickActionClass}>
-                Gerenciar caixa
+              <Link href="/admin/pdv" className={quickActionClass}>
+                Caixa no PDV
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href="/admin/metas" className={quickActionClass}>

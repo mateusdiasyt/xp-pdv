@@ -35,6 +35,28 @@ export async function listUsers(search?: string) {
   });
 }
 
+export async function listActiveOperators() {
+  return prisma.user.findMany({
+    where: {
+      status: RecordStatus.ACTIVE,
+    },
+    include: {
+      role: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
+}
+
+export async function findOperatorRole() {
+  return prisma.role.findUnique({
+    where: {
+      slug: "operador",
+    },
+  });
+}
+
 export async function listRoles() {
   return prisma.role.findMany({
     include: {

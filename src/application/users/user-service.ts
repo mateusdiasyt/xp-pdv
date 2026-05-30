@@ -4,6 +4,8 @@ import { createUserSchema, updateUserAccessSchema, updateUserStatusSchema } from
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   createUser,
+  findOperatorRole,
+  listActiveOperators,
   listPermissions,
   listRoles,
   listUsers,
@@ -13,6 +15,10 @@ import {
 
 export async function getUsers(search?: string) {
   return listUsers(search);
+}
+
+export async function getOperators() {
+  return listActiveOperators();
 }
 
 export async function getRoles() {
@@ -52,6 +58,50 @@ export async function createUserRecord(input: FormData, actorId?: string) {
       roleId: created.roleId,
     },
   });
+}
+
+export async function createOperatorRecord(input: FormData, actorId?: string) {
+  const operatorRole = await findOperatorRole();
+  if (!operatorRole) {
+    throw new Error("Perfil de operador nao encontrado.");
+  }
+
+  const parsed = createUserSchema.parse({
+    name: input.get("name"),
+    email: input.get("email"),
+    password: input.get("password"),
+    roleId: operatorRole.id,
+    status: "ACTIVE",
+  });
+
+  const passwordHash = await bcrypt.hash(parsed.password, 12);
+
+  const created = await createUser({
+    name: parsed.name.trim(),
+    email: parsed.email.toLowerCase(),
+    passwordHash,
+    roleId: operatorRole.id,
+    status: parsed.status,
+  });
+
+  await createAuditLog({
+    userId: actorId,
+    action: "operators.create",
+    entity: "User",
+    entityId: created.id,
+    metadata: {
+      email: created.email,
+      roleId: created.roleId,
+    },
+  });
+
+  return {
+    id: created.id,
+    name: created.name,
+    email: created.email,
+    roleName: operatorRole.name,
+    status: created.status,
+  };
 }
 
 export async function updateUserStatusRecord(input: FormData, actorId?: string) {

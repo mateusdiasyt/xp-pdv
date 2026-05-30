@@ -23,6 +23,7 @@ import {
 } from "@/application/gameplay/gameplay-release-service";
 import { getPdvCoupons } from "@/application/coupons/coupon-service";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
+import { listCashRegisters } from "@/infrastructure/db/repositories/cash-repository";
 import { getBusyGameplayReleasesByStationIds } from "@/infrastructure/db/repositories/gameplay-release-repository";
 import {
   addItemToComanda,
@@ -35,6 +36,7 @@ import {
   updateComandaItemQuantity,
 } from "@/infrastructure/db/repositories/comanda-repository";
 import { listCustomerOptions } from "@/infrastructure/db/repositories/customer-repository";
+import { listActiveOperators } from "@/infrastructure/db/repositories/user-repository";
 import {
   cancelSaleAndRestock,
   createSaleWithStockAdjustment,
@@ -307,6 +309,8 @@ export async function getPdvData() {
     openComandasResult,
     pdvConfigurationResult,
     couponsResult,
+    cashRegistersResult,
+    operatorsResult,
   ] = await Promise.all([
     settlePdvSection("sessoes de caixa", () => listPdvOpenSessions(), []),
     settlePdvSection("produtos", () => listPdvProductOptions(), []),
@@ -318,10 +322,14 @@ export async function getPdvData() {
       happyHourUpdatedAt: null,
     }),
     settlePdvSection("cupons", () => getPdvCoupons(), []),
+    settlePdvSection("caixas", () => listCashRegisters(), []),
+    settlePdvSection("operadores", () => listActiveOperators(), []),
   ]);
 
   return {
     openSessions: openSessionsResult.data,
+    cashRegisters: cashRegistersResult.data,
+    operators: operatorsResult.data,
     products: productsResult.data,
     sales: salesResult.data,
     customers: customersResult.data,
@@ -336,6 +344,8 @@ export async function getPdvData() {
       openComandasResult.issue,
       pdvConfigurationResult.issue,
       couponsResult.issue,
+      cashRegistersResult.issue,
+      operatorsResult.issue,
     ].filter(Boolean) as string[],
   };
 }

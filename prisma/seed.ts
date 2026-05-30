@@ -18,7 +18,7 @@ const permissions = [
   { key: "stock:view", description: "Visualizar movimentacoes de estoque" },
   { key: "stock:manage", description: "Registrar movimentacoes de estoque" },
   { key: "cash:view", description: "Visualizar sessoes de caixa" },
-  { key: "cash:manage", description: "Abrir e fechar caixa, registrar sangria" },
+  { key: "cash:manage", description: "Abrir e fechar caixa, registrar sangria e suprimento" },
   { key: "pdv:view", description: "Visualizar vendas no PDV" },
   { key: "pdv:manage", description: "Registrar vendas no PDV" },
   { key: "pdv:cancel", description: "Cancelar vendas no PDV" },
