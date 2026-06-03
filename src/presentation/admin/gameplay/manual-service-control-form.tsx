@@ -23,6 +23,12 @@ import {
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
 
+declare global {
+  interface Window {
+    __PDV_MODAL_OPEN__?: boolean;
+  }
+}
+
 type OpenSessionOption = {
   id: string;
   cashRegister: {
@@ -93,6 +99,10 @@ function couponLabel(coupon: PdvCouponOption) {
   return `${coupon.code} - ${value}`;
 }
 
+function setPdvModalOpen(isOpen: boolean) {
+  window.__PDV_MODAL_OPEN__ = isOpen;
+}
+
 export function ManualServiceControlForm({
   stationId,
   isBusy,
@@ -113,6 +123,7 @@ export function ManualServiceControlForm({
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const handledSuccessRef = useRef(false);
+  const refreshAfterDialogCloseRef = useRef(false);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
@@ -149,10 +160,21 @@ export function ManualServiceControlForm({
   const canPaidSubmit = Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
 
   useEffect(() => {
+    setPdvModalOpen(open);
+
+    return () => {
+      if (open) {
+        setPdvModalOpen(false);
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
     const succeeded = releaseState.status === "success" || extendState.status === "success" || paidState.status === "success";
 
     if (!succeeded) {
       handledSuccessRef.current = false;
+      refreshAfterDialogCloseRef.current = false;
       return;
     }
 
@@ -161,22 +183,47 @@ export function ManualServiceControlForm({
     }
 
     handledSuccessRef.current = true;
+    refreshAfterDialogCloseRef.current = true;
 
-    const closeTimeout = window.setTimeout(() => {
+    if (!open) {
+      const refreshTimeout = window.setTimeout(() => {
+        refreshAfterDialogCloseRef.current = false;
+        router.refresh();
+      }, 400);
+
+      return () => window.clearTimeout(refreshTimeout);
+    }
+
+    const closeFrame = window.requestAnimationFrame(() => {
       setOpen(false);
-    }, 0);
+    });
+
+    return () => window.cancelAnimationFrame(closeFrame);
+  }, [extendState.status, open, paidState.status, releaseState.status, router]);
+
+  useEffect(() => {
+    if (open || !refreshAfterDialogCloseRef.current) {
+      return;
+    }
+
     const refreshTimeout = window.setTimeout(() => {
+      refreshAfterDialogCloseRef.current = false;
       router.refresh();
-    }, 220);
+    }, 400);
 
     return () => {
-      window.clearTimeout(closeTimeout);
       window.clearTimeout(refreshTimeout);
     };
-  }, [extendState.status, paidState.status, releaseState.status, router]);
+  }, [open, router]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    setPdvModalOpen(nextOpen);
+    setOpen(nextOpen);
+  }
 
   function openReleaseDialog() {
     setMode(isBusy ? "paid" : effectiveDurationPreset === "FREE" ? "free" : "paid");
+    setPdvModalOpen(true);
     setOpen(true);
   }
 
@@ -204,7 +251,7 @@ export function ManualServiceControlForm({
       <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-[min(560px,94vw)] border-border/80 bg-card p-0 sm:max-w-[min(560px,94vw)]">
           <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
             <DialogTitle>

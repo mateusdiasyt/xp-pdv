@@ -10,6 +10,12 @@ type ServiceCountdownProps = {
   serviceStartsAt?: string | null;
 };
 
+declare global {
+  interface Window {
+    __PDV_MODAL_OPEN__?: boolean;
+  }
+}
+
 const SECOND_IN_MS = 1000;
 const MINUTE_IN_MS = 60 * SECOND_IN_MS;
 
@@ -35,14 +41,20 @@ function parseTime(value?: string | null) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function isPdvModalOpen() {
+  return window.__PDV_MODAL_OPEN__ === true;
+}
+
 export function ServicesAutoRefresh({ intervalMs = 5000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {
     const refreshVisiblePage = () => {
-      if (document.visibilityState === "visible") {
-        router.refresh();
+      if (document.visibilityState !== "visible" || isPdvModalOpen()) {
+        return;
       }
+
+      router.refresh();
     };
 
     const interval = window.setInterval(refreshVisiblePage, intervalMs);
@@ -76,7 +88,7 @@ export function ServiceCountdown({
   }, []);
 
   useEffect(() => {
-    if (!endTime || isFreeMode || endTime > now || refreshedAfterEndRef.current) {
+    if (!endTime || isFreeMode || endTime > now || refreshedAfterEndRef.current || isPdvModalOpen()) {
       return;
     }
 
