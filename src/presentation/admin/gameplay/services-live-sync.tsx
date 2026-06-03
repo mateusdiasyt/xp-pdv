@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 type ServiceCountdownProps = {
   durationMinutes: number;
@@ -46,25 +45,7 @@ function isPdvModalOpen() {
 }
 
 export function ServicesAutoRefresh({ intervalMs = 5000 }: { intervalMs?: number }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    const refreshVisiblePage = () => {
-      if (document.visibilityState !== "visible" || isPdvModalOpen()) {
-        return;
-      }
-
-      router.refresh();
-    };
-
-    const interval = window.setInterval(refreshVisiblePage, intervalMs);
-    window.addEventListener("focus", refreshVisiblePage);
-
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshVisiblePage);
-    };
-  }, [intervalMs, router]);
+  void intervalMs;
 
   return null;
 }
@@ -75,7 +56,6 @@ export function ServiceCountdown({
   releasedUntil,
   serviceStartsAt,
 }: ServiceCountdownProps) {
-  const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
   const refreshedAfterEndRef = useRef(false);
   const endTime = parseTime(releasedUntil);
@@ -93,9 +73,9 @@ export function ServiceCountdown({
     }
 
     refreshedAfterEndRef.current = true;
-    const timeout = window.setTimeout(() => router.refresh(), 800);
+    const timeout = window.setTimeout(() => window.location.reload(), 800);
     return () => window.clearTimeout(timeout);
-  }, [endTime, isFreeMode, now, router]);
+  }, [endTime, isFreeMode, now]);
 
   if (!endTime) {
     return null;

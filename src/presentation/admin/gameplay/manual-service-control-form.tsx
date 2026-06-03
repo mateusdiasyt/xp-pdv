@@ -2,14 +2,14 @@
 
 import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
 import { CreditCard, Gift, Play, Square, Ticket, X } from "lucide-react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
   endServiceSessionAction,
   extendServiceSessionAction,
@@ -102,6 +102,82 @@ function setPdvModalOpen(isOpen: boolean) {
   window.__PDV_MODAL_OPEN__ = isOpen;
 }
 
+function localActionError(error: unknown): ActionState {
+  return {
+    status: "error",
+    message: error instanceof Error ? error.message : "Nao foi possivel concluir a operacao.",
+  };
+}
+
+function reloadPage() {
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 100);
+}
+
+function ServiceReleaseModal({
+  open,
+  title,
+  titleId,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  titleId: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] grid place-items-center px-4 py-6">
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-xs" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 grid max-h-[calc(100vh-3rem)] w-full max-w-[min(560px,94vw)] gap-4 overflow-hidden rounded-xl border border-border/80 bg-card p-0 text-sm ring-1 ring-foreground/10"
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-border/70 px-5 py-4">
+          <h2 id={titleId} className="text-base font-medium leading-none">
+            {title}
+          </h2>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </Button>
+        </div>
+        <div className="admin-scrollbar overflow-y-auto px-5 pb-5">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ManualServiceControlForm({
   stationId,
   isBusy,
@@ -109,11 +185,10 @@ export function ManualServiceControlForm({
   gameplayProducts,
   coupons,
 }: ManualServiceControlFormProps) {
-  const router = useRouter();
-  const [releaseState, releaseAction, isReleasePending] = useActionState(manualServiceReleaseAction, initialActionState);
-  const [extendState, extendAction, isExtendPending] = useActionState(extendServiceSessionAction, initialActionState);
-  const [paidState, paidAction, isPaidPending] = useActionState(paidServiceReleaseAction, initialActionState);
-  const [endState, endAction] = useActionState(endServiceSessionAction, initialActionState);
+  const [releaseState, setReleaseState] = useState<ActionState>(initialActionState);
+  const [extendState, setExtendState] = useState<ActionState>(initialActionState);
+  const [paidState, setPaidState] = useState<ActionState>(initialActionState);
+  const [endState, setEndState] = useState<ActionState>(initialActionState);
   const [open, setOpen] = useState(false);
   const [durationPreset, setDurationPreset] = useState("30");
   const [mode, setMode] = useState<"free" | "paid">("free");
@@ -121,8 +196,7 @@ export function ManualServiceControlForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
-  const handledSuccessRef = useRef(false);
-  const handledEndSuccessRef = useRef(false);
+  const [pendingAction, setPendingAction] = useState<"free" | "paid" | "end" | null>(null);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
@@ -157,6 +231,9 @@ export function ManualServiceControlForm({
   const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
   const totalInCents = Math.max(0, subtotalInCents - couponDiscountInCents);
   const canPaidSubmit = Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
+  const isFreePending = pendingAction === "free";
+  const isPaidPending = pendingAction === "paid";
+  const isEndPending = pendingAction === "end";
 
   useEffect(() => {
     setPdvModalOpen(open);
@@ -168,67 +245,103 @@ export function ManualServiceControlForm({
     };
   }, [open]);
 
-  useEffect(() => {
-    const succeeded = releaseState.status === "success" || extendState.status === "success" || paidState.status === "success";
-
-    if (!succeeded) {
-      handledSuccessRef.current = false;
-      return;
-    }
-
-    if (handledSuccessRef.current) {
-      return;
-    }
-
-    handledSuccessRef.current = true;
-
-    let refreshTimeout: number | undefined;
-    const closeFrame = window.requestAnimationFrame(() => {
-      setPdvModalOpen(false);
-      setOpen(false);
-      refreshTimeout = window.setTimeout(() => {
-        router.refresh();
-      }, 100);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(closeFrame);
-      if (refreshTimeout) {
-        window.clearTimeout(refreshTimeout);
-      }
-    };
-  }, [extendState.status, paidState.status, releaseState.status, router]);
-
-  useEffect(() => {
-    if (endState.status !== "success") {
-      handledEndSuccessRef.current = false;
-      return;
-    }
-
-    if (handledEndSuccessRef.current) {
-      return;
-    }
-
-    handledEndSuccessRef.current = true;
-
-    const refreshTimeout = window.setTimeout(() => {
-      router.refresh();
-    }, 100);
-
-    return () => {
-      window.clearTimeout(refreshTimeout);
-    };
-  }, [endState.status, router]);
-
-  function handleOpenChange(nextOpen: boolean) {
-    setPdvModalOpen(nextOpen);
-    setOpen(nextOpen);
-  }
-
   function openReleaseDialog() {
     setMode(isBusy ? "paid" : effectiveDurationPreset === "FREE" ? "free" : "paid");
+    setReleaseState(initialActionState);
+    setExtendState(initialActionState);
+    setPaidState(initialActionState);
     setPdvModalOpen(true);
     setOpen(true);
+  }
+
+  function closeReleaseDialog() {
+    setPdvModalOpen(false);
+    setOpen(false);
+  }
+
+  async function handleFreeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    const nextPendingAction = "free";
+
+    setPendingAction(nextPendingAction);
+    if (isBusy) {
+      setExtendState(initialActionState);
+    } else {
+      setReleaseState(initialActionState);
+    }
+
+    try {
+      const result = isBusy
+        ? await extendServiceSessionAction(initialActionState, formData)
+        : await manualServiceReleaseAction(initialActionState, formData);
+
+      if (isBusy) {
+        setExtendState(result);
+      } else {
+        setReleaseState(result);
+      }
+
+      if (result.status === "success") {
+        closeReleaseDialog();
+        reloadPage();
+      }
+    } catch (error) {
+      const result = localActionError(error);
+      if (isBusy) {
+        setExtendState(result);
+      } else {
+        setReleaseState(result);
+      }
+    } finally {
+      setPendingAction((currentAction) => (currentAction === nextPendingAction ? null : currentAction));
+    }
+  }
+
+  async function handlePaidSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+
+    setPendingAction("paid");
+    setPaidState(initialActionState);
+
+    try {
+      const result = await paidServiceReleaseAction(initialActionState, formData);
+      setPaidState(result);
+
+      if (result.status === "success") {
+        closeReleaseDialog();
+        reloadPage();
+      }
+    } catch (error) {
+      setPaidState(localActionError(error));
+    } finally {
+      setPendingAction((currentAction) => (currentAction === "paid" ? null : currentAction));
+    }
+  }
+
+  async function handleEndSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+
+    setPendingAction("end");
+    setEndState(initialActionState);
+
+    try {
+      const result = await endServiceSessionAction(initialActionState, formData);
+      setEndState(result);
+
+      if (result.status === "success") {
+        reloadPage();
+      }
+    } catch (error) {
+      setEndState(localActionError(error));
+    } finally {
+      setPendingAction((currentAction) => (currentAction === "end" ? null : currentAction));
+    }
   }
 
   return (
@@ -255,26 +368,13 @@ export function ManualServiceControlForm({
       <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
 
-      {open ? (
-        <div className="fixed inset-0 z-50 grid place-items-center px-4 py-6">
-          <div className="absolute inset-0 bg-black/10 backdrop-blur-xs" onClick={() => handleOpenChange(false)} />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`service-release-title-${stationId}`}
-            className="relative z-10 grid w-full max-w-[min(560px,94vw)] gap-4 rounded-xl border border-border/80 bg-card p-0 text-sm ring-1 ring-foreground/10 sm:max-w-[min(560px,94vw)]"
-          >
-            <div className="flex items-center justify-between gap-4 border-b border-border/70 px-5 py-4">
-              <h2 id={`service-release-title-${stationId}`} className="text-base font-medium leading-none">
-                {isBusy ? "Adicionar tempo" : "Liberar"} {stationId.toUpperCase()}
-              </h2>
-              <Button type="button" variant="ghost" size="icon-sm" onClick={() => handleOpenChange(false)}>
-                <X className="h-4 w-4" />
-                <span className="sr-only">Fechar</span>
-              </Button>
-            </div>
-
-          <div className="space-y-4 px-5 pb-5">
+      <ServiceReleaseModal
+        open={open}
+        title={`${isBusy ? "Adicionar tempo" : "Liberar"} ${stationId.toUpperCase()}`}
+        titleId={`service-release-title-${stationId}`}
+        onClose={closeReleaseDialog}
+      >
+          <div className="space-y-4">
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -300,16 +400,17 @@ export function ManualServiceControlForm({
             </div>
 
             {mode === "free" ? (
-              <form action={isBusy ? extendAction : releaseAction} className="space-y-3">
+              <form onSubmit={handleFreeSubmit} className="space-y-3">
                 <input type="hidden" name="stationId" value={stationId} />
                 <input type="hidden" name="durationPreset" value={effectiveDurationPreset} />
-                <Button type="submit" className="w-full gap-2" disabled={isBusy ? isExtendPending : isReleasePending}>
+                <Button type="submit" className="w-full gap-2" disabled={isFreePending}>
                   <Play className="h-4 w-4" />
                   {isBusy ? "Adicionar grátis" : "Confirmar grátis"}
                 </Button>
+                <ActionFeedback state={isBusy ? extendState : releaseState} />
               </form>
             ) : (
-              <form action={paidAction} className="space-y-3">
+              <form onSubmit={handlePaidSubmit} className="space-y-3">
                 <input type="hidden" name="stationId" value={stationId} />
                 <input type="hidden" name="durationPreset" value={effectiveDurationPreset} />
                 <input type="hidden" name="extendActiveSession" value={isBusy ? "true" : "false"} />
@@ -423,17 +524,16 @@ export function ManualServiceControlForm({
                   <Play className="h-4 w-4" />
                   {isBusy ? "Confirmar tempo pago" : "Confirmar pago"}
                 </Button>
+                <ActionFeedback state={paidState} />
               </form>
             )}
             </div>
-          </div>
-        </div>
-      ) : null}
+      </ServiceReleaseModal>
 
       {isBusy ? (
-        <form action={endAction} className="space-y-2">
+        <form onSubmit={handleEndSubmit} className="space-y-2">
           <input type="hidden" name="stationId" value={stationId} />
-          <Button type="submit" size="sm" variant="destructive" className="gap-2">
+          <Button type="submit" size="sm" variant="destructive" className="gap-2" disabled={isEndPending}>
             <Square className="h-4 w-4" />
             Encerrar tempo
           </Button>
