@@ -13,7 +13,7 @@ import { PERMISSIONS } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
 import { ManualServiceControlForm } from "@/presentation/admin/gameplay/manual-service-control-form";
 import { RetryGameplayReleaseForm } from "@/presentation/admin/gameplay/retry-gameplay-release-form";
-import { ServiceCountdown, ServicesAutoRefresh } from "@/presentation/admin/gameplay/services-live-sync";
+import { ServiceCountdown } from "@/presentation/admin/gameplay/services-live-sync";
 
 type ServicesPageProps = {
   searchParams: Promise<{
@@ -178,7 +178,6 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
         title="Serviços ativos"
         description="Acompanhe PS5 e simulador, evite venda duplicada e reenvie liberações quando precisar."
       />
-      <ServicesAutoRefresh />
 
       <section className="grid gap-3 lg:grid-cols-2">
         {stationCatalog.map((station) => {

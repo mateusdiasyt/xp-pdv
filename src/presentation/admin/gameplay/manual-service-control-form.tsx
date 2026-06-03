@@ -1,13 +1,12 @@
 "use client";
 
 import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
-import { CreditCard, Gift, Play, Square, Ticket } from "lucide-react";
+import { CreditCard, Gift, Play, Square, Ticket, X } from "lucide-react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/presentation/admin/common/action-state";
@@ -123,7 +122,7 @@ export function ManualServiceControlForm({
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const handledSuccessRef = useRef(false);
-  const refreshAfterDialogCloseRef = useRef(false);
+  const handledEndSuccessRef = useRef(false);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
@@ -174,7 +173,6 @@ export function ManualServiceControlForm({
 
     if (!succeeded) {
       handledSuccessRef.current = false;
-      refreshAfterDialogCloseRef.current = false;
       return;
     }
 
@@ -183,38 +181,44 @@ export function ManualServiceControlForm({
     }
 
     handledSuccessRef.current = true;
-    refreshAfterDialogCloseRef.current = true;
 
-    if (!open) {
-      const refreshTimeout = window.setTimeout(() => {
-        refreshAfterDialogCloseRef.current = false;
-        router.refresh();
-      }, 400);
-
-      return () => window.clearTimeout(refreshTimeout);
-    }
-
+    let refreshTimeout: number | undefined;
     const closeFrame = window.requestAnimationFrame(() => {
+      setPdvModalOpen(false);
       setOpen(false);
+      refreshTimeout = window.setTimeout(() => {
+        router.refresh();
+      }, 100);
     });
 
-    return () => window.cancelAnimationFrame(closeFrame);
-  }, [extendState.status, open, paidState.status, releaseState.status, router]);
+    return () => {
+      window.cancelAnimationFrame(closeFrame);
+      if (refreshTimeout) {
+        window.clearTimeout(refreshTimeout);
+      }
+    };
+  }, [extendState.status, paidState.status, releaseState.status, router]);
 
   useEffect(() => {
-    if (open || !refreshAfterDialogCloseRef.current) {
+    if (endState.status !== "success") {
+      handledEndSuccessRef.current = false;
       return;
     }
 
+    if (handledEndSuccessRef.current) {
+      return;
+    }
+
+    handledEndSuccessRef.current = true;
+
     const refreshTimeout = window.setTimeout(() => {
-      refreshAfterDialogCloseRef.current = false;
       router.refresh();
-    }, 400);
+    }, 100);
 
     return () => {
       window.clearTimeout(refreshTimeout);
     };
-  }, [open, router]);
+  }, [endState.status, router]);
 
   function handleOpenChange(nextOpen: boolean) {
     setPdvModalOpen(nextOpen);
@@ -251,13 +255,24 @@ export function ManualServiceControlForm({
       <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
 
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-[min(560px,94vw)] border-border/80 bg-card p-0 sm:max-w-[min(560px,94vw)]">
-          <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
-            <DialogTitle>
-              {isBusy ? "Adicionar tempo" : "Liberar"} {stationId.toUpperCase()}
-            </DialogTitle>
-          </DialogHeader>
+      {open ? (
+        <div className="fixed inset-0 z-50 grid place-items-center px-4 py-6">
+          <div className="absolute inset-0 bg-black/10 backdrop-blur-xs" onClick={() => handleOpenChange(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`service-release-title-${stationId}`}
+            className="relative z-10 grid w-full max-w-[min(560px,94vw)] gap-4 rounded-xl border border-border/80 bg-card p-0 text-sm ring-1 ring-foreground/10 sm:max-w-[min(560px,94vw)]"
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-border/70 px-5 py-4">
+              <h2 id={`service-release-title-${stationId}`} className="text-base font-medium leading-none">
+                {isBusy ? "Adicionar tempo" : "Liberar"} {stationId.toUpperCase()}
+              </h2>
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => handleOpenChange(false)}>
+                <X className="h-4 w-4" />
+                <span className="sr-only">Fechar</span>
+              </Button>
+            </div>
 
           <div className="space-y-4 px-5 pb-5">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -410,9 +425,10 @@ export function ManualServiceControlForm({
                 </Button>
               </form>
             )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      ) : null}
 
       {isBusy ? (
         <form action={endAction} className="space-y-2">
