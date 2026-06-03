@@ -1,13 +1,32 @@
-import { Download, RefreshCw, Tv } from "lucide-react";
+import { cookies } from "next/headers";
 
-import { requirePermission } from "@/application/auth/guards";
+import { Download, KeyRound, RefreshCw, Tv } from "lucide-react";
+
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PERMISSIONS } from "@/domain/auth/permissions";
+import {
+  tvAppPageAccessCookieName,
+  tvAppPageAccessCookieValue,
+} from "@/domain/tv-app/app-page-access";
 import { tvAppUpdateManifest } from "@/domain/tv-app/update-manifest";
+import { getServerAuthSession } from "@/lib/auth";
 
-export default async function TvAppPage() {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+import { unlockTvAppPageAction } from "./actions";
+
+type TvAppPageProps = {
+  searchParams: Promise<{
+    pin?: string;
+  }>;
+};
+
+export default async function TvAppPage({ searchParams }: TvAppPageProps) {
+  const [session, cookieStore, params] = await Promise.all([getServerAuthSession(), cookies(), searchParams]);
+  const hasPinAccess = cookieStore.get(tvAppPageAccessCookieName)?.value === tvAppPageAccessCookieValue;
+  const canViewPage = Boolean(session?.user) || hasPinAccess;
+
+  if (!canViewPage) {
+    return <TvAppPinGate hasError={params.pin === "invalid"} />;
+  }
 
   return (
     <div className="space-y-5 text-white">
@@ -74,6 +93,45 @@ export default async function TvAppPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function TvAppPinGate({ hasError }: { hasError: boolean }) {
+  return (
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+      <Card className="w-full max-w-sm border-border/80 bg-card/86 shadow-2xl shadow-black/30 backdrop-blur-xl">
+        <CardHeader className="space-y-3 pb-4">
+          <div className="flex size-11 items-center justify-center rounded-2xl border border-primary/35 bg-primary/12 text-primary">
+            <KeyRound className="size-5" />
+          </div>
+          <div>
+            <CardTitle className="text-xl text-white">Acesso ao APK</CardTitle>
+            <p className="mt-1 text-sm text-white/55">Digite o PIN para baixar o app da TV.</p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form action={unlockTvAppPageAction} className="space-y-3">
+            <input
+              autoFocus
+              autoComplete="one-time-code"
+              className="h-12 w-full rounded-xl border border-border/80 bg-background/80 px-4 text-center text-lg font-semibold tracking-[0.35em] text-white outline-none transition focus:border-primary/70 focus:ring-4 focus:ring-primary/15"
+              inputMode="numeric"
+              maxLength={8}
+              name="pin"
+              placeholder="PIN"
+              type="password"
+            />
+            {hasError ? <p className="text-sm font-medium text-primary">PIN incorreto.</p> : null}
+            <button
+              className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-primary/30"
+              type="submit"
+            >
+              Entrar
+            </button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
