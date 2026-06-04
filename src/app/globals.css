@@ -287,18 +287,34 @@
 
 @media print {
   @page {
-    size: 57mm auto;
+    size: 48mm auto;
     margin: 0;
   }
 
   html.receipt-print-mode,
   body.receipt-print-mode {
-    width: 57mm;
-    min-width: 57mm;
+    width: 48mm;
+    min-width: 48mm;
+    margin: 0 !important;
     background: white !important;
     color: #000 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  body.receipt-print-mode > div {
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  body.receipt-print-mode > div > .pointer-events-none {
+    display: none !important;
+  }
+
+  body.receipt-print-mode > div > div {
+    min-height: auto !important;
+    background: white !important;
   }
 
   body.receipt-print-mode aside,
@@ -308,14 +324,24 @@
   }
 
   body.receipt-print-mode main {
+    width: 48mm !important;
+    min-width: 48mm !important;
     padding: 0 !important;
     display: flex !important;
     justify-content: center !important;
+    background: white !important;
+  }
+
+  body.receipt-print-mode main > div {
+    width: 48mm !important;
+    max-width: 48mm !important;
+    gap: 0 !important;
+    margin: 0 auto !important;
   }
 
   body.receipt-print-mode .receipt-print-card {
-    width: 57mm !important;
-    max-width: 57mm !important;
+    width: 48mm !important;
+    max-width: 48mm !important;
     margin: 0 auto !important;
     border: none !important;
     border-radius: 0 !important;
@@ -324,7 +350,7 @@
   }
 
   body.receipt-print-mode .receipt-print-content {
-    width: 57mm !important;
+    width: 48mm !important;
     min-height: 40mm !important;
     color: #000 !important;
     font-family: Arial, Helvetica, sans-serif !important;
