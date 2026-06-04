@@ -46,6 +46,7 @@ import {
   normalizeCouponCode,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
+import { paymentCardBrandOptions } from "@/presentation/admin/pdv/payment-card-brands";
 
 type CustomerOption = {
   id: string;
@@ -1461,15 +1462,22 @@ export function CreateSaleForm({
                                   <>
                                     <div className="space-y-2">
                                       <Label htmlFor={`payment-brand-${paymentLine.id}`}>Bandeira</Label>
-                                      <Input
+                                      <select
                                         id={`payment-brand-${paymentLine.id}`}
                                         name="paymentCardBrand"
+                                        className="admin-native-select"
                                         value={paymentLine.cardBrand ?? ""}
                                         onChange={(event) =>
                                           updatePaymentLine(paymentLine.id, "cardBrand", event.target.value)
                                         }
-                                        placeholder="Visa, Master..."
-                                      />
+                                      >
+                                        <option value="">Selecionar bandeira</option>
+                                        {paymentCardBrandOptions.map((brand) => (
+                                          <option key={brand} value={brand}>
+                                            {brand}
+                                          </option>
+                                        ))}
+                                      </select>
                                     </div>
                                     <div className="space-y-2">
                                       <Label htmlFor={`payment-last4-${paymentLine.id}`}>Final do cartao</Label>

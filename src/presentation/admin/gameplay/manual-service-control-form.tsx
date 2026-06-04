@@ -22,6 +22,7 @@ import {
   normalizeCouponCode,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
+import { paymentCardBrandOptions } from "@/presentation/admin/pdv/payment-card-brands";
 
 declare global {
   interface Window {
@@ -85,6 +86,10 @@ const paymentLabels: Record<PaymentMethod, string> = {
   CREDIT_CARD: "Crédito",
   DEBIT_CARD: "Débito",
 };
+
+function isCardPayment(method: PaymentMethod) {
+  return method === PaymentMethod.CREDIT_CARD || method === PaymentMethod.DEBIT_CARD;
+}
 
 function centsFromMoney(value: number) {
   return Math.round(value * 100);
@@ -263,10 +268,12 @@ export function ManualServiceControlForm({
   const [mode, setMode] = useState<"free" | "paid">("free");
   const [selectedProductId, setSelectedProductId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
+  const [paymentCardBrand, setPaymentCardBrand] = useState("");
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [endPaymentOpen, setEndPaymentOpen] = useState(false);
   const [endPaymentMethod, setEndPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
+  const [endPaymentCardBrand, setEndPaymentCardBrand] = useState("");
   const [endCashReceived, setEndCashReceived] = useState("");
   const [endShowCoupon, setEndShowCoupon] = useState(false);
   const [endCouponCode, setEndCouponCode] = useState("");
@@ -339,6 +346,8 @@ export function ManualServiceControlForm({
       : null;
   const endCouponDiscountInCents = endCouponPreview?.discountInCents ?? 0;
   const endTotalInCents = Math.max(0, endSubtotalInCents - endCouponDiscountInCents);
+  const paidCardPayment = !isOpenPaidStart && isCardPayment(paymentMethod);
+  const endCardPayment = isCardPayment(endPaymentMethod);
   const canPaidSubmit = isOpenPaidStart
     ? Boolean(selectedProduct)
     : Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
@@ -574,8 +583,6 @@ export function ManualServiceControlForm({
                 <input type="hidden" name="gameplayStationId" value={stationId} />
                 <input type="hidden" name="paymentAmount" value={moneyFromCents(totalInCents)} />
                 <input type="hidden" name="paymentApprovedAmount" value="" />
-                <input type="hidden" name="paymentCardBrand" value="" />
-                <input type="hidden" name="paymentCardLast4" value="" />
                 <input type="hidden" name="paymentNsu" value="" />
                 <input type="hidden" name="paymentAuthorizationCode" value="" />
                 <input type="hidden" name="paymentTerminalId" value="" />
@@ -648,7 +655,13 @@ export function ManualServiceControlForm({
                           name="paymentMethod"
                           className="admin-native-select"
                           value={paymentMethod}
-                          onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                          onChange={(event) => {
+                            const nextMethod = event.target.value as PaymentMethod;
+                            setPaymentMethod(nextMethod);
+                            if (!isCardPayment(nextMethod)) {
+                              setPaymentCardBrand("");
+                            }
+                          }}
                         >
                           {Object.values(PaymentMethod).map((method) => (
                             <option key={method} value={method}>
@@ -662,6 +675,29 @@ export function ManualServiceControlForm({
                         <span className="mt-1 block text-lg font-black text-foreground">{formatCurrencyFromCents(totalInCents)}</span>
                       </div>
                     </div>
+
+                    {paidCardPayment ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`service-payment-brand-${stationId}`}>Bandeira</Label>
+                        <select
+                          id={`service-payment-brand-${stationId}`}
+                          name="paymentCardBrand"
+                          className="admin-native-select"
+                          value={paymentCardBrand}
+                          onChange={(event) => setPaymentCardBrand(event.target.value)}
+                        >
+                          <option value="">Selecionar bandeira</option>
+                          {paymentCardBrandOptions.map((brand) => (
+                            <option key={brand} value={brand}>
+                              {brand}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <input type="hidden" name="paymentCardBrand" value="" />
+                    )}
+                    <input type="hidden" name="paymentCardLast4" value="" />
 
                     {showCoupon ? (
                       <div className="space-y-1.5 rounded-2xl border border-border/70 bg-background/45 p-3">
@@ -723,8 +759,6 @@ export function ManualServiceControlForm({
             <input type="hidden" name="couponCode" value={endCouponDiscountInCents > 0 ? selectedEndCoupon?.code ?? "" : ""} />
             <input type="hidden" name="paymentAmount" value={moneyFromCents(endTotalInCents)} />
             <input type="hidden" name="paymentApprovedAmount" value="" />
-            <input type="hidden" name="paymentCardBrand" value="" />
-            <input type="hidden" name="paymentCardLast4" value="" />
             <input type="hidden" name="paymentNsu" value="" />
             <input type="hidden" name="paymentAuthorizationCode" value="" />
             <input type="hidden" name="paymentTerminalId" value="" />
@@ -762,7 +796,13 @@ export function ManualServiceControlForm({
                   name="paymentMethod"
                   className="admin-native-select"
                   value={endPaymentMethod}
-                  onChange={(event) => setEndPaymentMethod(event.target.value as PaymentMethod)}
+                  onChange={(event) => {
+                    const nextMethod = event.target.value as PaymentMethod;
+                    setEndPaymentMethod(nextMethod);
+                    if (!isCardPayment(nextMethod)) {
+                      setEndPaymentCardBrand("");
+                    }
+                  }}
                 >
                   {Object.values(PaymentMethod).map((method) => (
                     <option key={method} value={method}>
@@ -772,6 +812,29 @@ export function ManualServiceControlForm({
                 </select>
               </div>
             </div>
+
+            {endCardPayment ? (
+              <div className="space-y-1.5">
+                <Label htmlFor={`service-end-payment-brand-${stationId}`}>Bandeira</Label>
+                <select
+                  id={`service-end-payment-brand-${stationId}`}
+                  name="paymentCardBrand"
+                  className="admin-native-select"
+                  value={endPaymentCardBrand}
+                  onChange={(event) => setEndPaymentCardBrand(event.target.value)}
+                >
+                  <option value="">Selecionar bandeira</option>
+                  {paymentCardBrandOptions.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <input type="hidden" name="paymentCardBrand" value="" />
+            )}
+            <input type="hidden" name="paymentCardLast4" value="" />
 
             {endPaymentMethod === PaymentMethod.CASH ? (
               <div className="space-y-1.5">
