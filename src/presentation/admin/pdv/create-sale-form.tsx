@@ -46,7 +46,7 @@ import {
   normalizeCouponCode,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
-import { paymentCardBrandOptions } from "@/presentation/admin/pdv/payment-card-brands";
+import { PaymentCardBrandPicker } from "@/presentation/admin/pdv/payment-card-brand-picker";
 
 type CustomerOption = {
   id: string;
@@ -1461,23 +1461,15 @@ export function CreateSaleForm({
                                 {cardPayment ? (
                                   <>
                                     <div className="space-y-2">
-                                      <Label htmlFor={`payment-brand-${paymentLine.id}`}>Bandeira</Label>
-                                      <select
-                                        id={`payment-brand-${paymentLine.id}`}
+                                      <Label id={`payment-brand-${paymentLine.id}`}>Bandeira</Label>
+                                      <PaymentCardBrandPicker
+                                        ariaLabelledBy={`payment-brand-${paymentLine.id}`}
                                         name="paymentCardBrand"
-                                        className="admin-native-select"
                                         value={paymentLine.cardBrand ?? ""}
                                         onChange={(event) =>
-                                          updatePaymentLine(paymentLine.id, "cardBrand", event.target.value)
+                                          updatePaymentLine(paymentLine.id, "cardBrand", event)
                                         }
-                                      >
-                                        <option value="">Selecionar bandeira</option>
-                                        {paymentCardBrandOptions.map((brand) => (
-                                          <option key={brand} value={brand}>
-                                            {brand}
-                                          </option>
-                                        ))}
-                                      </select>
+                                      />
                                     </div>
                                     <div className="space-y-2">
                                       <Label htmlFor={`payment-last4-${paymentLine.id}`}>Final do cartao</Label>

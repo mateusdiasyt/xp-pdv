@@ -37,7 +37,7 @@ import {
   calculateCouponDiscountInCents,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
-import { paymentCardBrandOptions } from "@/presentation/admin/pdv/payment-card-brands";
+import { PaymentCardBrandPicker } from "@/presentation/admin/pdv/payment-card-brand-picker";
 
 type CustomerOption = {
   id: string;
@@ -1382,23 +1382,15 @@ export function QuickSaleForm({
                             {cardPayment ? (
                               <>
                                 <div className="space-y-2">
-                                  <Label htmlFor={`quick-payment-brand-${paymentLine.id}`}>Bandeira</Label>
-                                  <select
-                                    id={`quick-payment-brand-${paymentLine.id}`}
+                                  <Label id={`quick-payment-brand-${paymentLine.id}`}>Bandeira</Label>
+                                  <PaymentCardBrandPicker
+                                    ariaLabelledBy={`quick-payment-brand-${paymentLine.id}`}
                                     name="paymentCardBrand"
-                                    className="admin-native-select"
                                     value={paymentLine.cardBrand ?? ""}
                                     onChange={(event) =>
-                                      updatePaymentLine(paymentLine.id, "cardBrand", event.target.value)
+                                      updatePaymentLine(paymentLine.id, "cardBrand", event)
                                     }
-                                  >
-                                    <option value="">Selecionar bandeira</option>
-                                    {paymentCardBrandOptions.map((brand) => (
-                                      <option key={brand} value={brand}>
-                                        {brand}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
                                 </div>
                                 <div className="space-y-2">
                                   <Label htmlFor={`quick-payment-last4-${paymentLine.id}`}>Final</Label>

@@ -22,7 +22,7 @@ import {
   normalizeCouponCode,
   type PdvCouponOption,
 } from "@/presentation/admin/pdv/coupon-utils";
-import { paymentCardBrandOptions } from "@/presentation/admin/pdv/payment-card-brands";
+import { PaymentCardBrandPicker } from "@/presentation/admin/pdv/payment-card-brand-picker";
 
 declare global {
   interface Window {
@@ -678,21 +678,13 @@ export function ManualServiceControlForm({
 
                     {paidCardPayment ? (
                       <div className="space-y-1.5">
-                        <Label htmlFor={`service-payment-brand-${stationId}`}>Bandeira</Label>
-                        <select
-                          id={`service-payment-brand-${stationId}`}
+                        <Label id={`service-payment-brand-${stationId}`}>Bandeira</Label>
+                        <PaymentCardBrandPicker
+                          ariaLabelledBy={`service-payment-brand-${stationId}`}
                           name="paymentCardBrand"
-                          className="admin-native-select"
                           value={paymentCardBrand}
-                          onChange={(event) => setPaymentCardBrand(event.target.value)}
-                        >
-                          <option value="">Selecionar bandeira</option>
-                          {paymentCardBrandOptions.map((brand) => (
-                            <option key={brand} value={brand}>
-                              {brand}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setPaymentCardBrand}
+                        />
                       </div>
                     ) : (
                       <input type="hidden" name="paymentCardBrand" value="" />
@@ -815,21 +807,13 @@ export function ManualServiceControlForm({
 
             {endCardPayment ? (
               <div className="space-y-1.5">
-                <Label htmlFor={`service-end-payment-brand-${stationId}`}>Bandeira</Label>
-                <select
-                  id={`service-end-payment-brand-${stationId}`}
+                <Label id={`service-end-payment-brand-${stationId}`}>Bandeira</Label>
+                <PaymentCardBrandPicker
+                  ariaLabelledBy={`service-end-payment-brand-${stationId}`}
                   name="paymentCardBrand"
-                  className="admin-native-select"
                   value={endPaymentCardBrand}
-                  onChange={(event) => setEndPaymentCardBrand(event.target.value)}
-                >
-                  <option value="">Selecionar bandeira</option>
-                  {paymentCardBrandOptions.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setEndPaymentCardBrand}
+                />
               </div>
             ) : (
               <input type="hidden" name="paymentCardBrand" value="" />
