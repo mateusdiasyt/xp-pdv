@@ -1381,7 +1381,7 @@ export function QuickSaleForm({
                             </div>
                             {cardPayment ? (
                               <>
-                                <div className="space-y-2">
+                                <div className="space-y-2 md:col-span-2 xl:col-span-3">
                                   <Label id={`quick-payment-brand-${paymentLine.id}`}>Bandeira</Label>
                                   <PaymentCardBrandPicker
                                     ariaLabelledBy={`quick-payment-brand-${paymentLine.id}`}

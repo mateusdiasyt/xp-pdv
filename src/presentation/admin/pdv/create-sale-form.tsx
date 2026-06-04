@@ -1460,7 +1460,7 @@ export function CreateSaleForm({
                                 </div>
                                 {cardPayment ? (
                                   <>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 md:col-span-2 xl:col-span-3">
                                       <Label id={`payment-brand-${paymentLine.id}`}>Bandeira</Label>
                                       <PaymentCardBrandPicker
                                         ariaLabelledBy={`payment-brand-${paymentLine.id}`}
