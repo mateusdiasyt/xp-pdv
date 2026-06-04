@@ -19,6 +19,7 @@ type PeriodOption = {
 };
 
 const periodOptions: PeriodOption[] = [
+  { value: "cash", label: "Caixa atual" },
   { value: "1d", label: "1 dia" },
   { value: "7d", label: "7 dias" },
   { value: "15d", label: "15 dias" },
@@ -320,7 +321,7 @@ export function ReportFilterForm({
         </div>
       ) : (
         <div className="flex h-10 w-[360px] max-w-full items-center rounded-xl border border-dashed border-border/70 bg-background/35 px-3 text-sm text-muted-foreground">
-          Intervalo automatico para o periodo selecionado
+          {period === "cash" ? "Somando apenas o caixa aberto atual" : "Intervalo automatico para o periodo selecionado"}
         </div>
       )}
 

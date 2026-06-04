@@ -24,6 +24,10 @@ function formatPercent(value: number) {
 }
 
 function printCode(report: ReportPeriodData) {
+  if (report.period === "cash") {
+    return "CAIXA";
+  }
+
   return report.period === "custom" ? "CUSTOM" : report.period.toUpperCase();
 }
 

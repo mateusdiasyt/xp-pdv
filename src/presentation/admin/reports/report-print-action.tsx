@@ -18,6 +18,7 @@ type PrintOption = {
 };
 
 const printOptions: PrintOption[] = [
+  { period: "cash", title: "Caixa atual" },
   { period: "1d", title: "1 dia" },
   { period: "7d", title: "7 dias" },
   { period: "15d", title: "15 dias" },

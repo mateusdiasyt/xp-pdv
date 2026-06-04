@@ -1,4 +1,4 @@
-import { CashMovementType, PaymentMethod, PaymentStatus, Prisma, SaleStatus } from "@prisma/client";
+import { CashMovementType, CashSessionStatus, PaymentMethod, PaymentStatus, Prisma, SaleStatus } from "@prisma/client";
 
 import { getBrandCustomizationSnapshot } from "@/application/customization/brand-customization-service";
 import {
@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 
 export const REPORT_PERIODS = [
+  "cash",
   "1d",
   "7d",
   "15d",
@@ -31,6 +32,9 @@ type ReportRange = {
   start: Date;
   end: Date;
   label: string;
+  cashSessionId?: string;
+  cashSessionLabel?: string;
+  mode: "cash" | "period";
   businessStartDate: string;
   businessEndDate: string;
   timezone: string;
@@ -270,6 +274,7 @@ function resolvePeriod(period?: string): ReportPeriod {
 
 function periodLabel(period: ReportPeriod) {
   const labels: Record<ReportPeriod, string> = {
+    cash: "Caixa atual",
     "1d": "Relatorio de 1 dia",
     "7d": "Relatorio de 7 dias",
     "15d": "Relatorio de 15 dias",
@@ -293,6 +298,17 @@ function rangeLabel(period: ReportPeriod, start: Ymd, end: Ymd, range: Operation
   return `${prefix}: ${dateLabel} | Turno ${range.startsAt}-${range.endsAt}`;
 }
 
+function formatDateTimeLabel(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: timezone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function buildRange(start: Ymd, end: Ymd, period: ReportPeriod, settings: ReportSettings): ReportRange {
   let normalizedStart = start;
   let normalizedEnd = end;
@@ -309,11 +325,60 @@ function buildRange(start: Ymd, end: Ymd, period: ReportPeriod, settings: Report
     start: startRange.start,
     end: endRange.end,
     label: rangeLabel(period, normalizedStart, normalizedEnd, startRange),
+    mode: "period",
     businessStartDate: formatYmd(normalizedStart),
     businessEndDate: formatYmd(normalizedEnd),
     timezone: startRange.timezone,
     startsAt: startRange.startsAt,
     endsAt: startRange.endsAt,
+  };
+}
+
+async function getOpenCashSessionRange(settings: ReportSettings, fallbackReferenceDate: Ymd): Promise<ReportRange | null> {
+  const openSession = await prisma.cashSession.findFirst({
+    where: {
+      status: CashSessionStatus.OPEN,
+    },
+    select: {
+      id: true,
+      openedAt: true,
+      cashRegister: {
+        select: {
+          name: true,
+          code: true,
+        },
+      },
+      operator: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      openedAt: "desc",
+    },
+  });
+
+  if (!openSession) {
+    return null;
+  }
+
+  const operationalDay = getOperationalDayRange(openSession.openedAt, settings);
+  const now = new Date();
+  const registerLabel = `${openSession.cashRegister.name} (${openSession.cashRegister.code})`;
+
+  return {
+    start: openSession.openedAt,
+    end: now,
+    label: `Caixa atual: ${registerLabel} | Aberto ${formatDateTimeLabel(openSession.openedAt, operationalDay.timezone)}`,
+    cashSessionId: openSession.id,
+    cashSessionLabel: `${registerLabel} - ${openSession.operator.name}`,
+    mode: "cash",
+    businessStartDate: formatYmd(operationalDay.businessDate),
+    businessEndDate: formatYmd(fallbackReferenceDate),
+    timezone: operationalDay.timezone,
+    startsAt: operationalDay.startsAt,
+    endsAt: operationalDay.endsAt,
   };
 }
 
@@ -324,6 +389,20 @@ function getRangeForPeriod(
   customStartDate?: string,
   customEndDate?: string,
 ) {
+  if (period === "cash") {
+    const range = buildRange(referenceDate, referenceDate, period, settings);
+
+    return {
+      range: {
+        ...range,
+        label: `Caixa atual: nenhum caixa aberto | Turno ${range.startsAt}-${range.endsAt}`,
+        mode: "cash" as const,
+      },
+      customStartDate: range.businessStartDate,
+      customEndDate: range.businessEndDate,
+    };
+  }
+
   if (period === "custom") {
     const fallbackStart = parseYmd(customStartDate) ?? parseYmd(customEndDate) ?? referenceDate;
     const fallbackEnd = parseYmd(customEndDate) ?? parseYmd(customStartDate) ?? referenceDate;
@@ -425,15 +504,44 @@ function buildPaymentRows(sales: SaleForReport[], netRevenue: number): ReportPay
 }
 
 async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Promise<ReportPeriodData> {
-  const [sales, cancelledSalesCount, cashMovements] = await Promise.all([
-    prisma.sale.findMany({
-      where: {
+  const completedSaleWhere = range.cashSessionId
+    ? {
+        status: SaleStatus.COMPLETED,
+        cashSessionId: range.cashSessionId,
+      }
+    : {
         status: SaleStatus.COMPLETED,
         createdAt: {
           gte: range.start,
           lt: range.end,
         },
-      },
+      };
+  const cancelledSaleWhere = range.cashSessionId
+    ? {
+        status: SaleStatus.CANCELLED,
+        cashSessionId: range.cashSessionId,
+      }
+    : {
+        status: SaleStatus.CANCELLED,
+        createdAt: {
+          gte: range.start,
+          lt: range.end,
+        },
+      };
+  const cashMovementWhere = range.cashSessionId
+    ? {
+        cashSessionId: range.cashSessionId,
+      }
+    : {
+        createdAt: {
+          gte: range.start,
+          lt: range.end,
+        },
+      };
+
+  const [sales, cancelledSalesCount, cashMovements] = await Promise.all([
+    prisma.sale.findMany({
+      where: completedSaleWhere,
       select: {
         id: true,
         subtotalAmount: true,
@@ -469,21 +577,10 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
       },
     }),
     prisma.sale.count({
-      where: {
-        status: SaleStatus.CANCELLED,
-        createdAt: {
-          gte: range.start,
-          lt: range.end,
-        },
-      },
+      where: cancelledSaleWhere,
     }),
     prisma.cashMovement.findMany({
-      where: {
-        createdAt: {
-          gte: range.start,
-          lt: range.end,
-        },
-      },
+      where: cashMovementWhere,
       select: {
         type: true,
         amount: true,
@@ -620,31 +717,40 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
 
 export async function getReportsData(input: ReportsDataInput): Promise<ReportsData> {
   const now = new Date();
-  const selectedPeriod = resolvePeriod(input.period);
   const { customization } = await getBrandCustomizationSnapshot();
   const currentOperationalDay = input.date
     ? getOperationalDayRangeByBusinessDate(parseYmd(input.date) ?? getOperationalDayRange(now, customization).businessDate, customization)
     : getOperationalDayRange(now, customization);
   const referenceDate = currentOperationalDay.businessDate;
+  const cashRange = await getOpenCashSessionRange(customization, referenceDate);
+  const selectedPeriod = input.period ? resolvePeriod(input.period) : cashRange ? "cash" : "1d";
 
   const oneDayRange = getRangeForPeriod("1d", referenceDate, customization, input.startDate, input.endDate).range;
   const sevenDaysRange = getRangeForPeriod("7d", referenceDate, customization, input.startDate, input.endDate).range;
   const fifteenDaysRange = getRangeForPeriod("15d", referenceDate, customization, input.startDate, input.endDate).range;
   const thirtyDaysRange = getRangeForPeriod("30d", referenceDate, customization, input.startDate, input.endDate).range;
-  const selectedRangeData = getRangeForPeriod(
-    selectedPeriod,
-    referenceDate,
-    customization,
-    input.startDate,
-    input.endDate,
-  );
+  const selectedRangeData =
+    selectedPeriod === "cash" && cashRange
+      ? {
+          range: cashRange,
+          customStartDate: cashRange.businessStartDate,
+          customEndDate: cashRange.businessEndDate,
+        }
+      : getRangeForPeriod(
+          selectedPeriod === "cash" ? "1d" : selectedPeriod,
+          referenceDate,
+          customization,
+          input.startDate,
+          input.endDate,
+        );
+  const activePeriod = selectedPeriod === "cash" && !cashRange ? "1d" : selectedPeriod;
 
   const [oneDay, sevenDays, fifteenDays, thirtyDays, active] = await Promise.all([
     getReportPeriodData("1d", oneDayRange),
     getReportPeriodData("7d", sevenDaysRange),
     getReportPeriodData("15d", fifteenDaysRange),
     getReportPeriodData("30d", thirtyDaysRange),
-    getReportPeriodData(selectedPeriod, selectedRangeData.range),
+    getReportPeriodData(activePeriod, selectedRangeData.range),
   ]);
 
   return {
@@ -652,7 +758,7 @@ export async function getReportsData(input: ReportsDataInput): Promise<ReportsDa
     referenceDate: formatYmd(referenceDate),
     customStartDate: selectedRangeData.customStartDate,
     customEndDate: selectedRangeData.customEndDate,
-    selectedPeriod,
+    selectedPeriod: activePeriod,
     active,
     oneDay,
     sevenDays,
