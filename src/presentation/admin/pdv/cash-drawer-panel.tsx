@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Banknote, LockKeyhole, MinusCircle, PlusCircle, Printer, WalletCards } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
   closeCashSessionAction,
   openCashSessionAction,
@@ -104,8 +103,23 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
 });
 
+const closedCashReportStorageKey = "xp-pdv:last-closed-cash-report";
+
 function isPdvCashSession(value: unknown): value is PdvCashSession {
   return Boolean(value && typeof value === "object" && "id" in value && "cashRegister" in value && "operator" in value);
+}
+
+function localActionError(error: unknown): ActionState {
+  return {
+    status: "error",
+    message: error instanceof Error ? error.message : "Nao foi possivel concluir a acao.",
+  };
+}
+
+function reloadPage() {
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 100);
 }
 
 function formatDateTime(value?: string | null) {
@@ -240,19 +254,34 @@ function CashReportCard({ session }: { session: PdvCashSession }) {
 function OpenCashForm({
   cashRegisters,
   operators,
-  onOpened,
 }: {
   cashRegisters: CashRegisterOption[];
   operators: OperatorOption[];
   onOpened: (session: PdvCashSession) => void;
 }) {
-  const [state, formAction] = useActionState(openCashSessionAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, setIsPending] = useState(false);
 
-  useEffect(() => {
-    if (state.status === "success" && isPdvCashSession(state.data)) {
-      onOpened(state.data);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    setIsPending(true);
+    setState(initialActionState);
+
+    try {
+      const result = await openCashSessionAction(initialActionState, formData);
+      setState(result);
+
+      if (result.status === "success") {
+        reloadPage();
+      }
+    } catch (error) {
+      setState(localActionError(error));
+    } finally {
+      setIsPending(false);
     }
-  }, [onOpened, state]);
+  }
 
   if (cashRegisters.length === 0) {
     return <p className="text-sm text-muted-foreground">Nenhum caixa ativo encontrado.</p>;
@@ -273,7 +302,7 @@ function OpenCashForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-3 lg:grid-cols-[minmax(170px,0.9fr)_minmax(170px,0.8fr)_130px_auto] lg:items-end">
+    <form onSubmit={handleSubmit} className="grid gap-3 lg:grid-cols-[minmax(170px,0.9fr)_minmax(170px,0.8fr)_130px_auto] lg:items-end">
       <div className="space-y-1.5">
         <Label htmlFor="pdv-cash-operator">Operador</Label>
         <select id="pdv-cash-operator" name="operatorId" className="admin-native-select" defaultValue={operators[0]?.id} required>
@@ -313,7 +342,9 @@ function OpenCashForm({
       </div>
 
       <div className="lg:col-span-4">
-        <FormSubmitButton>Abrir caixa</FormSubmitButton>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Abrindo..." : "Abrir caixa"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>
@@ -323,22 +354,37 @@ function OpenCashForm({
 function CashMovementForm({
   sessionId,
   type,
-  onUpdated,
 }: {
   sessionId: string;
   type: CashMovementTypeValue;
   onUpdated: (session: PdvCashSession) => void;
 }) {
-  const [state, formAction] = useActionState(registerCashMovementAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, setIsPending] = useState(false);
 
-  useEffect(() => {
-    if (state.status === "success" && isPdvCashSession(state.data)) {
-      onUpdated(state.data);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    setIsPending(true);
+    setState(initialActionState);
+
+    try {
+      const result = await registerCashMovementAction(initialActionState, formData);
+      setState(result);
+
+      if (result.status === "success") {
+        reloadPage();
+      }
+    } catch (error) {
+      setState(localActionError(error));
+    } finally {
+      setIsPending(false);
     }
-  }, [onUpdated, state]);
+  }
 
   return (
-    <form action={formAction} className="grid gap-3 md:grid-cols-[130px_minmax(180px,1fr)_auto] md:items-end">
+    <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[130px_minmax(180px,1fr)_auto] md:items-end">
       <input type="hidden" name="cashSessionId" value={sessionId} />
       <input type="hidden" name="type" value={type} />
       <div className="space-y-1.5">
@@ -354,7 +400,9 @@ function CashMovementForm({
           required
         />
       </div>
-      <FormSubmitButton>{type === "SUPPLY" ? "Confirmar suprimento" : "Confirmar sangria"}</FormSubmitButton>
+      <Button type="submit" disabled={isPending}>
+        {isPending ? "Salvando..." : type === "SUPPLY" ? "Confirmar suprimento" : "Confirmar sangria"}
+      </Button>
       <div className="md:col-span-3">
         <ActionFeedback state={state} />
       </div>
@@ -369,16 +417,38 @@ function CloseCashForm({
   session: PdvCashSession;
   onClosed: (session: PdvCashSession) => void;
 }) {
-  const [state, formAction] = useActionState(closeCashSessionAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, setIsPending] = useState(false);
 
-  useEffect(() => {
-    if (state.status === "success" && isPdvCashSession(state.data)) {
-      onClosed(state.data);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    setIsPending(true);
+    setState(initialActionState);
+
+    try {
+      const result = await closeCashSessionAction(initialActionState, formData);
+      setState(result);
+
+      if (result.status === "success" && isPdvCashSession(result.data)) {
+        onClosed(result.data);
+        try {
+          window.sessionStorage.setItem(closedCashReportStorageKey, JSON.stringify(result.data));
+        } catch {
+          // A impressao ainda fica disponivel antes do reload se o navegador bloquear o armazenamento.
+        }
+        reloadPage();
+      }
+    } catch (error) {
+      setState(localActionError(error));
+    } finally {
+      setIsPending(false);
     }
-  }, [onClosed, state]);
+  }
 
   return (
-    <form action={formAction} className="grid gap-3 md:grid-cols-[150px_minmax(190px,1fr)_auto] md:items-end">
+    <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[150px_minmax(190px,1fr)_auto] md:items-end">
       <input type="hidden" name="cashSessionId" value={session.id} />
       <div className="space-y-1.5">
         <Label htmlFor="pdv-closing-amount">Valor contado</Label>
@@ -394,7 +464,9 @@ function CloseCashForm({
         <Label htmlFor="pdv-closing-note">Obs.</Label>
         <Textarea id="pdv-closing-note" name="note" rows={1} placeholder="Opcional" />
       </div>
-      <FormSubmitButton>Fechar caixa</FormSubmitButton>
+      <Button type="submit" disabled={isPending}>
+        {isPending ? "Fechando..." : "Fechar caixa"}
+      </Button>
       <div className="md:col-span-3">
         <ActionFeedback state={state} />
       </div>
@@ -414,6 +486,31 @@ export function CashDrawerPanel({
   const [selectedSessionId, setSelectedSessionId] = useState(openSessions[0]?.id ?? "");
   const [activePanel, setActivePanel] = useState<"idle" | "withdrawal" | "supply" | "close">("idle");
   const [lastClosedSession, setLastClosedSession] = useState<PdvCashSession | null>(null);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+
+    try {
+      const storedReport = window.sessionStorage.getItem(closedCashReportStorageKey);
+      if (!storedReport) {
+        return;
+      }
+
+      window.sessionStorage.removeItem(closedCashReportStorageKey);
+      const parsedReport: unknown = JSON.parse(storedReport);
+      if (isPdvCashSession(parsedReport)) {
+        timeoutId = window.setTimeout(() => setLastClosedSession(parsedReport), 0);
+      }
+    } catch {
+      window.sessionStorage.removeItem(closedCashReportStorageKey);
+    }
+
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   const effectiveSelectedSessionId = openSessions.some((session) => session.id === selectedSessionId)
     ? selectedSessionId
