@@ -1,12 +1,12 @@
 export const tvAppUpdateManifest = {
-  versionCode: 4,
-  versionName: "0.1.3",
+  versionCode: 5,
+  versionName: "0.1.4",
   apkPath: "/app/xp-tv.apk",
   required: true,
-  publishedAt: "2026-06-03T20:52:00.000-03:00",
+  publishedAt: "2026-06-04T19:17:28.711-03:00",
   releaseNotes: [
-    "Configuracao inicial agora mostra HDMI do console.",
-    "Atalho do guardiao abre direto a tela de Acessibilidade.",
-    "Mais tempo para configurar Acessibilidade sem o app puxar a tela de volta.",
+    "Tela da TV permanece ligada enquanto o app XP Arcade estiver aberto.",
+    "Evita o protetor de tela em TVs Xiaomi durante bloqueio, preparo e sessao ativa.",
+    "Atualizacao obrigatoria para manter o kiosk sempre visivel.",
   ],
 } as const;
