@@ -1,10 +1,17 @@
-import { Prisma, SaleStatus } from "@prisma/client";
+import { CashMovementType, PaymentMethod, PaymentStatus, Prisma, SaleStatus } from "@prisma/client";
 
+import { getBrandCustomizationSnapshot } from "@/application/customization/brand-customization-service";
+import {
+  getOperationalDayRange,
+  getOperationalDayRangeByBusinessDate,
+  type OperationalDayRange,
+} from "@/domain/business-hours/operational-day";
 import { prisma } from "@/lib/prisma";
 
 export const REPORT_PERIODS = [
   "1d",
   "7d",
+  "15d",
   "30d",
   "3m",
   "6m",
@@ -14,15 +21,28 @@ export const REPORT_PERIODS = [
 
 export type ReportPeriod = (typeof REPORT_PERIODS)[number];
 
+type Ymd = {
+  year: number;
+  month: number;
+  day: number;
+};
+
 type ReportRange = {
   start: Date;
   end: Date;
   label: string;
+  businessStartDate: string;
+  businessEndDate: string;
+  timezone: string;
+  startsAt: string;
+  endsAt: string;
 };
 
 type ReportSummary = {
   salesCount: number;
+  cancelledSalesCount: number;
   itemsCount: number;
+  averageTicket: number;
   grossRevenue: number;
   netRevenue: number;
   discountAmount: number;
@@ -30,6 +50,25 @@ type ReportSummary = {
   grossProfit: number;
   grossMarginPercent: number;
   roiOnCostPercent: number;
+  paymentTotal: number;
+  reconciliationDifference: number;
+};
+
+export type ReportPaymentRow = {
+  method: PaymentMethod;
+  label: string;
+  amount: number;
+  salesCount: number;
+  transactionCount: number;
+  sharePercent: number;
+  averageTicket: number;
+};
+
+type ReportCashMovementSummary = {
+  cashSalesAmount: number;
+  supplyAmount: number;
+  withdrawalAmount: number;
+  netCashFlow: number;
 };
 
 type ReportCategoryRow = {
@@ -55,11 +94,13 @@ type ReportItemRow = {
   profitSharePercent: number;
 };
 
-type ReportPeriodData = {
+export type ReportPeriodData = {
   period: ReportPeriod;
   label: string;
   range: ReportRange;
   summary: ReportSummary;
+  paymentRows: ReportPaymentRow[];
+  cashMovementSummary: ReportCashMovementSummary;
   categoryRows: ReportCategoryRow[];
   itemRows: ReportItemRow[];
 };
@@ -71,7 +112,8 @@ type ReportsDataInput = {
   endDate?: string;
 };
 
-type ReportsData = {
+export type ReportsData = {
+  generatedAt: string;
   referenceDate: string;
   customStartDate: string;
   customEndDate: string;
@@ -79,6 +121,51 @@ type ReportsData = {
   active: ReportPeriodData;
   oneDay: ReportPeriodData;
   sevenDays: ReportPeriodData;
+  fifteenDays: ReportPeriodData;
+  thirtyDays: ReportPeriodData;
+};
+
+const paymentMethodOrder = [
+  PaymentMethod.CASH,
+  PaymentMethod.PIX,
+  PaymentMethod.CREDIT_CARD,
+  PaymentMethod.DEBIT_CARD,
+] as const;
+
+const paymentLabels: Record<PaymentMethod, string> = {
+  CASH: "Dinheiro",
+  PIX: "Pix",
+  CREDIT_CARD: "Credito",
+  DEBIT_CARD: "Debito",
+};
+
+type ReportSettings = {
+  businessTimezone?: string;
+  businessDayStartsAt?: string;
+  businessDayEndsAt?: string;
+};
+
+type SaleForReport = {
+  id: string;
+  subtotalAmount: Prisma.Decimal;
+  discountAmount: Prisma.Decimal;
+  totalAmount: Prisma.Decimal;
+  items: Array<{
+    productNameSnapshot: string;
+    quantity: number;
+    lineTotal: Prisma.Decimal;
+    lineCostTotal: Prisma.Decimal;
+    product: {
+      name: string;
+      category: {
+        name: string;
+      };
+    } | null;
+  }>;
+  payments: Array<{
+    method: PaymentMethod;
+    amount: Prisma.Decimal;
+  }>;
 };
 
 function toNumber(value: Prisma.Decimal | null | undefined) {
@@ -90,7 +177,7 @@ function toNumber(value: Prisma.Decimal | null | undefined) {
 }
 
 function round2(value: number) {
-  return Math.round(value * 100) / 100;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function toPercent(value: number, total: number) {
@@ -117,276 +204,362 @@ function toRoiPercent(grossProfit: number, totalCost: number) {
   return round2((grossProfit / totalCost) * 100);
 }
 
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function formatYmd(date: Ymd) {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 }
 
-function endExclusiveOfDay(date: Date) {
-  const end = startOfDay(date);
-  end.setDate(end.getDate() + 1);
-  return end;
-}
-
-function formatDateLabel(date: Date) {
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function parseDateInput(value?: string) {
-  if (!value) {
+function parseYmd(value?: string): Ymd | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  if (!match) {
     return null;
   }
 
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
+  const date = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+  const check = new Date(Date.UTC(date.year, date.month - 1, date.day, 12, 0, 0, 0));
+
+  if (
+    check.getUTCFullYear() !== date.year ||
+    check.getUTCMonth() + 1 !== date.month ||
+    check.getUTCDate() !== date.day
+  ) {
     return null;
   }
 
-  return startOfDay(parsed);
+  return date;
 }
 
-function parseReferenceDate(value?: string) {
-  return parseDateInput(value) ?? startOfDay(new Date());
+function addDays(date: Ymd, days: number): Ymd {
+  const next = new Date(Date.UTC(date.year, date.month - 1, date.day + days, 12, 0, 0, 0));
+
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+  };
 }
 
-function toDateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10);
+function addMonths(date: Ymd, months: number): Ymd {
+  const next = new Date(Date.UTC(date.year, date.month - 1 + months, date.day, 12, 0, 0, 0));
+
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+  };
+}
+
+function compareYmd(first: Ymd, second: Ymd) {
+  return formatYmd(first).localeCompare(formatYmd(second));
+}
+
+function formatDateLabel(date: Ymd) {
+  return `${String(date.day).padStart(2, "0")}/${String(date.month).padStart(2, "0")}/${date.year}`;
 }
 
 function resolvePeriod(period?: string): ReportPeriod {
-  if (!period) {
-    return "1d";
-  }
-
-  if ((REPORT_PERIODS as readonly string[]).includes(period)) {
+  if ((REPORT_PERIODS as readonly string[]).includes(period ?? "")) {
     return period as ReportPeriod;
   }
 
   return "1d";
 }
 
-function getTrailingDaysRange(referenceDate: Date, days: number, label: string): ReportRange {
-  const end = endExclusiveOfDay(referenceDate);
-  const start = startOfDay(referenceDate);
-  start.setDate(start.getDate() - (days - 1));
-
-  return {
-    start,
-    end,
-    label: `${label}: ${formatDateLabel(start)} ate ${formatDateLabel(referenceDate)}`,
+function periodLabel(period: ReportPeriod) {
+  const labels: Record<ReportPeriod, string> = {
+    "1d": "Relatorio de 1 dia",
+    "7d": "Relatorio de 7 dias",
+    "15d": "Relatorio de 15 dias",
+    "30d": "Relatorio de 30 dias",
+    "3m": "Relatorio de 3 meses",
+    "6m": "Relatorio de 6 meses",
+    "1y": "Relatorio de 1 ano",
+    custom: "Relatorio personalizado",
   };
+
+  return labels[period];
 }
 
-function getTrailingMonthsRange(referenceDate: Date, months: number, label: string): ReportRange {
-  const end = endExclusiveOfDay(referenceDate);
-  const start = startOfDay(referenceDate);
-  start.setMonth(start.getMonth() - months);
-  start.setDate(start.getDate() + 1);
+function rangeLabel(period: ReportPeriod, start: Ymd, end: Ymd, range: OperationalDayRange) {
+  const prefix = period === "custom" ? "Personalizado" : periodLabel(period).replace("Relatorio de ", "");
+  const dateLabel =
+    compareYmd(start, end) === 0
+      ? formatDateLabel(start)
+      : `${formatDateLabel(start)} ate ${formatDateLabel(end)}`;
 
-  return {
-    start,
-    end,
-    label: `${label}: ${formatDateLabel(start)} ate ${formatDateLabel(referenceDate)}`,
-  };
+  return `${prefix}: ${dateLabel} | Turno ${range.startsAt}-${range.endsAt}`;
 }
 
-function getCustomRange(startDateInput?: string, endDateInput?: string) {
-  const today = startOfDay(new Date());
-  const parsedStart = parseDateInput(startDateInput);
-  const parsedEnd = parseDateInput(endDateInput);
+function buildRange(start: Ymd, end: Ymd, period: ReportPeriod, settings: ReportSettings): ReportRange {
+  let normalizedStart = start;
+  let normalizedEnd = end;
 
-  const fallbackStart = parsedStart ?? parsedEnd ?? today;
-  const fallbackEnd = parsedEnd ?? parsedStart ?? today;
-
-  let start = fallbackStart;
-  let end = fallbackEnd;
-
-  if (start > end) {
-    const tmp = start;
-    start = end;
-    end = tmp;
+  if (compareYmd(normalizedStart, normalizedEnd) > 0) {
+    normalizedStart = end;
+    normalizedEnd = start;
   }
 
+  const startRange = getOperationalDayRangeByBusinessDate(normalizedStart, settings);
+  const endRange = getOperationalDayRangeByBusinessDate(normalizedEnd, settings);
+
   return {
-    range: {
-      start,
-      end: endExclusiveOfDay(end),
-      label: `Personalizado: ${formatDateLabel(start)} ate ${formatDateLabel(end)}`,
-    },
-    startDate: toDateInputValue(start),
-    endDate: toDateInputValue(end),
+    start: startRange.start,
+    end: endRange.end,
+    label: rangeLabel(period, normalizedStart, normalizedEnd, startRange),
+    businessStartDate: formatYmd(normalizedStart),
+    businessEndDate: formatYmd(normalizedEnd),
+    timezone: startRange.timezone,
+    startsAt: startRange.startsAt,
+    endsAt: startRange.endsAt,
   };
 }
 
 function getRangeForPeriod(
   period: ReportPeriod,
-  referenceDate: Date,
+  referenceDate: Ymd,
+  settings: ReportSettings,
   customStartDate?: string,
   customEndDate?: string,
 ) {
-  switch (period) {
-    case "1d":
-      return {
-        range: getTrailingDaysRange(referenceDate, 1, "Periodo de 1 dia"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "7d":
-      return {
-        range: getTrailingDaysRange(referenceDate, 7, "Periodo de 7 dias"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "30d":
-      return {
-        range: getTrailingDaysRange(referenceDate, 30, "Periodo de 30 dias"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "3m":
-      return {
-        range: getTrailingMonthsRange(referenceDate, 3, "Periodo de 3 meses"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "6m":
-      return {
-        range: getTrailingMonthsRange(referenceDate, 6, "Periodo de 6 meses"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "1y":
-      return {
-        range: getTrailingMonthsRange(referenceDate, 12, "Periodo de 1 ano"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
-    case "custom": {
-      const custom = getCustomRange(customStartDate, customEndDate);
-      return {
-        range: custom.range,
-        customStartDate: custom.startDate,
-        customEndDate: custom.endDate,
-      };
-    }
-    default:
-      return {
-        range: getTrailingDaysRange(referenceDate, 1, "Periodo de 1 dia"),
-        customStartDate: customStartDate ?? toDateInputValue(referenceDate),
-        customEndDate: customEndDate ?? toDateInputValue(referenceDate),
-      };
+  if (period === "custom") {
+    const fallbackStart = parseYmd(customStartDate) ?? parseYmd(customEndDate) ?? referenceDate;
+    const fallbackEnd = parseYmd(customEndDate) ?? parseYmd(customStartDate) ?? referenceDate;
+    const range = buildRange(fallbackStart, fallbackEnd, period, settings);
+
+    return {
+      range,
+      customStartDate: range.businessStartDate,
+      customEndDate: range.businessEndDate,
+    };
   }
+
+  const daysByPeriod: Partial<Record<ReportPeriod, number>> = {
+    "1d": 1,
+    "7d": 7,
+    "15d": 15,
+    "30d": 30,
+  };
+  const days = daysByPeriod[period];
+
+  if (days) {
+    const start = addDays(referenceDate, -(days - 1));
+    const range = buildRange(start, referenceDate, period, settings);
+
+    return {
+      range,
+      customStartDate: range.businessStartDate,
+      customEndDate: range.businessEndDate,
+    };
+  }
+
+  const months = period === "3m" ? 3 : period === "6m" ? 6 : 12;
+  const start = addDays(addMonths(referenceDate, -months), 1);
+  const range = buildRange(start, referenceDate, period, settings);
+
+  return {
+    range,
+    customStartDate: range.businessStartDate,
+    customEndDate: range.businessEndDate,
+  };
+}
+
+function buildPaymentRows(sales: SaleForReport[], netRevenue: number): ReportPaymentRow[] {
+  const amounts = new Map<PaymentMethod, number>();
+  const transactionCounts = new Map<PaymentMethod, number>();
+  const saleIds = new Map<PaymentMethod, Set<string>>();
+
+  for (const method of paymentMethodOrder) {
+    amounts.set(method, 0);
+    transactionCounts.set(method, 0);
+    saleIds.set(method, new Set<string>());
+  }
+
+  for (const sale of sales) {
+    let remaining = toNumber(sale.totalAmount);
+    const orderedPayments = [...sale.payments].sort((first, second) => {
+      if (first.method === PaymentMethod.CASH && second.method !== PaymentMethod.CASH) {
+        return 1;
+      }
+
+      if (first.method !== PaymentMethod.CASH && second.method === PaymentMethod.CASH) {
+        return -1;
+      }
+
+      return paymentMethodOrder.indexOf(first.method) - paymentMethodOrder.indexOf(second.method);
+    });
+
+    for (const payment of orderedPayments) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const appliedAmount = Math.min(toNumber(payment.amount), remaining);
+      if (appliedAmount <= 0) {
+        continue;
+      }
+
+      amounts.set(payment.method, round2((amounts.get(payment.method) ?? 0) + appliedAmount));
+      transactionCounts.set(payment.method, (transactionCounts.get(payment.method) ?? 0) + 1);
+      saleIds.get(payment.method)?.add(sale.id);
+      remaining = round2(remaining - appliedAmount);
+    }
+  }
+
+  return paymentMethodOrder.map((method) => {
+    const amount = round2(amounts.get(method) ?? 0);
+    const salesCount = saleIds.get(method)?.size ?? 0;
+
+    return {
+      method,
+      label: paymentLabels[method],
+      amount,
+      salesCount,
+      transactionCount: transactionCounts.get(method) ?? 0,
+      sharePercent: toPercent(amount, netRevenue),
+      averageTicket: salesCount > 0 ? round2(amount / salesCount) : 0,
+    };
+  });
 }
 
 async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Promise<ReportPeriodData> {
-  const [salesAggregate, salesCount, saleItems] = await Promise.all([
-    prisma.sale.aggregate({
+  const [sales, cancelledSalesCount, cashMovements] = await Promise.all([
+    prisma.sale.findMany({
       where: {
         status: SaleStatus.COMPLETED,
         createdAt: {
           gte: range.start,
           lt: range.end,
-        },
-      },
-      _sum: {
-        totalAmount: true,
-        discountAmount: true,
-      },
-    }),
-    prisma.sale.count({
-      where: {
-        status: SaleStatus.COMPLETED,
-        createdAt: {
-          gte: range.start,
-          lt: range.end,
-        },
-      },
-    }),
-    prisma.saleItem.findMany({
-      where: {
-        sale: {
-          status: SaleStatus.COMPLETED,
-          createdAt: {
-            gte: range.start,
-            lt: range.end,
-          },
         },
       },
       select: {
-        productNameSnapshot: true,
-        quantity: true,
-        lineTotal: true,
-        lineCostTotal: true,
-        product: {
+        id: true,
+        subtotalAmount: true,
+        discountAmount: true,
+        totalAmount: true,
+        items: {
           select: {
-            name: true,
-            category: {
+            productNameSnapshot: true,
+            quantity: true,
+            lineTotal: true,
+            lineCostTotal: true,
+            product: {
               select: {
                 name: true,
+                category: {
+                  select: {
+                    name: true,
+                  },
+                },
               },
             },
           },
         },
+        payments: {
+          where: {
+            status: PaymentStatus.APPROVED,
+          },
+          select: {
+            method: true,
+            amount: true,
+          },
+        },
+      },
+    }),
+    prisma.sale.count({
+      where: {
+        status: SaleStatus.CANCELLED,
+        createdAt: {
+          gte: range.start,
+          lt: range.end,
+        },
+      },
+    }),
+    prisma.cashMovement.findMany({
+      where: {
+        createdAt: {
+          gte: range.start,
+          lt: range.end,
+        },
+      },
+      select: {
+        type: true,
+        amount: true,
       },
     }),
   ]);
 
   let itemsCount = 0;
   let grossRevenue = 0;
+  let discountAmount = 0;
+  let netRevenue = 0;
   let totalCost = 0;
 
   const categoryMap = new Map<string, Omit<ReportCategoryRow, "profitSharePercent">>();
   const itemMap = new Map<string, Omit<ReportItemRow, "profitSharePercent">>();
 
-  for (const saleItem of saleItems) {
-    const quantity = saleItem.quantity;
-    const lineRevenue = toNumber(saleItem.lineTotal);
-    const lineCost = toNumber(saleItem.lineCostTotal);
-    const lineProfit = lineRevenue - lineCost;
-    const category = saleItem.product?.category?.name ?? "Sem categoria";
-    const itemName = saleItem.product?.name ?? saleItem.productNameSnapshot ?? "Item removido";
+  for (const sale of sales) {
+    grossRevenue += toNumber(sale.subtotalAmount);
+    discountAmount += toNumber(sale.discountAmount);
+    netRevenue += toNumber(sale.totalAmount);
 
-    itemsCount += quantity;
-    grossRevenue += lineRevenue;
-    totalCost += lineCost;
+    for (const saleItem of sale.items) {
+      const quantity = saleItem.quantity;
+      const lineRevenue = toNumber(saleItem.lineTotal);
+      const lineCost = toNumber(saleItem.lineCostTotal);
+      const lineProfit = lineRevenue - lineCost;
+      const category = saleItem.product?.category?.name ?? "Sem categoria";
+      const itemName = saleItem.product?.name ?? saleItem.productNameSnapshot ?? "Item removido";
 
-    const categoryAccumulator = categoryMap.get(category) ?? {
-      category,
-      quantity: 0,
-      grossRevenue: 0,
-      totalCost: 0,
-      grossProfit: 0,
-      grossMarginPercent: 0,
-      roiOnCostPercent: 0,
-    };
-    categoryAccumulator.quantity += quantity;
-    categoryAccumulator.grossRevenue += lineRevenue;
-    categoryAccumulator.totalCost += lineCost;
-    categoryAccumulator.grossProfit += lineProfit;
-    categoryMap.set(category, categoryAccumulator);
+      itemsCount += quantity;
+      totalCost += lineCost;
 
-    const itemKey = `${category}::${itemName}`;
-    const itemAccumulator = itemMap.get(itemKey) ?? {
-      category,
-      item: itemName,
-      quantity: 0,
-      grossRevenue: 0,
-      totalCost: 0,
-      grossProfit: 0,
-      grossMarginPercent: 0,
-      roiOnCostPercent: 0,
-    };
-    itemAccumulator.quantity += quantity;
-    itemAccumulator.grossRevenue += lineRevenue;
-    itemAccumulator.totalCost += lineCost;
-    itemAccumulator.grossProfit += lineProfit;
-    itemMap.set(itemKey, itemAccumulator);
+      const categoryAccumulator = categoryMap.get(category) ?? {
+        category,
+        quantity: 0,
+        grossRevenue: 0,
+        totalCost: 0,
+        grossProfit: 0,
+        grossMarginPercent: 0,
+        roiOnCostPercent: 0,
+      };
+      categoryAccumulator.quantity += quantity;
+      categoryAccumulator.grossRevenue += lineRevenue;
+      categoryAccumulator.totalCost += lineCost;
+      categoryAccumulator.grossProfit += lineProfit;
+      categoryMap.set(category, categoryAccumulator);
+
+      const itemKey = `${category}::${itemName}`;
+      const itemAccumulator = itemMap.get(itemKey) ?? {
+        category,
+        item: itemName,
+        quantity: 0,
+        grossRevenue: 0,
+        totalCost: 0,
+        grossProfit: 0,
+        grossMarginPercent: 0,
+        roiOnCostPercent: 0,
+      };
+      itemAccumulator.quantity += quantity;
+      itemAccumulator.grossRevenue += lineRevenue;
+      itemAccumulator.totalCost += lineCost;
+      itemAccumulator.grossProfit += lineProfit;
+      itemMap.set(itemKey, itemAccumulator);
+    }
   }
 
-  const grossProfit = grossRevenue - totalCost;
+  const grossProfit = grossRevenue - discountAmount - totalCost;
+  const paymentRows = buildPaymentRows(sales, netRevenue);
+  const paymentTotal = round2(paymentRows.reduce((total, row) => total + row.amount, 0));
+  const cashSalesAmount = paymentRows.find((row) => row.method === PaymentMethod.CASH)?.amount ?? 0;
+  const supplyAmount = cashMovements
+    .filter((movement) => movement.type === CashMovementType.SUPPLY)
+    .reduce((total, movement) => total + toNumber(movement.amount), 0);
+  const withdrawalAmount = cashMovements
+    .filter((movement) => movement.type === CashMovementType.WITHDRAWAL)
+    .reduce((total, movement) => total + toNumber(movement.amount), 0);
 
   const categoryRows = Array.from(categoryMap.values())
     .map((row) => ({
@@ -413,61 +586,77 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
     .sort((a, b) => b.grossRevenue - a.grossRevenue);
 
   const summary: ReportSummary = {
-    salesCount,
+    salesCount: sales.length,
+    cancelledSalesCount,
     itemsCount,
+    averageTicket: sales.length > 0 ? round2(netRevenue / sales.length) : 0,
     grossRevenue: round2(grossRevenue),
-    netRevenue: round2(toNumber(salesAggregate._sum.totalAmount)),
-    discountAmount: round2(toNumber(salesAggregate._sum.discountAmount)),
+    netRevenue: round2(netRevenue),
+    discountAmount: round2(discountAmount),
     totalCost: round2(totalCost),
     grossProfit: round2(grossProfit),
-    grossMarginPercent: toMarginPercent(grossProfit, grossRevenue),
+    grossMarginPercent: toMarginPercent(grossProfit, netRevenue),
     roiOnCostPercent: toRoiPercent(grossProfit, totalCost),
+    paymentTotal,
+    reconciliationDifference: round2(netRevenue - paymentTotal),
   };
 
   return {
     period,
-    label:
-      period === "1d"
-        ? "Relatorio de 1 dia"
-        : period === "7d"
-          ? "Relatorio de 7 dias"
-          : period === "30d"
-            ? "Relatorio de 30 dias"
-            : period === "3m"
-              ? "Relatorio de 3 meses"
-              : period === "6m"
-                ? "Relatorio de 6 meses"
-                : period === "1y"
-                  ? "Relatorio de 1 ano"
-                  : "Relatorio personalizado",
+    label: periodLabel(period),
     range,
     summary,
+    paymentRows,
+    cashMovementSummary: {
+      cashSalesAmount: round2(cashSalesAmount),
+      supplyAmount: round2(supplyAmount),
+      withdrawalAmount: round2(withdrawalAmount),
+      netCashFlow: round2(cashSalesAmount + supplyAmount - withdrawalAmount),
+    },
     categoryRows,
     itemRows,
   };
 }
 
 export async function getReportsData(input: ReportsDataInput): Promise<ReportsData> {
+  const now = new Date();
   const selectedPeriod = resolvePeriod(input.period);
-  const referenceDate = parseReferenceDate(input.date);
+  const { customization } = await getBrandCustomizationSnapshot();
+  const currentOperationalDay = input.date
+    ? getOperationalDayRangeByBusinessDate(parseYmd(input.date) ?? getOperationalDayRange(now, customization).businessDate, customization)
+    : getOperationalDayRange(now, customization);
+  const referenceDate = currentOperationalDay.businessDate;
 
-  const oneDayRange = getRangeForPeriod("1d", referenceDate, input.startDate, input.endDate).range;
-  const sevenDaysRange = getRangeForPeriod("7d", referenceDate, input.startDate, input.endDate).range;
-  const selectedRangeData = getRangeForPeriod(selectedPeriod, referenceDate, input.startDate, input.endDate);
+  const oneDayRange = getRangeForPeriod("1d", referenceDate, customization, input.startDate, input.endDate).range;
+  const sevenDaysRange = getRangeForPeriod("7d", referenceDate, customization, input.startDate, input.endDate).range;
+  const fifteenDaysRange = getRangeForPeriod("15d", referenceDate, customization, input.startDate, input.endDate).range;
+  const thirtyDaysRange = getRangeForPeriod("30d", referenceDate, customization, input.startDate, input.endDate).range;
+  const selectedRangeData = getRangeForPeriod(
+    selectedPeriod,
+    referenceDate,
+    customization,
+    input.startDate,
+    input.endDate,
+  );
 
-  const [oneDay, sevenDays, active] = await Promise.all([
+  const [oneDay, sevenDays, fifteenDays, thirtyDays, active] = await Promise.all([
     getReportPeriodData("1d", oneDayRange),
     getReportPeriodData("7d", sevenDaysRange),
+    getReportPeriodData("15d", fifteenDaysRange),
+    getReportPeriodData("30d", thirtyDaysRange),
     getReportPeriodData(selectedPeriod, selectedRangeData.range),
   ]);
 
   return {
-    referenceDate: toDateInputValue(referenceDate),
+    generatedAt: now.toISOString(),
+    referenceDate: formatYmd(referenceDate),
     customStartDate: selectedRangeData.customStartDate,
     customEndDate: selectedRangeData.customEndDate,
     selectedPeriod,
     active,
     oneDay,
     sevenDays,
+    fifteenDays,
+    thirtyDays,
   };
 }

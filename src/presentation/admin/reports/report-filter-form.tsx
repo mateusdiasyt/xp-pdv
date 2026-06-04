@@ -19,8 +19,9 @@ type PeriodOption = {
 };
 
 const periodOptions: PeriodOption[] = [
-  { value: "1d", label: "Relatorio 1 dia" },
+  { value: "1d", label: "1 dia" },
   { value: "7d", label: "7 dias" },
+  { value: "15d", label: "15 dias" },
   { value: "30d", label: "30 dias" },
   { value: "3m", label: "3 meses" },
   { value: "6m", label: "6 meses" },
