@@ -5,6 +5,7 @@ import {
   countGameplayReleasesByStatus,
   createManualGameplayRelease,
   endActiveGameplayReleaseByStationId,
+  getGameplayProductForManualBilling,
   extendActiveGameplayReleaseByStationId,
   getBusyGameplayReleasesByStationIds,
   getSaleGameplaySnapshot,
@@ -24,6 +25,8 @@ const XP_GATEWAY_INTEGRATION_ID = "pdv-xp-main";
 const FALLBACK_STATION_ID = "sem-estacao";
 const FALLBACK_PLAN_CODE = "gameplay";
 const MANUAL_FREE_RELEASE_UNTIL = new Date("2099-12-31T23:59:59.000Z");
+export const MANUAL_PAID_OPEN_PLAN_CODE = "MANUAL-LIVRE-PAGO";
+const MANUAL_PAID_OPEN_MODE = "OPEN_PAID";
 
 const manualReleaseDurations = {
   "15": { label: "15 min", durationMinutes: 15, planCode: "MANUAL-15" },
@@ -43,8 +46,123 @@ type GameplayReleaseOutcome = {
   stationId?: string;
 };
 
+export type ManualPaidOpenBillingConfig = {
+  mode: typeof MANUAL_PAID_OPEN_MODE;
+  productId: string;
+  productName: string;
+  productPlanCode: string;
+  categoryId: string;
+  baseDurationMinutes: number;
+  basePriceInCents: number;
+};
+
+export type ManualPaidOpenCharge = ManualPaidOpenBillingConfig & {
+  startedAt: Date;
+  elapsedMinutes: number;
+  billedMinutes: number;
+  amountInCents: number;
+  amount: Prisma.Decimal;
+  pricePerMinuteInCents: number;
+};
+
+type ManualPaidOpenReleaseSource = {
+  planCode: string;
+  paidAt: Date;
+  serviceStartsAt?: Date | null;
+  requestPayload: unknown;
+};
+
 function toNumber(value: Prisma.Decimal | number) {
   return Number(value);
+}
+
+function moneyToCents(value: Prisma.Decimal | number) {
+  return Math.round(toNumber(value) * 100);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readPositiveInteger(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function roundServiceMinutesUp(minutes: number) {
+  return Math.max(5, Math.ceil(Math.max(1, minutes) / 5) * 5);
+}
+
+export function getManualPaidOpenBillingConfig(
+  release?: Pick<ManualPaidOpenReleaseSource, "planCode" | "requestPayload"> | null,
+): ManualPaidOpenBillingConfig | null {
+  if (!release || release.planCode !== MANUAL_PAID_OPEN_PLAN_CODE || !isRecord(release.requestPayload)) {
+    return null;
+  }
+
+  const payload = release.requestPayload;
+  const mode = readString(payload.manualBillingMode);
+  const productId = readString(payload.billingProductId);
+  const productName = readString(payload.billingProductName);
+  const productPlanCode = readString(payload.billingPlanCode);
+  const categoryId = readString(payload.billingCategoryId);
+  const baseDurationMinutes = readPositiveInteger(payload.billingDurationMinutes);
+  const basePriceInCents = readPositiveInteger(payload.billingBasePriceInCents);
+
+  if (
+    mode !== MANUAL_PAID_OPEN_MODE ||
+    !productId ||
+    !productName ||
+    !productPlanCode ||
+    !categoryId ||
+    !baseDurationMinutes ||
+    !basePriceInCents
+  ) {
+    return null;
+  }
+
+  return {
+    mode: MANUAL_PAID_OPEN_MODE,
+    productId,
+    productName,
+    productPlanCode,
+    categoryId,
+    baseDurationMinutes,
+    basePriceInCents,
+  };
+}
+
+export function calculateManualPaidOpenCharge(
+  release: ManualPaidOpenReleaseSource,
+  now = new Date(),
+): ManualPaidOpenCharge | null {
+  const config = getManualPaidOpenBillingConfig(release);
+  if (!config) {
+    return null;
+  }
+
+  const startedAt = release.serviceStartsAt ?? release.paidAt;
+  const elapsedMilliseconds = Math.max(0, now.getTime() - startedAt.getTime());
+  const elapsedMinutes = Math.max(1, Math.ceil(elapsedMilliseconds / 60_000));
+  const billedMinutes = roundServiceMinutesUp(elapsedMinutes);
+  const amountInCents = Math.max(
+    1,
+    Math.round((config.basePriceInCents * billedMinutes) / config.baseDurationMinutes),
+  );
+
+  return {
+    ...config,
+    startedAt,
+    elapsedMinutes,
+    billedMinutes,
+    amountInCents,
+    amount: new Prisma.Decimal(amountInCents).dividedBy(100).toDecimalPlaces(2),
+    pricePerMinuteInCents: config.basePriceInCents / config.baseDurationMinutes,
+  };
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
@@ -453,11 +571,35 @@ export async function getGameplayReleaseData(filters?: {
   };
 }
 
+export async function getManualPaidOpenChargeByStationId(stationId: string, now = new Date()) {
+  const normalizedStationId = stationId.trim().toLowerCase();
+  if (!normalizedStationId) {
+    return null;
+  }
+
+  const activeRelease = (await getBusyGameplayReleasesByStationIds([normalizedStationId], now))[0];
+  if (!activeRelease || activeRelease.stationId !== normalizedStationId) {
+    return null;
+  }
+
+  const charge = calculateManualPaidOpenCharge(activeRelease, now);
+  if (!charge) {
+    return null;
+  }
+
+  return {
+    release: activeRelease,
+    charge,
+  };
+}
+
 export async function releaseManualGameplayStation(data: {
   stationId: string;
   durationPreset: string;
   operator: string;
   actorId?: string;
+  billingMode?: "PAID_OPEN";
+  billingProductId?: string;
 }) {
   const stationId = data.stationId.trim().toLowerCase();
 
@@ -484,34 +626,68 @@ export async function releaseManualGameplayStation(data: {
   }
 
   const option = manualReleaseDurations[data.durationPreset];
+  const isPaidOpenRelease = option.durationMinutes === 0 && data.billingMode === "PAID_OPEN";
+  const billingProduct = isPaidOpenRelease
+    ? await getGameplayProductForManualBilling(String(data.billingProductId ?? ""))
+    : null;
+
+  if (isPaidOpenRelease) {
+    if (!billingProduct) {
+      throw new Error("Selecione o produto/servico que define o valor do tempo livre.");
+    }
+
+    if (!billingProduct.gameplayPlanCode || !billingProduct.gameplayDurationMinutes) {
+      throw new Error(`Produto ${billingProduct.name} precisa de plano e duracao configurados.`);
+    }
+
+    if (billingProduct.salePrice.lessThanOrEqualTo(0)) {
+      throw new Error(`Produto ${billingProduct.name} precisa ter valor de venda maior que zero.`);
+    }
+  }
+
   const now = new Date();
   const releasedUntil =
     option.durationMinutes === 0 ? MANUAL_FREE_RELEASE_UNTIL : new Date(now.getTime() + option.durationMinutes * 60_000);
+  const billingPayload = billingProduct
+    ? {
+        manualBillingMode: MANUAL_PAID_OPEN_MODE,
+        billingProductId: billingProduct.id,
+        billingProductName: billingProduct.name,
+        billingProductSku: billingProduct.sku,
+        billingPlanCode: billingProduct.gameplayPlanCode,
+        billingDurationMinutes: billingProduct.gameplayDurationMinutes,
+        billingBasePriceInCents: moneyToCents(billingProduct.salePrice),
+        billingCategoryId: billingProduct.categoryId,
+      }
+    : {};
+  const planCode = isPaidOpenRelease ? MANUAL_PAID_OPEN_PLAN_CODE : option.planCode;
   const requestPayload = {
     integrationId: "manual-admin",
     saleId: null,
     stationId,
-    planCode: option.planCode,
+    planCode,
     durationMinutes: option.durationMinutes,
     amount: 0,
     paidAt: now.toISOString(),
     operator: data.operator,
     manualRelease: true,
+    ...billingPayload,
   };
   const responsePayload = {
     status: GameplayReleaseStatus.LIBERADA,
     stationId,
-    planCode: option.planCode,
+    planCode,
     durationMinutes: option.durationMinutes,
     serviceStartsAt: now.toISOString(),
     preparationSeconds: 0,
     releasedUntil: releasedUntil.toISOString(),
     manualRelease: true,
+    ...billingPayload,
   };
 
   const release = await createManualGameplayRelease({
     stationId,
-    planCode: option.planCode,
+    planCode,
     durationMinutes: option.durationMinutes,
     amount: new Prisma.Decimal(0),
     paidAt: now,
@@ -530,15 +706,19 @@ export async function releaseManualGameplayStation(data: {
     entityId: release.id,
     metadata: {
       stationId,
-      planCode: option.planCode,
+      planCode,
       durationMinutes: option.durationMinutes,
       manualRelease: true,
+      manualBillingMode: billingProduct ? MANUAL_PAID_OPEN_MODE : undefined,
+      billingProductId: billingProduct?.id,
     },
   });
 
   return {
     release,
-    message: formatManualReleaseMessage(stationId, option.label, releasedUntil),
+    message: billingProduct
+      ? `${stationId.toUpperCase()} liberada em modo livre pago. Cobranca calculada no encerramento.`
+      : formatManualReleaseMessage(stationId, option.label, releasedUntil),
   };
 }
 
@@ -593,6 +773,10 @@ export async function endManualGameplayStation(data: {
   stationId: string;
   operator: string;
   actorId?: string;
+  saleId?: string;
+  amount?: Prisma.Decimal;
+  durationMinutes?: number;
+  billingPayload?: Prisma.InputJsonValue;
 }) {
   const stationId = data.stationId.trim().toLowerCase();
 
@@ -600,7 +784,12 @@ export async function endManualGameplayStation(data: {
     throw new Error("Informe a TV para encerrar o tempo.");
   }
 
-  const endedRelease = await endActiveGameplayReleaseByStationId(stationId);
+  const endedRelease = await endActiveGameplayReleaseByStationId(stationId, {
+    saleId: data.saleId,
+    amount: data.amount,
+    durationMinutes: data.durationMinutes,
+    billingPayload: data.billingPayload,
+  });
 
   if (!endedRelease) {
     return {
@@ -618,11 +807,16 @@ export async function endManualGameplayStation(data: {
       stationId,
       operator: data.operator,
       previousReleasedUntil: endedRelease.responsePayload,
+      saleId: data.saleId,
+      amount: data.amount?.toString(),
+      durationMinutes: data.durationMinutes,
     },
   });
 
   return {
     release: endedRelease,
-    message: `${stationId.toUpperCase()} encerrada manualmente. A TV volta ao bloqueio na proxima consulta.`,
+    message: data.saleId
+      ? `${stationId.toUpperCase()} encerrada e venda registrada. A TV volta ao bloqueio na proxima consulta.`
+      : `${stationId.toUpperCase()} encerrada manualmente. A TV volta ao bloqueio na proxima consulta.`,
   };
 }

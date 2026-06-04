@@ -69,11 +69,13 @@ function createSaleNumber() {
 function parseItems(formData: FormData) {
   const productIds = formData.getAll("itemProductId").map((value) => String(value));
   const quantities = formData.getAll("itemQuantity").map((value) => Number(value));
+  const unitPrices = formData.getAll("itemUnitPrice").map((value) => String(value));
 
   const items = productIds
     .map((productId, index) => ({
       productId,
       quantity: quantities[index],
+      unitPrice: unitPrices[index] ?? "",
     }))
     .filter((item) => item.productId);
 
@@ -81,7 +83,19 @@ function parseItems(formData: FormData) {
     throw new Error("Informe ao menos um item para registrar a venda.");
   }
 
-  return items.map((item) => saleItemSchema.parse(item));
+  return items.map((item) => {
+    const parsed = saleItemSchema.parse(item);
+    const unitPrice = item.unitPrice ? parseDecimalInput(item.unitPrice) : undefined;
+
+    if (unitPrice?.lessThanOrEqualTo(0)) {
+      throw new Error("Preco do item precisa ser maior que zero.");
+    }
+
+    return {
+      ...parsed,
+      unitPrice,
+    };
+  });
 }
 
 function formDataList(formData: FormData, key: string) {

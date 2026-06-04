@@ -7,6 +7,12 @@ type ServiceCountdownProps = {
   planCode: string;
   releasedUntil?: string | null;
   serviceStartsAt?: string | null;
+  manualPaidOpenBilling?: {
+    productName: string;
+    baseDurationMinutes: number;
+    basePriceInCents: number;
+    startedAt: string;
+  } | null;
 };
 
 declare global {
@@ -29,6 +35,24 @@ function formatRemaining(milliseconds: number) {
   }
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatCurrencyFromCents(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value / 100);
+}
+
+function formatCurrencyFromFractionalCents(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value / 100);
+}
+
+function roundServiceMinutesUp(minutes: number) {
+  return Math.max(5, Math.ceil(Math.max(1, minutes) / 5) * 5);
 }
 
 function parseTime(value?: string | null) {
@@ -55,12 +79,14 @@ export function ServiceCountdown({
   planCode,
   releasedUntil,
   serviceStartsAt,
+  manualPaidOpenBilling,
 }: ServiceCountdownProps) {
   const [now, setNow] = useState(() => Date.now());
   const refreshedAfterEndRef = useRef(false);
   const endTime = parseTime(releasedUntil);
   const startTime = parseTime(serviceStartsAt) ?? now;
-  const isFreeMode = durationMinutes === 0 || planCode === "MANUAL-LIVRE";
+  const isPaidOpenMode = Boolean(manualPaidOpenBilling);
+  const isFreeMode = !isPaidOpenMode && (durationMinutes === 0 || planCode === "MANUAL-LIVRE");
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), SECOND_IN_MS);
@@ -79,6 +105,42 @@ export function ServiceCountdown({
 
   if (!endTime) {
     return null;
+  }
+
+  if (manualPaidOpenBilling) {
+    const billingStartTime = parseTime(manualPaidOpenBilling.startedAt) ?? startTime;
+    const elapsedMinutes = Math.max(1, Math.ceil(Math.max(0, now - billingStartTime) / MINUTE_IN_MS));
+    const billedMinutes = roundServiceMinutesUp(elapsedMinutes);
+    const amountInCents = Math.max(
+      1,
+      Math.round((manualPaidOpenBilling.basePriceInCents * billedMinutes) / manualPaidOpenBilling.baseDurationMinutes),
+    );
+    const pricePerMinuteInCents =
+      manualPaidOpenBilling.basePriceInCents / manualPaidOpenBilling.baseDurationMinutes;
+
+    return (
+      <div className="mt-4 rounded-2xl border border-emerald-300/35 bg-emerald-400/10 p-3">
+        <p className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-emerald-100">Livre pago</p>
+        <p className="mt-1 text-xs text-muted-foreground">{manualPaidOpenBilling.productName}</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Tempo real</p>
+            <p className="font-mono text-2xl font-black text-foreground tabular-nums">{elapsedMinutes} min</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cobrar</p>
+            <p className="font-mono text-2xl font-black text-foreground tabular-nums">{billedMinutes} min</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{formatCurrencyFromFractionalCents(pricePerMinuteInCents)}/min</p>
+            <p className="text-2xl font-black text-foreground">{formatCurrencyFromCents(amountInCents)}</p>
+          </div>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-emerald-950/70">
+          <div className="h-full w-full rounded-full bg-emerald-300" />
+        </div>
+      </div>
+    );
   }
 
   if (isFreeMode) {

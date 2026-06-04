@@ -1,7 +1,11 @@
 import { GameplayReleaseStatus, ProductKind } from "@prisma/client";
 
 import { requirePermission } from "@/application/auth/guards";
-import { getGameplayReleaseData } from "@/application/gameplay/gameplay-release-service";
+import {
+  calculateManualPaidOpenCharge,
+  getGameplayReleaseData,
+  getManualPaidOpenBillingConfig,
+} from "@/application/gameplay/gameplay-release-service";
 import { getPdvData } from "@/application/pdv/pdv-service";
 import { MetricCard } from "@/components/admin/metric-card";
 import { PageHeader } from "@/components/admin/page-header";
@@ -86,7 +90,8 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
 
   const serviceStartsAt = release.serviceStartsAt ?? release.paidAt;
   const isPreparing = serviceStartsAt.getTime() > now.getTime();
-  const isFreeMode = release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE";
+  const isPaidOpenMode = Boolean(getManualPaidOpenBillingConfig(release));
+  const isFreeMode = !isPaidOpenMode && (release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE");
 
   if (isPreparing) {
     return {
@@ -99,7 +104,11 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
 
   return {
     label: "EM USO",
-    helper: isFreeMode ? "Modo livre até encerramento manual" : `Ocupada até ${timeFormatter.format(release.releasedUntil)}`,
+    helper: isPaidOpenMode
+      ? "Livre pago, cobrando por minuto"
+      : isFreeMode
+        ? "Modo livre ate encerramento manual"
+        : `Ocupada ate ${timeFormatter.format(release.releasedUntil)}`,
     className: "border-emerald-300/45 bg-emerald-400/10",
     badgeClassName: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
   };
@@ -110,6 +119,10 @@ function getReleaseOriginLabel(release: Awaited<ReturnType<typeof getGameplayRel
 }
 
 function getReleaseDurationLabel(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number]) {
+  if (getManualPaidOpenBillingConfig(release)) {
+    return "Livre pago";
+  }
+
   if (release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE") {
     return "Livre";
   }
@@ -183,6 +196,7 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
         {stationCatalog.map((station) => {
           const release = activeReleases.find((item) => item.stationId === station.id);
           const state = getServiceState(release, now);
+          const paidOpenCharge = release ? calculateManualPaidOpenCharge(release, now) : null;
 
           return (
             <Card key={station.id} className={state.className}>
@@ -208,6 +222,16 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                       planCode={release.planCode}
                       releasedUntil={release.releasedUntil?.toISOString()}
                       serviceStartsAt={(release.serviceStartsAt ?? release.paidAt).toISOString()}
+                      manualPaidOpenBilling={
+                        paidOpenCharge
+                          ? {
+                              productName: paidOpenCharge.productName,
+                              baseDurationMinutes: paidOpenCharge.baseDurationMinutes,
+                              basePriceInCents: paidOpenCharge.basePriceInCents,
+                              startedAt: paidOpenCharge.startedAt.toISOString(),
+                            }
+                          : null
+                      }
                     />
                   </>
                 ) : (
@@ -220,6 +244,19 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                   openSessions={openSessionOptions}
                   gameplayProducts={gameplayProducts}
                   coupons={couponOptions}
+                  activePaidOpenBilling={
+                    paidOpenCharge
+                      ? {
+                          productId: paidOpenCharge.productId,
+                          productName: paidOpenCharge.productName,
+                          productPlanCode: paidOpenCharge.productPlanCode,
+                          categoryId: paidOpenCharge.categoryId,
+                          baseDurationMinutes: paidOpenCharge.baseDurationMinutes,
+                          basePriceInCents: paidOpenCharge.basePriceInCents,
+                          startedAt: paidOpenCharge.startedAt.toISOString(),
+                        }
+                      : null
+                  }
                 />
               </CardContent>
             </Card>

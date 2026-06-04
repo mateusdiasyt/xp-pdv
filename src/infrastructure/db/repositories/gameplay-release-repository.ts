@@ -1,4 +1,4 @@
-import { GameplayReleaseStatus, Prisma, SaleStatus } from "@prisma/client";
+import { GameplayReleaseStatus, Prisma, ProductKind, RecordStatus, SaleStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -250,7 +250,36 @@ export async function createManualGameplayRelease(data: {
   });
 }
 
-export async function endActiveGameplayReleaseByStationId(stationId: string, now = new Date()) {
+export async function getGameplayProductForManualBilling(productId: string) {
+  return prisma.product.findFirst({
+    where: {
+      id: productId,
+      kind: ProductKind.GAMEPLAY,
+      status: RecordStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      gameplayPlanCode: true,
+      gameplayDurationMinutes: true,
+      salePrice: true,
+      categoryId: true,
+    },
+  });
+}
+
+export async function endActiveGameplayReleaseByStationId(
+  stationId: string,
+  data?: {
+    now?: Date;
+    saleId?: string;
+    amount?: Prisma.Decimal;
+    durationMinutes?: number;
+    billingPayload?: Prisma.InputJsonValue;
+  },
+) {
+  const now = data?.now ?? new Date();
   const activeRelease = await prisma.gameplayRelease.findFirst({
     where: {
       stationId,
@@ -274,6 +303,9 @@ export async function endActiveGameplayReleaseByStationId(stationId: string, now
       id: activeRelease.id,
     },
     data: {
+      saleId: data?.saleId,
+      amount: data?.amount,
+      durationMinutes: data?.durationMinutes,
       releasedUntil: now,
       responsePayload: {
         status: "ENDED_MANUALLY",
@@ -281,6 +313,7 @@ export async function endActiveGameplayReleaseByStationId(stationId: string, now
         previousReleasedUntil: activeRelease.releasedUntil?.toISOString() ?? null,
         stationId: activeRelease.stationId,
         planCode: activeRelease.planCode,
+        billing: data?.billingPayload,
       },
       lastError: null,
       lastAttemptAt: now,

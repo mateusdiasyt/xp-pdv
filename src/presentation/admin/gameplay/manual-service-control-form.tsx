@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
+  endPaidOpenServiceSessionAction,
   endServiceSessionAction,
   extendServiceSessionAction,
   manualServiceReleaseAction,
@@ -57,6 +58,17 @@ type ManualServiceControlFormProps = {
   openSessions: OpenSessionOption[];
   gameplayProducts: GameplayProductOption[];
   coupons: PdvCouponOption[];
+  activePaidOpenBilling?: ActivePaidOpenBilling | null;
+};
+
+type ActivePaidOpenBilling = {
+  productId: string;
+  productName: string;
+  productPlanCode: string;
+  categoryId: string;
+  baseDurationMinutes: number;
+  basePriceInCents: number;
+  startedAt: string;
 };
 
 const durationOptions = [
@@ -87,6 +99,62 @@ function formatCurrencyFromCents(value: number) {
     style: "currency",
     currency: "BRL",
   }).format(value / 100);
+}
+
+function formatCurrencyFromFractionalCents(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value / 100);
+}
+
+function roundServiceMinutesUp(minutes: number) {
+  return Math.max(5, Math.ceil(Math.max(1, minutes) / 5) * 5);
+}
+
+function computeOpenPaidCharge(billing: ActivePaidOpenBilling, now: number) {
+  const startedAt = new Date(billing.startedAt).getTime();
+  const safeStartedAt = Number.isNaN(startedAt) ? now : startedAt;
+  const elapsedMinutes = Math.max(1, Math.ceil(Math.max(0, now - safeStartedAt) / 60_000));
+  const billedMinutes = roundServiceMinutesUp(elapsedMinutes);
+  const amountInCents = Math.max(
+    1,
+    Math.round((billing.basePriceInCents * billedMinutes) / billing.baseDurationMinutes),
+  );
+
+  return {
+    elapsedMinutes,
+    billedMinutes,
+    amountInCents,
+    pricePerMinuteInCents: billing.basePriceInCents / billing.baseDurationMinutes,
+  };
+}
+
+function inferGameplayStationIdFromProduct(product: GameplayProductOption) {
+  const source = `${product.name} ${product.gameplayPlanCode ?? ""}`.toLowerCase();
+
+  if (
+    source.includes("tv 02") ||
+    source.includes("tv-02") ||
+    source.includes("simulador") ||
+    source.includes("simulator") ||
+    source.includes("corrida") ||
+    source.includes("racing")
+  ) {
+    return "tv-02";
+  }
+
+  if (
+    source.includes("tv 01") ||
+    source.includes("tv-01") ||
+    source.includes("ps5") ||
+    source.includes("playstation") ||
+    source.includes("play station")
+  ) {
+    return "tv-01";
+  }
+
+  return null;
 }
 
 function couponLabel(coupon: PdvCouponOption) {
@@ -184,6 +252,7 @@ export function ManualServiceControlForm({
   openSessions,
   gameplayProducts,
   coupons,
+  activePaidOpenBilling,
 }: ManualServiceControlFormProps) {
   const [releaseState, setReleaseState] = useState<ActionState>(initialActionState);
   const [extendState, setExtendState] = useState<ActionState>(initialActionState);
@@ -196,17 +265,34 @@ export function ManualServiceControlForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
+  const [endPaymentOpen, setEndPaymentOpen] = useState(false);
+  const [endPaymentMethod, setEndPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
+  const [endCashReceived, setEndCashReceived] = useState("");
+  const [endShowCoupon, setEndShowCoupon] = useState(false);
+  const [endCouponCode, setEndCouponCode] = useState("");
+  const [liveNow, setLiveNow] = useState(() => Date.now());
   const [pendingAction, setPendingAction] = useState<"free" | "paid" | "end" | null>(null);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
   const durationChoices = isBusy ? durationOptions.filter((option) => option.value !== "FREE") : durationOptions;
+  const stationGameplayProducts = useMemo(() => {
+    const stationMatches = gameplayProducts.filter(
+      (product) => inferGameplayStationIdFromProduct(product) === stationId && product.gameplayDurationMinutes,
+    );
+
+    return stationMatches.length > 0
+      ? stationMatches
+      : gameplayProducts.filter((product) => product.gameplayDurationMinutes);
+  }, [gameplayProducts, stationId]);
   const paidProducts = useMemo(
     () =>
-      gameplayProducts.filter(
-        (product) => product.kind === ProductKind.GAMEPLAY && product.gameplayDurationMinutes === durationMinutes,
-      ),
-    [durationMinutes, gameplayProducts],
+      effectiveDurationPreset === "FREE"
+        ? stationGameplayProducts
+        : gameplayProducts.filter(
+            (product) => product.kind === ProductKind.GAMEPLAY && product.gameplayDurationMinutes === durationMinutes,
+          ),
+    [durationMinutes, effectiveDurationPreset, gameplayProducts, stationGameplayProducts],
   );
   const selectedProduct = paidProducts.find((product) => product.id === selectedProductId) ?? paidProducts[0] ?? null;
   const subtotalInCents = selectedProduct ? centsFromMoney(selectedProduct.salePrice) : 0;
@@ -230,20 +316,55 @@ export function ManualServiceControlForm({
       : null;
   const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
   const totalInCents = Math.max(0, subtotalInCents - couponDiscountInCents);
-  const canPaidSubmit = Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
+  const isOpenPaidStart = !isBusy && effectiveDurationPreset === "FREE" && mode === "paid";
+  const activeOpenPaidCharge = activePaidOpenBilling ? computeOpenPaidCharge(activePaidOpenBilling, liveNow) : null;
+  const endSubtotalInCents = activeOpenPaidCharge?.amountInCents ?? 0;
+  const normalizedEndCouponCode = normalizeCouponCode(endCouponCode);
+  const selectedEndCoupon = normalizedEndCouponCode
+    ? coupons.find((coupon) => coupon.code === normalizedEndCouponCode)
+    : undefined;
+  const endCouponPreview =
+    selectedEndCoupon && activePaidOpenBilling
+      ? calculateCouponDiscountInCents({
+          coupon: selectedEndCoupon,
+          subtotalInCents: endSubtotalInCents,
+          lines: [
+            {
+              productId: activePaidOpenBilling.productId,
+              categoryId: activePaidOpenBilling.categoryId,
+              lineTotalInCents: endSubtotalInCents,
+            },
+          ],
+        })
+      : null;
+  const endCouponDiscountInCents = endCouponPreview?.discountInCents ?? 0;
+  const endTotalInCents = Math.max(0, endSubtotalInCents - endCouponDiscountInCents);
+  const canPaidSubmit = isOpenPaidStart
+    ? Boolean(selectedProduct)
+    : Boolean(selectedProduct && openSessions.length > 0 && totalInCents > 0);
+  const canEndPaidSubmit = Boolean(activePaidOpenBilling && openSessions.length > 0 && endTotalInCents > 0);
   const isFreePending = pendingAction === "free";
   const isPaidPending = pendingAction === "paid";
   const isEndPending = pendingAction === "end";
 
   useEffect(() => {
-    setPdvModalOpen(open);
+    setPdvModalOpen(open || endPaymentOpen);
 
     return () => {
-      if (open) {
+      if (open || endPaymentOpen) {
         setPdvModalOpen(false);
       }
     };
-  }, [open]);
+  }, [endPaymentOpen, open]);
+
+  useEffect(() => {
+    if (!activePaidOpenBilling) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setLiveNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [activePaidOpenBilling]);
 
   function openReleaseDialog() {
     setMode(isBusy ? "paid" : effectiveDurationPreset === "FREE" ? "free" : "paid");
@@ -257,6 +378,11 @@ export function ManualServiceControlForm({
   function closeReleaseDialog() {
     setPdvModalOpen(false);
     setOpen(false);
+  }
+
+  function closeEndPaymentDialog() {
+    setPdvModalOpen(false);
+    setEndPaymentOpen(false);
   }
 
   async function handleFreeSubmit(event: FormEvent<HTMLFormElement>) {
@@ -344,9 +470,33 @@ export function ManualServiceControlForm({
     }
   }
 
+  async function handlePaidOpenEndSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+
+    setPendingAction("end");
+    setEndState(initialActionState);
+
+    try {
+      const result = await endPaidOpenServiceSessionAction(initialActionState, formData);
+      setEndState(result);
+
+      if (result.status === "success") {
+        closeEndPaymentDialog();
+        reloadPage();
+      }
+    } catch (error) {
+      setEndState(localActionError(error));
+    } finally {
+      setPendingAction((currentAction) => (currentAction === "end" ? null : currentAction));
+    }
+  }
+
   return (
     <div className="space-y-3 border-t border-border/60 pt-4">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+      {!activePaidOpenBilling ? (
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <select
           className="admin-native-select h-9"
           value={effectiveDurationPreset}
@@ -363,7 +513,8 @@ export function ManualServiceControlForm({
           <Play className="h-4 w-4" />
           {isBusy ? "Adicionar tempo" : "Liberar"}
         </Button>
-      </div>
+        </div>
+      ) : null}
       <ActionFeedback state={releaseState} />
       <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
@@ -392,7 +543,6 @@ export function ManualServiceControlForm({
                   mode === "paid" ? "border-primary/55 bg-primary/12" : "border-border/75 bg-background/45"
                 }`}
                 onClick={() => setMode("paid")}
-                disabled={effectiveDurationPreset === "FREE"}
               >
                 <CreditCard className="mb-2 h-4 w-4 text-primary" />
                 <span className="block text-sm font-bold text-foreground">{isBusy ? "Pago +" : "Pago"}</span>
@@ -432,16 +582,22 @@ export function ManualServiceControlForm({
                 <input type="hidden" name="paymentExternalTransactionId" value="" />
                 <input type="hidden" name="paymentReceiptText" value="" />
 
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                <div className={`grid gap-3 ${isOpenPaidStart ? "" : "sm:grid-cols-[minmax(0,1fr)_150px]"}`}>
                   <div className="space-y-1.5">
-                    <Label htmlFor={`service-product-${stationId}`}>Plano</Label>
+                    <Label htmlFor={`service-product-${stationId}`}>
+                      {isOpenPaidStart ? "Base de cobranca" : "Plano"}
+                    </Label>
                     <select
                       id={`service-product-${stationId}`}
                       className="admin-native-select"
                       value={selectedProduct?.id ?? ""}
                       onChange={(event) => setSelectedProductId(event.target.value)}
                     >
-                      {paidProducts.length === 0 ? <option value="">Sem produto para {effectiveDurationPreset} min</option> : null}
+                      {paidProducts.length === 0 ? (
+                        <option value="">
+                          {isOpenPaidStart ? "Sem produto configurado" : `Sem produto para ${effectiveDurationPreset} min`}
+                        </option>
+                      ) : null}
                       {paidProducts.map((product) => (
                         <option key={product.id} value={product.id}>
                           {product.name}
@@ -449,80 +605,104 @@ export function ManualServiceControlForm({
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`service-cash-${stationId}`}>Caixa</Label>
-                    <select id={`service-cash-${stationId}`} name="cashSessionId" className="admin-native-select">
-                      {openSessions.length === 0 ? <option value="">Sem caixa</option> : null}
-                      {openSessions.map((session) => (
-                        <option key={session.id} value={session.id}>
-                          {session.cashRegister.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`service-payment-${stationId}`}>Pagamento</Label>
-                    <select
-                      id={`service-payment-${stationId}`}
-                      name="paymentMethod"
-                      className="admin-native-select"
-                      value={paymentMethod}
-                      onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                    >
-                      {Object.values(PaymentMethod).map((method) => (
-                        <option key={method} value={method}>
-                          {paymentLabels[method]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
-                    <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">Total</span>
-                    <span className="mt-1 block text-lg font-black text-foreground">{formatCurrencyFromCents(totalInCents)}</span>
-                  </div>
-                </div>
-
-                {showCoupon ? (
-                  <div className="space-y-1.5 rounded-2xl border border-border/70 bg-background/45 p-3">
-                    <Label htmlFor={`service-coupon-${stationId}`}>Cupom</Label>
-                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                      <Input
-                        id={`service-coupon-${stationId}`}
-                        value={couponCode}
-                        onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                        list={`service-coupons-${stationId}`}
-                        placeholder="Selecionar cupom"
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={() => setShowCoupon(false)}>
-                        Remover
-                      </Button>
+                  {!isOpenPaidStart ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`service-cash-${stationId}`}>Caixa</Label>
+                      <select id={`service-cash-${stationId}`} name="cashSessionId" className="admin-native-select">
+                        {openSessions.length === 0 ? <option value="">Sem caixa</option> : null}
+                        {openSessions.map((session) => (
+                          <option key={session.id} value={session.id}>
+                            {session.cashRegister.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <datalist id={`service-coupons-${stationId}`}>
-                      {coupons.map((coupon) => (
-                        <option key={coupon.id} value={coupon.code}>
-                          {couponLabel(coupon)}
-                        </option>
-                      ))}
-                    </datalist>
-                    {couponPreview?.message ? (
-                      <p className="text-xs text-muted-foreground">{couponPreview.message}</p>
-                    ) : couponDiscountInCents > 0 ? (
-                      <p className="text-xs text-primary">Desconto {formatCurrencyFromCents(couponDiscountInCents)}</p>
-                    ) : null}
+                  ) : null}
+                </div>
+
+                {isOpenPaidStart && selectedProduct?.gameplayDurationMinutes ? (
+                  <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
+                    <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">
+                      Cobranca no encerramento
+                    </span>
+                    <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                      <span>{formatCurrencyFromCents(centsFromMoney(selectedProduct.salePrice))}</span>
+                      <span>{selectedProduct.gameplayDurationMinutes} min base</span>
+                      <span>
+                        {formatCurrencyFromFractionalCents(
+                          centsFromMoney(selectedProduct.salePrice) / selectedProduct.gameplayDurationMinutes,
+                        )}
+                        /min
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <Button type="button" variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowCoupon(true)}>
-                    <Ticket className="h-4 w-4" />
-                    Aplicar cupom
-                  </Button>
-                )}
+                ) : null}
+
+                {!isOpenPaidStart ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`service-payment-${stationId}`}>Pagamento</Label>
+                        <select
+                          id={`service-payment-${stationId}`}
+                          name="paymentMethod"
+                          className="admin-native-select"
+                          value={paymentMethod}
+                          onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                        >
+                          {Object.values(PaymentMethod).map((method) => (
+                            <option key={method} value={method}>
+                              {paymentLabels[method]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
+                        <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">Total</span>
+                        <span className="mt-1 block text-lg font-black text-foreground">{formatCurrencyFromCents(totalInCents)}</span>
+                      </div>
+                    </div>
+
+                    {showCoupon ? (
+                      <div className="space-y-1.5 rounded-2xl border border-border/70 bg-background/45 p-3">
+                        <Label htmlFor={`service-coupon-${stationId}`}>Cupom</Label>
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                          <Input
+                            id={`service-coupon-${stationId}`}
+                            value={couponCode}
+                            onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                            list={`service-coupons-${stationId}`}
+                            placeholder="Selecionar cupom"
+                          />
+                          <Button type="button" variant="outline" size="sm" onClick={() => setShowCoupon(false)}>
+                            Remover
+                          </Button>
+                        </div>
+                        <datalist id={`service-coupons-${stationId}`}>
+                          {coupons.map((coupon) => (
+                            <option key={coupon.id} value={coupon.code}>
+                              {couponLabel(coupon)}
+                            </option>
+                          ))}
+                        </datalist>
+                        {couponPreview?.message ? (
+                          <p className="text-xs text-muted-foreground">{couponPreview.message}</p>
+                        ) : couponDiscountInCents > 0 ? (
+                          <p className="text-xs text-primary">Desconto {formatCurrencyFromCents(couponDiscountInCents)}</p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" size="sm" className="w-full gap-2" onClick={() => setShowCoupon(true)}>
+                        <Ticket className="h-4 w-4" />
+                        Aplicar cupom
+                      </Button>
+                    )}
+                  </>
+                ) : null}
 
                 <Button type="submit" className="w-full gap-2" disabled={!canPaidSubmit || isPaidPending}>
                   <Play className="h-4 w-4" />
-                  {isBusy ? "Confirmar tempo pago" : "Confirmar pago"}
+                  {isOpenPaidStart ? "Iniciar livre pago" : isBusy ? "Confirmar tempo pago" : "Confirmar pago"}
                 </Button>
                 <ActionFeedback state={paidState} />
               </form>
@@ -530,7 +710,159 @@ export function ManualServiceControlForm({
             </div>
       </ServiceReleaseModal>
 
-      {isBusy ? (
+      <ServiceReleaseModal
+        open={endPaymentOpen}
+        title={`Encerrar ${stationId.toUpperCase()}`}
+        titleId={`service-end-title-${stationId}`}
+        onClose={closeEndPaymentDialog}
+      >
+        {activePaidOpenBilling && activeOpenPaidCharge ? (
+          <form onSubmit={handlePaidOpenEndSubmit} className="space-y-3">
+            <input type="hidden" name="stationId" value={stationId} />
+            <input type="hidden" name="customerName" value="" />
+            <input type="hidden" name="couponCode" value={endCouponDiscountInCents > 0 ? selectedEndCoupon?.code ?? "" : ""} />
+            <input type="hidden" name="paymentAmount" value={moneyFromCents(endTotalInCents)} />
+            <input type="hidden" name="paymentApprovedAmount" value="" />
+            <input type="hidden" name="paymentCardBrand" value="" />
+            <input type="hidden" name="paymentCardLast4" value="" />
+            <input type="hidden" name="paymentNsu" value="" />
+            <input type="hidden" name="paymentAuthorizationCode" value="" />
+            <input type="hidden" name="paymentTerminalId" value="" />
+            <input type="hidden" name="paymentExternalTransactionId" value="" />
+            <input type="hidden" name="paymentReceiptText" value="" />
+
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
+              <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">
+                Tempo livre pago
+              </span>
+              <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                <span>{activeOpenPaidCharge.elapsedMinutes} min real</span>
+                <span>{activeOpenPaidCharge.billedMinutes} min cobrado</span>
+                <span>{formatCurrencyFromFractionalCents(activeOpenPaidCharge.pricePerMinuteInCents)}/min</span>
+              </div>
+              <p className="mt-2 text-lg font-black text-foreground">{formatCurrencyFromCents(endSubtotalInCents)}</p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+              <div className="space-y-1.5">
+                <Label htmlFor={`service-end-cash-${stationId}`}>Caixa</Label>
+                <select id={`service-end-cash-${stationId}`} name="cashSessionId" className="admin-native-select">
+                  {openSessions.length === 0 ? <option value="">Sem caixa</option> : null}
+                  {openSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.cashRegister.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`service-end-payment-${stationId}`}>Pagamento</Label>
+                <select
+                  id={`service-end-payment-${stationId}`}
+                  name="paymentMethod"
+                  className="admin-native-select"
+                  value={endPaymentMethod}
+                  onChange={(event) => setEndPaymentMethod(event.target.value as PaymentMethod)}
+                >
+                  {Object.values(PaymentMethod).map((method) => (
+                    <option key={method} value={method}>
+                      {paymentLabels[method]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {endPaymentMethod === PaymentMethod.CASH ? (
+              <div className="space-y-1.5">
+                <Label htmlFor={`service-end-cash-received-${stationId}`}>Recebido em dinheiro</Label>
+                <Input
+                  id={`service-end-cash-received-${stationId}`}
+                  name="cashReceived"
+                  inputMode="decimal"
+                  value={endCashReceived}
+                  onChange={(event) => setEndCashReceived(event.target.value)}
+                  placeholder={moneyFromCents(endTotalInCents)}
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="cashReceived" value="" />
+            )}
+
+            {endShowCoupon ? (
+              <div className="space-y-1.5 rounded-2xl border border-border/70 bg-background/45 p-3">
+                <Label htmlFor={`service-end-coupon-${stationId}`}>Cupom</Label>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <Input
+                    id={`service-end-coupon-${stationId}`}
+                    value={endCouponCode}
+                    onChange={(event) => setEndCouponCode(event.target.value.toUpperCase())}
+                    list={`service-end-coupons-${stationId}`}
+                    placeholder="Selecionar cupom"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setEndShowCoupon(false)}>
+                    Remover
+                  </Button>
+                </div>
+                <datalist id={`service-end-coupons-${stationId}`}>
+                  {coupons.map((coupon) => (
+                    <option key={coupon.id} value={coupon.code}>
+                      {couponLabel(coupon)}
+                    </option>
+                  ))}
+                </datalist>
+                {endCouponPreview?.message ? (
+                  <p className="text-xs text-muted-foreground">{endCouponPreview.message}</p>
+                ) : endCouponDiscountInCents > 0 ? (
+                  <p className="text-xs text-primary">Desconto {formatCurrencyFromCents(endCouponDiscountInCents)}</p>
+                ) : null}
+              </div>
+            ) : (
+              <Button type="button" variant="outline" size="sm" className="w-full gap-2" onClick={() => setEndShowCoupon(true)}>
+                <Ticket className="h-4 w-4" />
+                Aplicar cupom
+              </Button>
+            )}
+
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+              <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                <span>Desconto</span>
+                <span>{formatCurrencyFromCents(endCouponDiscountInCents)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-border/70 pt-2">
+                <span className="font-black text-foreground">Total</span>
+                <span className="text-lg font-black text-foreground">{formatCurrencyFromCents(endTotalInCents)}</span>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full gap-2" disabled={!canEndPaidSubmit || isEndPending}>
+              <Square className="h-4 w-4" />
+              Encerrar e registrar venda
+            </Button>
+            <ActionFeedback state={endState} />
+          </form>
+        ) : null}
+      </ServiceReleaseModal>
+
+      {isBusy && activePaidOpenBilling ? (
+        <div className="space-y-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="gap-2"
+            disabled={isEndPending}
+            onClick={() => {
+              setEndState(initialActionState);
+              setEndPaymentOpen(true);
+            }}
+          >
+            <Square className="h-4 w-4" />
+            Encerrar e cobrar
+          </Button>
+          <ActionFeedback state={endState} />
+        </div>
+      ) : isBusy ? (
         <form onSubmit={handleEndSubmit} className="space-y-2">
           <input type="hidden" name="stationId" value={stationId} />
           <Button type="submit" size="sm" variant="destructive" className="gap-2" disabled={isEndPending}>
