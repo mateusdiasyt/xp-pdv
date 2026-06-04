@@ -154,116 +154,104 @@ function ReceiptBody({ sale, cashReceived, title, subtitle, showFiscalSummary = 
   const gameplayStatusLabel = getGameplayStatusLabel(sale.gameplayRelease);
 
   return (
-    <div className="space-y-2.5 pb-4">
-      <div className="space-y-1 border-b border-black pb-2.5 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/api/branding/logo"
-          alt="Logo do estabelecimento"
-          className="mx-auto h-8 w-auto max-w-[42mm] object-contain"
-        />
-        <p className="text-[8px] font-semibold uppercase tracking-[0.22em] text-black/55">{title}</p>
-        <h3 className="text-[0.9rem] font-bold leading-tight text-black">{subtitle}</h3>
-        <p className="text-[1.55rem] font-black leading-none text-black">#{ticketCode}</p>
+    <div className="space-y-2 pb-2 text-black">
+      <div className="space-y-1 border-b-2 border-black pb-2 text-center">
+        {title ? <p className="text-[8px] font-black uppercase tracking-[0.18em] text-black">{title}</p> : null}
+        <h3 className="text-[1rem] font-black leading-tight text-black">{subtitle}</h3>
+        <p className="text-[1.8rem] font-black leading-none text-black">#{ticketCode}</p>
       </div>
 
-      <div className="space-y-1 border-b border-black pb-2.5 text-[9px] leading-3.5 text-black/78">
-        <p className="text-[11px] font-semibold text-black">{sale.saleNumber}</p>
+      <div className="space-y-1 border-b-2 border-black pb-2 text-[9.5px] font-medium leading-3.5 text-black">
+        <p className="text-[11px] font-black text-black">{sale.saleNumber}</p>
         <p>{receiptDateFormatter.format(sale.createdAt)}</p>
         <p>{sale.customerName || "Comanda avulsa"}</p>
         <p>
           Caixa {sale.cashSession.cashRegister.name} ({sale.cashSession.cashRegister.code})
         </p>
         <p>Operador: {sale.operator.name}</p>
-        <p className="font-semibold text-black">
+        <p className="font-black text-black">
           {sale.status === SaleStatus.COMPLETED ? "Pago / Concluido" : "Cancelada"}
         </p>
-        <p className="text-[8px] uppercase tracking-[0.08em] text-black/65">{getFiscalStatusLabel(sale.fiscalStatus)}</p>
+        <p className="text-[8px] font-black uppercase tracking-[0.08em] text-black">{getFiscalStatusLabel(sale.fiscalStatus)}</p>
         {gameplayStatusLabel ? (
-          <p className="rounded-sm border border-black/20 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-black">
+          <p className="rounded-sm border border-black px-1.5 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-black">
             {gameplayStatusLabel}
           </p>
         ) : null}
         {showFiscalSummary && sale.fiscalNumber ? (
-          <p className="text-[8px] text-black/70">
+          <p className="text-[8px] font-medium text-black">
             Numero: {sale.fiscalNumber} / Serie: {sale.fiscalSeries ?? "-"}
           </p>
         ) : null}
         {showFiscalSummary && sale.fiscalAccessKey ? (
-          <p className="break-all text-[7px] leading-3 text-black/55">{sale.fiscalAccessKey}</p>
+          <p className="break-all text-[7px] font-medium leading-3 text-black">{sale.fiscalAccessKey}</p>
         ) : null}
       </div>
 
-      <div className="space-y-1.5 border-b border-black pb-2.5">
-        <div className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 border-b border-dashed border-black/25 pb-1 text-[7px] font-bold uppercase text-black/65">
+      <div className="space-y-1.5 border-b-2 border-black pb-2">
+        <div className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 border-b border-dashed border-black pb-1 text-[7px] font-black uppercase text-black">
           <span>Cod.</span>
           <span>Descricao</span>
           <span className="text-right">Qtd.</span>
           <span className="text-right">Total</span>
         </div>
         {sale.items.map((item, index) => (
-          <div key={item.id} className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 text-[9px] leading-3.5 text-black">
-            <span className="break-all text-[7px] text-black/70">{item.skuSnapshot || String(index + 1).padStart(2, "0")}</span>
+          <div key={item.id} className="grid grid-cols-[24px_minmax(0,1fr)_22px_42px] gap-1.5 text-[9.5px] font-medium leading-3.5 text-black">
+            <span className="break-all text-[7px] font-medium text-black">{item.skuSnapshot || String(index + 1).padStart(2, "0")}</span>
             <div className="min-w-0">
-              <p className="font-semibold leading-3.5">{item.productNameSnapshot}</p>
-              <p className="text-[8px] leading-3.5 text-black/60">
+              <p className="font-black leading-3.5">{item.productNameSnapshot}</p>
+              <p className="text-[8px] font-medium leading-3.5 text-black">
                 {formatCurrency(toNumber(item.unitPrice))} un.
               </p>
             </div>
             <span className="text-right">{item.quantity}</span>
-            <span className="text-right font-semibold">{formatCurrency(toNumber(item.lineTotal))}</span>
+            <span className="text-right font-black">{formatCurrency(toNumber(item.lineTotal))}</span>
           </div>
         ))}
       </div>
 
-      <div className="space-y-1.5 border-b border-black pb-2.5">
+      <div className="space-y-1.5 border-b-2 border-black pb-2">
         {sale.payments.map((payment) => (
-          <div key={payment.id} className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
-            <span className="text-black/70">{paymentLabels[payment.method]}</span>
-            <span className="font-medium text-black">{formatCurrency(toNumber(payment.amount))}</span>
+          <div key={payment.id} className="flex items-center justify-between gap-3 text-[9.5px] font-medium leading-3.5 text-black">
+            <span>{paymentLabels[payment.method]}</span>
+            <span className="font-black">{formatCurrency(toNumber(payment.amount))}</span>
           </div>
         ))}
         {cashReceived ? (
-          <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
-            <span className="text-black/70">Recebido</span>
-            <span className="font-medium text-black">{formatCurrency(cashReceived)}</span>
+          <div className="flex items-center justify-between gap-3 text-[9.5px] font-medium leading-3.5 text-black">
+            <span>Recebido</span>
+            <span className="font-black">{formatCurrency(cashReceived)}</span>
           </div>
         ) : null}
         {computedChange > 0 ? (
-          <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5">
-            <span className="text-black/70">Troco</span>
-            <span className="font-medium text-black">{formatCurrency(computedChange)}</span>
+          <div className="flex items-center justify-between gap-3 text-[9.5px] font-medium leading-3.5 text-black">
+            <span>Troco</span>
+            <span className="font-black">{formatCurrency(computedChange)}</span>
           </div>
         ) : null}
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5 text-black/70">
+        <div className="flex items-center justify-between gap-3 text-[9.5px] font-medium leading-3.5 text-black">
           <span>Subtotal</span>
           <span>{formatCurrency(toNumber(sale.subtotalAmount))}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 text-[9px] leading-3.5 text-black/70">
+        <div className="flex items-center justify-between gap-3 text-[9.5px] font-medium leading-3.5 text-black">
           <span>Desconto</span>
           <span>{formatCurrency(toNumber(sale.discountAmount))}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-black/25 pt-1.5 text-[1rem] font-bold text-black">
+        <div className="flex items-center justify-between gap-3 border-t-2 border-black pt-1.5 text-[1.12rem] font-black text-black">
           <span>Total</span>
           <span>{formatCurrency(toNumber(sale.totalAmount))}</span>
         </div>
-      </div>
-
-      <div className="border-t border-dashed border-black/25 pt-2 text-center text-[8px] uppercase tracking-[0.16em] text-black/55">
-        Ticket operacional
       </div>
     </div>
   );
 }
 
 export function ReceiptPreviewCard({ sale, cashReceived, ticketMode = false }: ReceiptPreviewCardProps) {
-  const quickTicketTitle = "Via cliente";
+  const quickTicketTitle = "";
   const quickTicketSubtitle = "Ticket de retirada";
-  const quickKitchenTitle = "Via balcao";
-  const quickKitchenSubtitle = "Ticket interno";
 
   return (
     <section className="space-y-4 print:block">
@@ -290,20 +278,14 @@ export function ReceiptPreviewCard({ sale, cashReceived, ticketMode = false }: R
       </div>
 
       <Card className="receipt-print-card mx-auto w-full max-w-[57mm] overflow-hidden border border-black/10 bg-white text-black shadow-[0_28px_60px_-28px_rgba(0,0,0,0.45)] print:max-w-none print:border-none print:shadow-none">
-        <CardContent className="receipt-print-content min-h-[40mm] space-y-0 px-[3.5mm] py-[4mm] print:px-[3mm] print:py-[3.5mm]">
+        <CardContent className="receipt-print-content min-h-[40mm] space-y-0 px-[3mm] py-[3mm] print:px-[3mm] print:py-[3mm]">
           {ticketMode ? (
-            <>
-              <ReceiptBody sale={sale} cashReceived={cashReceived} title={quickTicketTitle} subtitle={quickTicketSubtitle} />
-              <div className="border-t border-dashed border-black/25 py-2 text-center text-[8px] uppercase tracking-[0.18em] text-black/60">
-                destaque no corte
-              </div>
-              <ReceiptBody sale={sale} cashReceived={cashReceived} title={quickKitchenTitle} subtitle={quickKitchenSubtitle} />
-            </>
+            <ReceiptBody sale={sale} cashReceived={cashReceived} title={quickTicketTitle} subtitle={quickTicketSubtitle} />
           ) : (
             <ReceiptBody
               sale={sale}
               cashReceived={cashReceived}
-              title="Via cliente"
+              title=""
               subtitle="Comprovante operacional"
               showFiscalSummary
             />

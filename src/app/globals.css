@@ -296,6 +296,9 @@
     width: 57mm;
     min-width: 57mm;
     background: white !important;
+    color: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   body.receipt-print-mode aside,
@@ -306,19 +309,32 @@
 
   body.receipt-print-mode main {
     padding: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
   }
 
   body.receipt-print-mode .receipt-print-card {
     width: 57mm !important;
     max-width: 57mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    color: #000 !important;
   }
 
   body.receipt-print-mode .receipt-print-content {
     width: 57mm !important;
     min-height: 40mm !important;
+    color: #000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-weight: 600 !important;
+  }
+
+  body.receipt-print-mode .receipt-print-content * {
+    color: #000 !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+    filter: none !important;
   }
 }
