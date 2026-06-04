@@ -22,32 +22,21 @@ import {
   Coffee,
   GlassWater,
 } from "lucide-react";
-import type { FormEvent } from "react";
-import { useActionState, useDeferredValue, useEffect, useState, useTransition } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
   addComandaItemRequest,
   cancelComandaRequest,
-  closeComandaAction,
+  closeComandaRequest,
   removeComandaItemRequest,
   updateComandaCustomerRequest,
   updateComandaItemRequest,
@@ -312,6 +301,84 @@ function ProductCardMedia({
   );
 }
 
+function ComandaConfirmModal({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] grid place-items-center px-4 py-6">
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-xs" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="comanda-close-confirm-title"
+        className="relative z-10 grid max-h-[calc(100vh-3rem)] w-full max-w-[min(460px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-primary/20 bg-card text-sm ring-1 ring-primary/15"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+          <h2 id="comanda-close-confirm-title" className="text-lg font-semibold text-foreground">
+            {title}
+          </h2>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </Button>
+        </div>
+        <div className="admin-scrollbar overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function comandaReceiptUrl(data: unknown) {
+  const sale = data as { saleId?: unknown; cashReceived?: unknown } | null;
+  const saleId = typeof sale?.saleId === "string" ? sale.saleId : "";
+
+  if (!saleId) {
+    return null;
+  }
+
+  const params = new URLSearchParams({ receipt: saleId });
+
+  if (typeof sale?.cashReceived === "string" && sale.cashReceived) {
+    params.set("cashReceived", sale.cashReceived);
+  }
+
+  return `/admin/pdv?${params.toString()}`;
+}
+
 export function CreateSaleForm({
   customers,
   openSessions,
@@ -332,7 +399,7 @@ export function CreateSaleForm({
   const [removeItemState, setRemoveItemState] = useState(initialActionState);
   const [customerState, setCustomerState] = useState(initialActionState);
   const [cancelState, setCancelState] = useState(initialActionState);
-  const [saleState, saleFormAction] = useActionState(closeComandaAction, initialActionState);
+  const [saleState, setSaleState] = useState<ActionState>(initialActionState);
   const [isAddingItem, startAddTransition] = useTransition();
   const [isMutatingItem, startItemMutationTransition] = useTransition();
   const [isUpdatingCustomer, startCustomerTransition] = useTransition();
@@ -346,6 +413,7 @@ export function CreateSaleForm({
   const [couponPanelOpen, setCouponPanelOpen] = useState(false);
   const [paymentAutofillEnabled, setPaymentAutofillEnabled] = useState(true);
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
+  const [isClosingSale, setIsClosingSale] = useState(false);
   const [paymentLineSeed, setPaymentLineSeed] = useState(1);
   const [optimisticItems, setOptimisticItems] = useState(selectedComanda.items);
   const [quantityByItem, setQuantityByItem] = useState<Record<string, string>>(
@@ -699,6 +767,45 @@ export function CreateSaleForm({
         },
       ];
     });
+  }
+
+  async function handleCloseComandaSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isClosingSale) {
+      return;
+    }
+
+    setIsClosingSale(true);
+    setSaleState(initialActionState);
+
+    try {
+      const result = await closeComandaRequest(new FormData(event.currentTarget));
+      setSaleState(result);
+
+      if (result.status !== "success") {
+        return;
+      }
+
+      const nextUrl = comandaReceiptUrl(result.data);
+      if (!nextUrl) {
+        setSaleState({
+          status: "error",
+          message: "Comanda fechada, mas nao foi possivel abrir o recibo automaticamente.",
+        });
+        return;
+      }
+
+      setIsFinalizeDialogOpen(false);
+      window.location.assign(nextUrl);
+    } catch (error) {
+      setSaleState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel fechar a comanda.",
+      });
+    } finally {
+      setIsClosingSale(false);
+    }
   }
 
   function updateComandaCustomerLocal(customerId: string | null, label: string) {
@@ -1149,7 +1256,7 @@ export function CreateSaleForm({
                 <p className="text-sm text-amber-100">Abra o caixa acima para finalizar esta comanda.</p>
               </div>
             ) : (
-              <form id={`close-comanda-form-${selectedComanda.id}`} action={saleFormAction} className="space-y-4">
+              <form id={`close-comanda-form-${selectedComanda.id}`} onSubmit={handleCloseComandaSubmit} className="space-y-4">
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
                 <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
                 <input type="hidden" name="cashReceived" value="" />
@@ -1471,23 +1578,29 @@ export function CreateSaleForm({
                   <Button type="button" variant="outline" className="sm:w-auto" onClick={syncSinglePaymentWithTotal}>
                     Ajustar pagamento
                   </Button>
-                  <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
-                    <AlertDialogTrigger
-                      render={<Button type="button" disabled={!canSubmitComandaSale} className="flex-1 gap-2" />}
-                    >
-                      <Check className="h-4 w-4" />
-                      {nonCashExcessInCents > 0 || paymentShortfallInCents > 0 ? "Ajuste o pagamento" : "Fechar venda"}
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
-                      <AlertDialogHeader className="place-items-start text-left">
-                        <AlertDialogMedia className="mb-1 rounded-2xl border border-primary/20 bg-primary/12 text-primary">
-                          <Receipt className="h-5 w-5" />
-                        </AlertDialogMedia>
-                        <AlertDialogTitle className="text-lg font-semibold">Fechar comanda #{selectedComanda.number}?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-left">
-                          A venda sera registrada, o estoque atualizado e o ticket fiscal iniciado.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
+                  <Button
+                    type="button"
+                    disabled={!canSubmitComandaSale || isClosingSale}
+                    className="flex-1 gap-2"
+                    onClick={() => setIsFinalizeDialogOpen(true)}
+                  >
+                    <Check className="h-4 w-4" />
+                    {nonCashExcessInCents > 0 || paymentShortfallInCents > 0 ? "Ajuste o pagamento" : "Fechar venda"}
+                  </Button>
+
+                  <ComandaConfirmModal
+                    open={isFinalizeDialogOpen}
+                    title={`Fechar comanda #${selectedComanda.number}?`}
+                    onClose={() => {
+                      if (!isClosingSale) {
+                        setIsFinalizeDialogOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="space-y-4">
+                      <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary">
+                        <Receipt className="h-5 w-5" />
+                      </div>
 
                       <div className="grid gap-2 rounded-[1.2rem] border border-border/75 bg-background/40 p-3 text-sm">
                         <div className="flex items-center justify-between gap-3 text-muted-foreground">
@@ -1516,15 +1629,27 @@ export function CreateSaleForm({
 
                       {saleState.status === "error" ? <ActionFeedback state={saleState} /> : null}
 
-                      <AlertDialogFooter className="-mx-5 -mb-5 mt-1 rounded-b-[1.5rem] border-border/70 bg-background/45 p-4">
-                        <AlertDialogCancel>Voltar</AlertDialogCancel>
-                        <AlertDialogAction type="submit" form={`close-comanda-form-${selectedComanda.id}`} className="gap-2">
+                      <div className="-mx-5 -mb-5 mt-1 flex flex-col-reverse gap-2 rounded-b-[1.5rem] border-t border-border/70 bg-background/45 p-4 sm:flex-row sm:justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isClosingSale}
+                          onClick={() => setIsFinalizeDialogOpen(false)}
+                        >
+                          Voltar
+                        </Button>
+                        <Button
+                          type="submit"
+                          form={`close-comanda-form-${selectedComanda.id}`}
+                          className="gap-2"
+                          disabled={isClosingSale}
+                        >
                           <Check className="h-4 w-4" />
-                          Confirmar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          {isClosingSale ? "Fechando..." : "Confirmar"}
+                        </Button>
+                      </div>
+                    </div>
+                  </ComandaConfirmModal>
                 </div>
                 <ActionFeedback state={saleState} />
               </form>

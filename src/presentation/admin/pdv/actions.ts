@@ -50,6 +50,31 @@ export async function closeQuickSaleAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  const result = await closeQuickSaleRequest(formData);
+
+  if (result.status !== "success") {
+    return result;
+  }
+
+  const saleResult = result.data as { saleId?: string; cashReceived?: string } | undefined;
+  if (!saleResult?.saleId) {
+    return { status: "error", message: toActionErrorMessage(new Error("Nao foi possivel concluir a venda rapida")) };
+  }
+
+  const params = new URLSearchParams({
+    receipt: saleResult.saleId,
+    ticket: "quick",
+    print: "ticket",
+  });
+
+  if (saleResult.cashReceived) {
+    params.set("cashReceived", saleResult.cashReceived);
+  }
+
+  redirect(`/admin/pdv?${params.toString()}`);
+}
+
+export async function closeQuickSaleRequest(formData: FormData): Promise<ActionState> {
   let result: Awaited<ReturnType<typeof createSaleRecord>> | null = null;
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
@@ -62,18 +87,17 @@ export async function closeQuickSaleAction(
     return { status: "error", message: toActionErrorMessage(new Error("Nao foi possivel concluir a venda rapida")) };
   }
 
-  const params = new URLSearchParams({
-    receipt: result.saleId,
-    ticket: "quick",
-    print: "ticket",
-  });
-
-  if (result.cashReceived) {
-    params.set("cashReceived", result.cashReceived);
-  }
-
   revalidateSaleSurfaces();
-  redirect(`/admin/pdv?${params.toString()}`);
+  return {
+    status: "success",
+    message: "Venda registrada com sucesso.",
+    data: {
+      saleId: result.saleId,
+      cashReceived: result.cashReceived,
+      ticket: "quick",
+      print: "ticket",
+    },
+  };
 }
 export async function cancelSaleAction(
   prevState: ActionState = initialActionState,
@@ -217,6 +241,29 @@ export async function closeComandaAction(
   formData: FormData,
 ): Promise<ActionState> {
   void prevState;
+  const result = await closeComandaRequest(formData);
+
+  if (result.status !== "success") {
+    return result;
+  }
+
+  const saleResult = result.data as { saleId?: string; cashReceived?: string } | undefined;
+  if (!saleResult?.saleId) {
+    return { status: "error", message: toActionErrorMessage(new Error("Nao foi possivel concluir o fechamento da comanda")) };
+  }
+
+  const params = new URLSearchParams({
+    receipt: saleResult.saleId,
+  });
+
+  if (saleResult.cashReceived) {
+    params.set("cashReceived", saleResult.cashReceived);
+  }
+
+  redirect(`/admin/pdv?${params.toString()}`);
+}
+
+export async function closeComandaRequest(formData: FormData): Promise<ActionState> {
   let result: Awaited<ReturnType<typeof closeComandaRecord>> | null = null;
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
@@ -229,16 +276,15 @@ export async function closeComandaAction(
     return { status: "error", message: toActionErrorMessage(new Error("Nao foi possivel concluir o fechamento da comanda")) };
   }
 
-  const params = new URLSearchParams({
-    receipt: result.saleId,
-  });
-
-  if (result.cashReceived) {
-    params.set("cashReceived", result.cashReceived);
-  }
-
   revalidateSaleSurfaces();
-  redirect(`/admin/pdv?${params.toString()}`);
+  return {
+    status: "success",
+    message: "Comanda fechada com sucesso.",
+    data: {
+      saleId: result.saleId,
+      cashReceived: result.cashReceived,
+    },
+  };
 }
 
 export async function removeComandaItemAction(

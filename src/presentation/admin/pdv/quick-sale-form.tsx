@@ -19,29 +19,20 @@ import {
   Trash2,
   Tv,
   Wallet,
+  X,
 } from "lucide-react";
-import { useActionState, useDeferredValue, useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
-import { initialActionState } from "@/presentation/admin/common/action-state";
-import { closeQuickSaleAction } from "@/presentation/admin/pdv/actions";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
+import { closeQuickSaleRequest } from "@/presentation/admin/pdv/actions";
 import {
   calculateCouponDiscountInCents,
   type PdvCouponOption,
@@ -296,6 +287,88 @@ function ProductCardMedia({
   );
 }
 
+function QuickSaleConfirmModal({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] grid place-items-center px-4 py-6">
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-xs" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-sale-confirm-title"
+        className="relative z-10 grid max-h-[calc(100vh-3rem)] w-full max-w-[min(460px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-primary/20 bg-card text-sm ring-1 ring-primary/15"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+          <h2 id="quick-sale-confirm-title" className="text-lg font-semibold text-foreground">
+            {title}
+          </h2>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </Button>
+        </div>
+        <div className="admin-scrollbar overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function saleReceiptUrl(data: unknown) {
+  const sale = data as { saleId?: unknown; cashReceived?: unknown; ticket?: unknown; print?: unknown } | null;
+  const saleId = typeof sale?.saleId === "string" ? sale.saleId : "";
+
+  if (!saleId) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    receipt: saleId,
+    ticket: typeof sale?.ticket === "string" ? sale.ticket : "quick",
+    print: typeof sale?.print === "string" ? sale.print : "ticket",
+  });
+
+  if (typeof sale?.cashReceived === "string" && sale.cashReceived) {
+    params.set("cashReceived", sale.cashReceived);
+  }
+
+  return `/admin/pdv?${params.toString()}`;
+}
+
 export function QuickSaleForm({
   customers,
   openSessions,
@@ -304,7 +377,8 @@ export function QuickSaleForm({
   canManage,
   happyHourActive,
 }: QuickSaleFormProps) {
-  const [saleState, saleFormAction] = useActionState(closeQuickSaleAction, initialActionState);
+  const [saleState, setSaleState] = useState<ActionState>(initialActionState);
+  const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const deferredProductSearch = useDeferredValue(productSearch);
@@ -358,13 +432,6 @@ export function QuickSaleForm({
       return () => window.clearTimeout(timeoutId);
     }
   }, [firstCategoryId, selectedCategoryId, selectedCategoryIsAvailable]);
-
-  useEffect(() => {
-    if (saleState.status === "error") {
-      const timeoutId = window.setTimeout(() => setIsFinalizeDialogOpen(false), 0);
-      return () => window.clearTimeout(timeoutId);
-    }
-  }, [saleState.status]);
 
   const filteredProducts = products.filter((product) => {
     if (!selectedCategoryId || product.category.id !== selectedCategoryId) {
@@ -635,6 +702,45 @@ export function QuickSaleForm({
     });
   }
 
+  async function handleQuickSaleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmittingSale) {
+      return;
+    }
+
+    setIsSubmittingSale(true);
+    setSaleState(initialActionState);
+
+    try {
+      const result = await closeQuickSaleRequest(new FormData(event.currentTarget));
+      setSaleState(result);
+
+      if (result.status !== "success") {
+        return;
+      }
+
+      const nextUrl = saleReceiptUrl(result.data);
+      if (!nextUrl) {
+        setSaleState({
+          status: "error",
+          message: "Venda registrada, mas nao foi possivel abrir o ticket automaticamente.",
+        });
+        return;
+      }
+
+      setIsFinalizeDialogOpen(false);
+      window.location.assign(nextUrl);
+    } catch (error) {
+      setSaleState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel concluir a venda.",
+      });
+    } finally {
+      setIsSubmittingSale(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <header className="overflow-hidden rounded-[1.4rem] border border-border/75 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_42%),rgba(18,17,17,0.72)] px-4 py-3.5">
@@ -684,7 +790,7 @@ export function QuickSaleForm({
           <p className="text-sm text-amber-100">Abra o caixa acima para iniciar a venda rapida.</p>
         </section>
       ) : (
-        <form id="quick-sale-form" action={saleFormAction} className="space-y-4">
+        <form id="quick-sale-form" onSubmit={handleQuickSaleSubmit} className="space-y-4">
           <input type="hidden" name="customerName" value={customerNameValue} />
           <input type="hidden" name="cashSessionId" value={selectedCashSessionId} />
           <input type="hidden" name="discountAmount" value={normalizedDiscountAmount} />
@@ -1449,12 +1555,12 @@ export function QuickSaleForm({
                   ) : null}
                 </section>
 
-            <AlertDialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
-              <AlertDialogTrigger
-                render={
-                  <Button type="button" disabled={!canSubmitQuickSale} className="w-full gap-2" />
-                }
-              >
+            <Button
+              type="button"
+              disabled={!canSubmitQuickSale || isSubmittingSale}
+              className="w-full gap-2"
+              onClick={() => setIsFinalizeDialogOpen(true)}
+            >
                 <Check className="h-4 w-4" />
                 {cartItems.length === 0
                   ? "Selecione itens para fechar"
@@ -1463,61 +1569,67 @@ export function QuickSaleForm({
                     : nonCashExcessInCents > 0 || paymentShortfallInCents > 0
                       ? "Ajuste o pagamento"
                       : "Revisar e finalizar venda"}
-              </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-[min(460px,calc(100vw-2rem))] gap-4 rounded-[1.5rem] border border-primary/20 bg-card p-5 ring-primary/15 sm:max-w-[min(460px,calc(100vw-2rem))]">
-                <AlertDialogHeader className="place-items-start text-left">
-                  <AlertDialogMedia className="mb-1 rounded-2xl border border-primary/20 bg-primary/12 text-primary">
-                    <Receipt className="h-5 w-5" />
-                  </AlertDialogMedia>
-                  <AlertDialogTitle className="text-lg font-semibold">Confirmar venda rapida?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-left">
-                    Ao confirmar, o pedido sera gravado, o estoque sera atualizado e o ticket com o fluxo fiscal sera
-                    iniciado.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
+            </Button>
 
-                <div className="grid gap-2 rounded-[1.2rem] border border-border/75 bg-background/40 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                    <span>Itens no pedido</span>
-                    <span className="font-semibold text-foreground">{cartItems.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                    <span>Desconto</span>
-                    <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                    <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
-                    <span className="font-semibold text-foreground">
-                      {formatCurrency(paymentsTotalInCents / 100)}
-                    </span>
-                  </div>
-                  {hasCashPayment && changeInCents > 0 ? (
-                    <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                      <span>Troco previsto</span>
-                      <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
-                    </div>
-                  ) : null}
-                  <div className="mt-1 flex items-center justify-between gap-3 border-t border-border/70 pt-2">
-                    <span className="font-semibold text-foreground">Total da venda</span>
-                    <span className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</span>
-                  </div>
+            <QuickSaleConfirmModal
+              open={isFinalizeDialogOpen}
+              title="Confirmar venda rapida?"
+              onClose={() => {
+                if (!isSubmittingSale) {
+                  setIsFinalizeDialogOpen(false);
+                }
+              }}
+            >
+              <div className="space-y-4">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary">
+                  <Receipt className="h-5 w-5" />
                 </div>
 
-                {saleState.status === "error" ? <ActionFeedback state={saleState} /> : null}
+                <div className="grid gap-2 rounded-[1.2rem] border border-border/75 bg-background/40 p-3 text-sm">
+                <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                  <span>Itens no pedido</span>
+                  <span className="font-semibold text-foreground">{cartItems.length}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                  <span>Desconto</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                  <span>{hasCashPayment ? "Recebido" : "Pagamentos"}</span>
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(paymentsTotalInCents / 100)}
+                  </span>
+                </div>
+                {hasCashPayment && changeInCents > 0 ? (
+                  <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                    <span>Troco previsto</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(changeInCents / 100)}</span>
+                  </div>
+                ) : null}
+                <div className="mt-1 flex items-center justify-between gap-3 border-t border-border/70 pt-2">
+                  <span className="font-semibold text-foreground">Total da venda</span>
+                  <span className="text-lg font-semibold text-primary">{formatCurrency(totalInCents / 100)}</span>
+                </div>
+              </div>
 
-                <AlertDialogFooter className="-mx-5 -mb-5 mt-1 rounded-b-[1.5rem] border-border/70 bg-background/45 p-4">
-                  <AlertDialogCancel>Voltar e revisar</AlertDialogCancel>
-                  <AlertDialogAction
-                    type="submit"
-                    form="quick-sale-form"
-                    className="gap-2"
-                  >
-                    <Check className="h-4 w-4" />
-                    Confirmar e gerar ticket
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              {saleState.status === "error" ? <ActionFeedback state={saleState} /> : null}
+
+              <div className="-mx-5 -mb-5 mt-1 flex flex-col-reverse gap-2 rounded-b-[1.5rem] border-t border-border/70 bg-background/45 p-4 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmittingSale}
+                  onClick={() => setIsFinalizeDialogOpen(false)}
+                >
+                  Voltar e revisar
+                </Button>
+                <Button type="submit" form="quick-sale-form" className="gap-2" disabled={isSubmittingSale}>
+                  <Check className="h-4 w-4" />
+                  {isSubmittingSale ? "Gerando..." : "Confirmar e gerar ticket"}
+                </Button>
+              </div>
+              </div>
+            </QuickSaleConfirmModal>
               </aside>
 
             <ActionFeedback state={saleState} />
