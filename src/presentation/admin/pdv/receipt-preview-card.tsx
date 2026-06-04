@@ -189,17 +189,18 @@ function ReceiptBody({ sale, cashReceived, title, subtitle, showFiscalSummary = 
       </div>
 
       <div className="space-y-1.5 border-b-2 border-black pb-2">
-        <div className="grid grid-cols-[18px_minmax(0,1fr)_18px_34px] gap-1 border-b border-dashed border-black pb-1 text-[6.5px] font-black uppercase text-black">
-          <span>Cod.</span>
+        <div className="grid grid-cols-[minmax(0,1fr)_18px_34px] gap-1 border-b border-dashed border-black pb-1 text-[6.5px] font-black uppercase text-black">
           <span>Descricao</span>
           <span className="text-right">Qtd.</span>
           <span className="text-right">Total</span>
         </div>
         {sale.items.map((item, index) => (
-          <div key={item.id} className="grid grid-cols-[18px_minmax(0,1fr)_18px_34px] gap-1 text-[8.5px] font-medium leading-3 text-black">
-            <span className="break-all text-[6.5px] font-medium text-black">{item.skuSnapshot || String(index + 1).padStart(2, "0")}</span>
+          <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_18px_34px] gap-1 text-[8.5px] font-medium leading-3 text-black">
             <div className="min-w-0">
               <p className="font-black leading-3">{item.productNameSnapshot}</p>
+              <p className="break-words text-[6.8px] font-medium leading-[10px] text-black">
+                COD {item.skuSnapshot || String(index + 1).padStart(2, "0")}
+              </p>
               <p className="text-[7.5px] font-medium leading-3 text-black">
                 {formatCurrency(toNumber(item.unitPrice))} un.
               </p>
