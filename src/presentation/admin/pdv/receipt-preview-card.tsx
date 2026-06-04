@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { GameplayReleaseStatus, PaymentMethod, SaleStatus } from "@prisma/client";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
@@ -270,13 +268,13 @@ export function ReceiptPreviewCard({ sale, cashReceived, ticketMode = false }: R
   return (
     <section className="space-y-4 print:block">
       <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
-        <Link
+        <a
           href="/admin/pdv"
           className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black transition-colors hover:bg-black/5"
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar ao PDV
-        </Link>
+        </a>
         {sale.fiscalDanfeUrl ? (
           <a
             href={sale.fiscalDanfeUrl}
