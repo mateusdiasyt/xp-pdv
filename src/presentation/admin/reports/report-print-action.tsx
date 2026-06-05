@@ -1,7 +1,6 @@
 "use client";
 
 import { CalendarDays, Printer, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,13 +41,23 @@ function buildPrintPath(period: ReportPeriod, startDate?: string, endDate?: stri
 }
 
 export function ReportPrintAction({ customStartDate, customEndDate }: ReportPrintActionProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const [startDate, setStartDate] = useState(customStartDate);
   const [endDate, setEndDate] = useState(customEndDate);
 
   function goToPrint(period: ReportPeriod) {
-    router.push(buildPrintPath(period, startDate, endDate));
+    if (navigating) {
+      return;
+    }
+
+    const targetPath = buildPrintPath(period, startDate, endDate);
+    setNavigating(true);
+    setOpen(false);
+
+    window.setTimeout(() => {
+      window.location.assign(targetPath);
+    }, 120);
   }
 
   return (
@@ -69,6 +78,7 @@ export function ReportPrintAction({ customStartDate, customEndDate }: ReportPrin
               <button
                 type="button"
                 onClick={() => setOpen(false)}
+                disabled={navigating}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/50 text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Fechar"
               >
@@ -82,6 +92,7 @@ export function ReportPrintAction({ customStartDate, customEndDate }: ReportPrin
                   key={option.period}
                   type="button"
                   onClick={() => goToPrint(option.period)}
+                  disabled={navigating}
                   className="rounded-2xl border border-border/80 bg-background/45 p-4 text-left transition-colors hover:border-primary/45 hover:bg-primary/10"
                 >
                   <Printer className="mb-3 h-4 w-4 text-primary" />
@@ -101,6 +112,7 @@ export function ReportPrintAction({ customStartDate, customEndDate }: ReportPrin
                     onChange={(event) => setStartDate(event.target.value)}
                     className={dateInputClass}
                     aria-label="Inicio do relatorio"
+                    disabled={navigating}
                   />
                   <input
                     type="date"
@@ -108,9 +120,10 @@ export function ReportPrintAction({ customStartDate, customEndDate }: ReportPrin
                     onChange={(event) => setEndDate(event.target.value)}
                     className={dateInputClass}
                     aria-label="Fim do relatorio"
+                    disabled={navigating}
                   />
-                  <Button type="button" onClick={() => goToPrint("custom")} disabled={!startDate || !endDate}>
-                    Imprimir
+                  <Button type="button" onClick={() => goToPrint("custom")} disabled={!startDate || !endDate || navigating}>
+                    {navigating ? "Abrindo..." : "Imprimir"}
                   </Button>
                 </div>
               </div>
