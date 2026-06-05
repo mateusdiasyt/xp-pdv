@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AccountPayableStatus } from "@prisma/client";
 import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
 
@@ -98,39 +96,39 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
           </section>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Link
+            <a
               href="/admin/accounts"
               className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
             >
               Todas
-            </Link>
-            <Link
+            </a>
+            <a
               href="/admin/accounts?status=PENDING"
               className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
             >
               <Clock3 className="h-4 w-4" />
               Pendentes
-            </Link>
-            <Link
+            </a>
+            <a
               href="/admin/accounts?status=PAID"
               className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/80 bg-background/85 px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
             >
               <CheckCircle2 className="h-4 w-4" />
               Pagas
-            </Link>
-            <Link
+            </a>
+            <a
               href="/admin/accounts?status=PENDING&range=due"
               className="inline-flex h-9 items-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/10 px-3 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:border-amber-300/55 hover:bg-amber-400/15"
             >
               <AlertTriangle className="h-4 w-4" />
               Perto de vencer
-            </Link>
-            <Link
+            </a>
+            <a
               href="/admin/accounts"
               className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
             >
               Limpar filtros
-            </Link>
+            </a>
           </div>
 
           <AccountsSpreadsheet accounts={serializedAccounts} />
