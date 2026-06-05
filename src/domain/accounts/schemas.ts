@@ -10,15 +10,30 @@ const moneySchema = z.preprocess((value) => {
 }, z.coerce.number().positive("Informe um valor maior que zero."));
 
 const dueDateSchema = z.coerce.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data valida.");
+const optionalDueDateSchema = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+
+  return value;
+}, dueDateSchema.optional());
+
+const installmentTotalSchema = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") {
+    return 1;
+  }
+
+  return value;
+}, z.coerce.number().int().min(1).max(120));
 
 export const createAccountPayableSchema = z
   .object({
     name: z.coerce.string().trim().min(2, "Informe o nome da conta.").max(120, "Nome muito longo."),
     amount: moneySchema,
     accountMode: z.enum(["RECURRING", "INSTALLMENT"]).default("RECURRING"),
-    dueDate: z.union([dueDateSchema, z.literal("")]).optional(),
+    dueDate: optionalDueDateSchema,
     dueDay: z.coerce.number().int().min(1, "Dia invalido.").max(31, "Dia invalido.").optional(),
-    installmentTotal: z.coerce.number().int().min(1).max(120).default(1),
+    installmentTotal: installmentTotalSchema,
     notes: z.coerce.string().trim().max(240).optional(),
   })
   .superRefine((data, context) => {
