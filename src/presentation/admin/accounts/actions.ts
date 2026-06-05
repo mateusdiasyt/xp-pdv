@@ -7,7 +7,7 @@ import {
   uploadAccountPayableReceiptRecord,
 } from "@/application/accounts/account-payable-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
-import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
+import { toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
 export async function createAccountPayableAction(formData: FormData): Promise<ActionState> {
   try {
@@ -44,5 +44,3 @@ export async function uploadAccountPayableReceiptAction(formData: FormData): Pro
     return { status: "error", message: toActionErrorMessage(error) };
   }
 }
-
-export { initialActionState };
