@@ -152,7 +152,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     group: "Sistema",
   },
   {
-    label: "Personalizacao",
+    label: "Configuracoes",
     href: "/admin/customization",
     icon: PaintbrushVertical,
     permission: PERMISSIONS.DASHBOARD_VIEW,

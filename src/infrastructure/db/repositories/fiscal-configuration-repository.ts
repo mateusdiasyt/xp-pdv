@@ -27,6 +27,18 @@ export async function getFiscalConfiguration() {
 
 export async function upsertFiscalConfiguration(data: {
   environment: string;
+  cnpjEmitente?: string | null;
+  defaultNcm?: string | null;
+  tokenHomologEncrypted?: string | null;
+  tokenProductionEncrypted?: string | null;
+  nfceHomologSeries?: string | null;
+  nfceHomologNextNumber?: number | null;
+  nfceHomologIdToken?: string | null;
+  nfceHomologCscEncrypted?: string | null;
+  nfceProductionSeries?: string | null;
+  nfceProductionNextNumber?: number | null;
+  nfceProductionIdToken?: string | null;
+  nfceProductionCscEncrypted?: string | null;
   updatedById?: string;
   updatedByName?: string;
 }) {

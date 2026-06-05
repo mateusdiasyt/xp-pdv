@@ -1,6 +1,6 @@
 import { requirePermission } from "@/application/auth/guards";
 import { getBrandCustomizationSnapshot } from "@/application/customization/brand-customization-service";
-import { getFiscalEnvironmentSnapshot } from "@/application/fiscal/fiscal-configuration-service";
+import { getFiscalSettingsSnapshot } from "@/application/fiscal/fiscal-configuration-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
@@ -10,15 +10,15 @@ import { UpdateFiscalEnvironmentForm } from "@/presentation/admin/customization/
 export default async function CustomizationPage() {
   const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
   const { customization, setupPending } = await getBrandCustomizationSnapshot();
-  const fiscal = await getFiscalEnvironmentSnapshot();
+  const fiscal = await getFiscalSettingsSnapshot();
   const canManageFiscalEnvironment = hasPermission(session.user.permissions, PERMISSIONS.USERS_MANAGE);
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Modulo ERP"
-        title="Personalizacao"
-        description="Altere nome da aba, cores da interface, logo e favicon para adaptar o sistema para cada empresa."
+        title="Configuracoes"
+        description="Ajuste identidade visual, horario operacional e credenciais fiscais do sistema."
       />
 
       <Card>
@@ -54,9 +54,9 @@ export default async function CustomizationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ambiente fiscal NFC-e</CardTitle>
+          <CardTitle>Fiscal / Focus NFe</CardTitle>
           <CardDescription>
-            Troque entre homologacao e producao sem redeploy. A alteracao vale para novas emissoes.
+            Configure tokens, ambiente, CNPJ emitente e dados NFC-e sem redeploy.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -66,8 +66,7 @@ export default async function CustomizationPage() {
             </div>
           ) : canManageFiscalEnvironment ? (
             <UpdateFiscalEnvironmentForm
-              initialEnvironment={fiscal.environment}
-              persisted={fiscal.persisted}
+              settings={fiscal}
             />
           ) : (
             <p className="text-sm text-muted-foreground">

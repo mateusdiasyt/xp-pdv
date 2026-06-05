@@ -1,6 +1,6 @@
 import { PaymentMethod, Prisma, ProductKind, SaleStatus } from "@prisma/client";
 
-import { resolveFiscalEnvironment } from "@/application/fiscal/fiscal-configuration-service";
+import { resolveFocusFiscalSettings } from "@/application/fiscal/fiscal-configuration-service";
 import {
   getSaleFiscalSnapshot,
   getSaleFiscalStatus,
@@ -73,30 +73,18 @@ function normalizeCnpjDigits(value: string | undefined) {
   return value.replace(/\D/g, "");
 }
 
-function resolveTokenByEnvironment(environment: FocusEnvironment) {
-  const token =
-    environment === "producao"
-      ? process.env.FOCUS_NFE_TOKEN_PROD?.trim()
-      : process.env.FOCUS_NFE_TOKEN_HOMOLOG?.trim();
-  return token;
-}
-
 async function getFocusNfceConfig(): Promise<FocusNfceConfig> {
-  const environment = await resolveFiscalEnvironment();
-  const token = resolveTokenByEnvironment(environment);
-  const cnpjEmitente = normalizeCnpjDigits(
-    process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE,
-  );
-  const defaultNcm = (process.env.FOCUS_NFCE_NCM_PADRAO ?? process.env.FOCUS_NFE_NCM_PADRAO ?? "").trim();
-  const baseUrl =
-    environment === "producao" ? "https://api.focusnfe.com.br" : "https://homologacao.focusnfe.com.br";
+  const settings = await resolveFocusFiscalSettings();
+  const token = settings.token;
+  const cnpjEmitente = normalizeCnpjDigits(settings.cnpjEmitente);
+  const defaultNcm = (settings.defaultNcm ?? "").trim();
 
   return {
     enabled: Boolean(token && cnpjEmitente),
-    environment,
+    environment: settings.environment,
     token,
     cnpjEmitente,
-    baseUrl,
+    baseUrl: settings.baseUrl,
     defaultNcm,
     defaultCfop: (process.env.FOCUS_NFCE_CFOP_PADRAO ?? "5102").trim(),
     defaultIcmsOrigem: (process.env.FOCUS_NFCE_ICMS_ORIGEM_PADRAO ?? "0").trim(),
@@ -294,7 +282,7 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
 
   if (!config.enabled) {
     const message =
-      "NFC-e nao emitida: configure FOCUS_NFE_TOKEN_*, FOCUS_NFCE_CNPJ_EMITENTE e FOCUS_NFCE_NCM_PADRAO.";
+      "NFC-e nao emitida: configure token Focus, CNPJ emitente e NCM padrao em Configuracoes > Fiscal / Focus NFe.";
     await updateSaleFiscalData(snapshot.id, {
       fiscalReference,
       fiscalDocumentType: "NFCE",
@@ -374,7 +362,7 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
 
   if (hasMissingNcm) {
     const message =
-      "NFC-e nao emitida: cadastre o NCM no produto ou configure FOCUS_NFCE_NCM_PADRAO no ambiente.";
+      "NFC-e nao emitida: cadastre o NCM no produto ou configure o NCM padrao em Configuracoes > Fiscal / Focus NFe.";
     await updateSaleFiscalData(snapshot.id, {
       fiscalReference,
       fiscalDocumentType: "NFCE",

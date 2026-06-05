@@ -846,13 +846,25 @@ model SystemUpdate {
 }
 
 model FiscalConfiguration {
-  id            String   @id @default(cuid())
-  scope         String   @unique @default("GLOBAL")
-  environment   String   @default("homologacao")
-  updatedById   String?
-  updatedByName String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  scope                      String   @unique @default("GLOBAL")
+  environment                String   @default("homologacao")
+  cnpjEmitente               String?
+  defaultNcm                 String?
+  tokenHomologEncrypted      String?
+  tokenProductionEncrypted   String?
+  nfceHomologSeries          String?
+  nfceHomologNextNumber      Int?
+  nfceHomologIdToken         String?
+  nfceHomologCscEncrypted    String?
+  nfceProductionSeries       String?
+  nfceProductionNextNumber   Int?
+  nfceProductionIdToken      String?
+  nfceProductionCscEncrypted String?
+  updatedById                String?
+  updatedByName              String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   @@index([updatedAt])
 }

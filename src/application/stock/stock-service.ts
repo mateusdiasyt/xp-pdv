@@ -1,5 +1,6 @@
 import { Prisma, StockMovementType, StockUnit } from "@prisma/client";
 
+import { resolveFocusFiscalSettings } from "@/application/fiscal/fiscal-configuration-service";
 import { createStockMovementSchema } from "@/domain/stock/schemas";
 import {
   createAuditLog,
@@ -313,12 +314,14 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
   };
 }
 
-function getConfiguredCompanyDocument() {
-  return normalizeXmlDocument(process.env.FOCUS_NFCE_CNPJ_EMITENTE ?? process.env.FOCUS_NFE_CNPJ_EMITENTE);
+async function getConfiguredCompanyDocument() {
+  const settings = await resolveFocusFiscalSettings("producao");
+  return normalizeXmlDocument(settings.cnpjEmitente);
 }
 
-function getFocusReceivedNfeToken() {
-  return process.env.FOCUS_NFE_TOKEN_PROD?.trim() || process.env.FOCUS_NFE_TOKEN?.trim();
+async function getFocusReceivedNfeToken() {
+  const settings = await resolveFocusFiscalSettings("producao");
+  return settings.token || process.env.FOCUS_NFE_TOKEN?.trim();
 }
 
 function normalizeAccessKey(rawValue?: string | null) {
@@ -423,12 +426,12 @@ async function requestFocusReceivedNfeScience(accessKey: string, token: string) 
 }
 
 async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
-  const token = getFocusReceivedNfeToken();
-  const companyDocument = getConfiguredCompanyDocument();
+  const token = await getFocusReceivedNfeToken();
+  const companyDocument = await getConfiguredCompanyDocument();
 
   if (!token || !companyDocument) {
     throw new Error(
-      "Recebimento de NF-e nao configurado. Configure FOCUS_NFE_TOKEN_PROD e FOCUS_NFCE_CNPJ_EMITENTE/FOCUS_NFE_CNPJ_EMITENTE.",
+      "Recebimento de NF-e nao configurado. Configure token de producao e CNPJ emitente em Configuracoes > Fiscal / Focus NFe.",
     );
   }
 
@@ -449,8 +452,8 @@ async function fetchReceivedNfeXmlByAccessKey(accessKey: string) {
   );
 }
 
-function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceXml) {
-  const configuredDocument = getConfiguredCompanyDocument();
+async function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockInvoiceXml) {
+  const configuredDocument = await getConfiguredCompanyDocument();
   if (!configuredDocument || !parsedInvoice.recipientDocument) {
     return;
   }
@@ -923,7 +926,7 @@ export async function getStockInvoiceXmlReview(stockInvoiceXmlId: string) {
   }
 
   const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
-  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+  await assertInvoiceRecipientMatchesCompany(parsedInvoice);
 
   const [categories, products, importedAudit] = await Promise.all([
     listCategoryOptions(),
@@ -1045,7 +1048,7 @@ async function storeRawStockInvoiceXmlRecord(params: {
 
   const { actorId, rawXml } = params;
   const parsedInvoice = parseStockInvoiceXml(rawXml);
-  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+  await assertInvoiceRecipientMatchesCompany(parsedInvoice);
 
   let created: Awaited<ReturnType<typeof createStockInvoiceXmlRecord>>;
   try {
@@ -1133,7 +1136,7 @@ export async function importStockInvoiceXmlById(stockInvoiceXmlId: string, actor
   }
 
   const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
-  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+  await assertInvoiceRecipientMatchesCompany(parsedInvoice);
 
   const summary = await runStockXmlImport({
     xmlRecordId: xmlRecord.id,
@@ -1164,7 +1167,7 @@ export async function importReviewedStockInvoiceXmlRecord(input: FormData, actor
   }
 
   const parsedInvoice = parseStockInvoiceXml(xmlRecord.rawXml);
-  assertInvoiceRecipientMatchesCompany(parsedInvoice);
+  await assertInvoiceRecipientMatchesCompany(parsedInvoice);
   await assertStockInvoiceXmlIsPending(xmlRecord.id);
 
   const reviewedItems = parseReviewedStockInvoiceItems(input, parsedInvoice.items);

@@ -1,4 +1,4 @@
-import { resolveFiscalEnvironment } from "@/application/fiscal/fiscal-configuration-service";
+import { resolveFiscalEnvironment, resolveFocusFiscalSettings } from "@/application/fiscal/fiscal-configuration-service";
 
 export type FocusEnvironment = "homologacao" | "producao";
 
@@ -38,26 +38,19 @@ export function getFocusBaseUrl(environment: FocusEnvironment) {
     : "https://homologacao.focusnfe.com.br";
 }
 
-export function getFocusToken(environment: FocusEnvironment) {
-  if (environment === "producao") {
-    return process.env.FOCUS_NFE_TOKEN_PROD?.trim();
-  }
-
-  return process.env.FOCUS_NFE_TOKEN_HOMOLOG?.trim();
-}
-
 export async function resolveFocusConnection(preferredEnvironment?: string | null): Promise<FocusConnection | null> {
   const environment = preferredEnvironment
     ? normalizeEnvironment(preferredEnvironment)
     : await resolveFiscalEnvironment();
-  const token = getFocusToken(environment);
+  const settings = await resolveFocusFiscalSettings(environment);
+  const token = settings.token;
   if (!token) {
     return null;
   }
 
   return {
     environment,
-    baseUrl: getFocusBaseUrl(environment),
+    baseUrl: settings.baseUrl,
     token,
   };
 }
