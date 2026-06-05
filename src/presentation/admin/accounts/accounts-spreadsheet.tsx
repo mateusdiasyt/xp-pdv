@@ -275,7 +275,7 @@ export function AccountsSpreadsheet({ accounts }: AccountsSpreadsheetProps) {
 
             <Button type="button" size="sm" className="gap-2" onClick={() => setFormOpen(true)}>
               <Plus className="h-4 w-4" />
-              Adicionar Conta Fixa
+              Adicionar Conta
             </Button>
           </div>
         </div>
