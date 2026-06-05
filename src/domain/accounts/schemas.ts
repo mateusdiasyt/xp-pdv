@@ -11,13 +11,33 @@ const moneySchema = z.preprocess((value) => {
 
 const dueDateSchema = z.coerce.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data valida.");
 
-export const createAccountPayableSchema = z.object({
-  name: z.coerce.string().trim().min(2, "Informe o nome da conta.").max(120, "Nome muito longo."),
-  amount: moneySchema,
-  dueDate: dueDateSchema,
-  installmentTotal: z.coerce.number().int().min(1).max(120).default(1),
-  notes: z.coerce.string().trim().max(240).optional(),
-});
+export const createAccountPayableSchema = z
+  .object({
+    name: z.coerce.string().trim().min(2, "Informe o nome da conta.").max(120, "Nome muito longo."),
+    amount: moneySchema,
+    accountMode: z.enum(["RECURRING", "INSTALLMENT"]).default("RECURRING"),
+    dueDate: z.union([dueDateSchema, z.literal("")]).optional(),
+    dueDay: z.coerce.number().int().min(1, "Dia invalido.").max(31, "Dia invalido.").optional(),
+    installmentTotal: z.coerce.number().int().min(1).max(120).default(1),
+    notes: z.coerce.string().trim().max(240).optional(),
+  })
+  .superRefine((data, context) => {
+    if (data.accountMode === "RECURRING" && !data.dueDay) {
+      context.addIssue({
+        code: "custom",
+        message: "Informe o dia do vencimento.",
+        path: ["dueDay"],
+      });
+    }
+
+    if (data.accountMode === "INSTALLMENT" && !data.dueDate) {
+      context.addIssue({
+        code: "custom",
+        message: "Informe a data de vencimento.",
+        path: ["dueDate"],
+      });
+    }
+  });
 
 export const updateAccountPayableStatusSchema = z.object({
   accountId: z.coerce.string().trim().min(1, "Conta invalida."),

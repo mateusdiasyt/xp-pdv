@@ -50,6 +50,8 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
     name: account.name,
     amount: Number(account.amount),
     dueDate: serializeDateOnly(account.dueDate),
+    isRecurringMonthly: account.isRecurringMonthly,
+    dueDay: account.dueDay,
     status: account.status,
     installmentNumber: account.installmentNumber,
     installmentTotal: account.installmentTotal,

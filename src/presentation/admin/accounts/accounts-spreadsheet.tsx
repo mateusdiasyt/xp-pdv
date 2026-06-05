@@ -24,6 +24,8 @@ type AccountRow = {
   name: string;
   amount: number;
   dueDate: string;
+  isRecurringMonthly: boolean;
+  dueDay?: number | null;
   status: AccountPayableStatus;
   installmentNumber: number;
   installmentTotal: number;
@@ -123,6 +125,7 @@ async function readReceiptFile(file: File) {
 export function AccountsSpreadsheet({ accounts }: AccountsSpreadsheetProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [accountMode, setAccountMode] = useState<"RECURRING" | "INSTALLMENT">("RECURRING");
   const [state, setState] = useState<ActionState>(initialActionState);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
@@ -281,36 +284,96 @@ export function AccountsSpreadsheet({ accounts }: AccountsSpreadsheetProps) {
           <form
             ref={formRef}
             onSubmit={handleCreateSubmit}
-            className="grid gap-3 border-b border-border/65 bg-background/28 px-4 py-4 xl:grid-cols-[minmax(220px,2fr)_140px_150px_130px_minmax(180px,1fr)_auto_auto]"
+            className="border-b border-border/65 bg-background/28 px-4 py-4"
           >
-            <div className="space-y-1">
-              <Label htmlFor="accountName">Nome</Label>
-              <Input id="accountName" name="name" placeholder="Aluguel, internet, fornecedor..." required />
+            <input type="hidden" name="accountMode" value={accountMode} />
+
+            <div className="mb-4 grid gap-2 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setAccountMode("RECURRING")}
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-left transition-colors",
+                  accountMode === "RECURRING"
+                    ? "border-primary/70 bg-primary/12 text-foreground"
+                    : "border-border/70 bg-background/45 text-muted-foreground hover:bg-muted/35",
+                )}
+              >
+                <span className="text-sm font-semibold">Mensal fixa</span>
+                <span className="mt-1 block text-xs">Todo mes no mesmo dia.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountMode("INSTALLMENT")}
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-left transition-colors",
+                  accountMode === "INSTALLMENT"
+                    ? "border-primary/70 bg-primary/12 text-foreground"
+                    : "border-border/70 bg-background/45 text-muted-foreground hover:bg-muted/35",
+                )}
+              >
+                <span className="text-sm font-semibold">Avulsa ou parcelada</span>
+                <span className="mt-1 block text-xs">Data inicial e quantidade de parcelas.</span>
+              </button>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="accountAmount">Valor</Label>
-              <Input id="accountAmount" name="amount" inputMode="decimal" placeholder="0,00" required />
+
+            <div
+              className={cn(
+                "grid gap-3",
+                accountMode === "RECURRING"
+                  ? "xl:grid-cols-[minmax(220px,2fr)_140px_150px_minmax(180px,1fr)_auto_auto]"
+                  : "xl:grid-cols-[minmax(220px,2fr)_140px_150px_130px_minmax(180px,1fr)_auto_auto]",
+              )}
+            >
+              <div className="space-y-1">
+                <Label htmlFor="accountName">Nome</Label>
+                <Input id="accountName" name="name" placeholder="Aluguel, internet, fornecedor..." required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="accountAmount">Valor</Label>
+                <Input id="accountAmount" name="amount" inputMode="decimal" placeholder="0,00" required />
+              </div>
+              {accountMode === "RECURRING" ? (
+                <div className="space-y-1">
+                  <Label htmlFor="accountDueDay">Dia do mes</Label>
+                  <Input id="accountDueDay" name="dueDay" type="number" min={1} max={31} placeholder="10" required />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="accountDueDate">Vencimento</Label>
+                    <Input id="accountDueDate" name="dueDate" type="date" required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="accountInstallments">Parcelas</Label>
+                    <Input
+                      id="accountInstallments"
+                      name="installmentTotal"
+                      type="number"
+                      min={1}
+                      max={120}
+                      defaultValue={1}
+                    />
+                  </div>
+                </>
+              )}
+              <div className="space-y-1">
+                <Label htmlFor="accountNotes">Obs.</Label>
+                <Input id="accountNotes" name="notes" placeholder="Opcional" />
+              </div>
+              <Button type="submit" className="self-end gap-2" disabled={pendingAction === "create"}>
+                {pendingAction === "create" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Salvar
+              </Button>
+              <Button type="button" variant="outline" className="self-end gap-2" onClick={() => setFormOpen(false)}>
+                <X className="h-4 w-4" />
+                Fechar
+              </Button>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="accountDueDate">Vencimento</Label>
-              <Input id="accountDueDate" name="dueDate" type="date" required />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="accountInstallments">Parcelas</Label>
-              <Input id="accountInstallments" name="installmentTotal" type="number" min={1} max={120} defaultValue={1} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="accountNotes">Obs.</Label>
-              <Input id="accountNotes" name="notes" placeholder="Opcional" />
-            </div>
-            <Button type="submit" className="self-end gap-2" disabled={pendingAction === "create"}>
-              {pendingAction === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              Salvar
-            </Button>
-            <Button type="button" variant="outline" className="self-end gap-2" onClick={() => setFormOpen(false)}>
-              <X className="h-4 w-4" />
-              Fechar
-            </Button>
           </form>
         ) : null}
 
@@ -346,12 +409,14 @@ export function AccountsSpreadsheet({ accounts }: AccountsSpreadsheetProps) {
                     <td className="px-4 py-3 font-semibold text-foreground">{formatCurrency(account.amount)}</td>
                     <td className="px-4 py-3 text-muted-foreground">{formatDate(account.dueDate)}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {account.installmentNumber}/{account.installmentTotal}
+                      {account.isRecurringMonthly
+                        ? `Todo dia ${account.dueDay ?? new Date(`${account.dueDate}T12:00:00.000Z`).getUTCDate()}`
+                        : `${account.installmentNumber}/${account.installmentTotal}`}
                     </td>
                     <td className="px-4 py-3">
                       <Badge className={cn("gap-1.5 border px-2.5 py-1 text-[0.76rem]", getStatusClass(account))}>
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {statusLabels[account.status]} · {getDueLabel(account)}
+                        {statusLabels[account.status]} - {getDueLabel(account)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">

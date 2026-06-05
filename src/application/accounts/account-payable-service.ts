@@ -8,8 +8,10 @@ import {
 import { emptyToUndefined } from "@/domain/shared/normalizers";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
+  createAccountPayable,
   createAccountPayables,
   getAccountPayableSummary,
+  hasPendingRecurringAccount,
   isMissingAccountPayableTableError,
   listAccountPayables,
   updateAccountPayableStatus,
@@ -25,6 +27,40 @@ function addMonths(date: Date, months: number) {
   const nextDate = new Date(date);
   nextDate.setUTCMonth(nextDate.getUTCMonth() + months);
   return nextDate;
+}
+
+function clampDayForMonth(year: number, monthIndex: number, day: number) {
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0, 12, 0, 0)).getUTCDate();
+  return Math.min(day, lastDay);
+}
+
+function createMonthlyDueDate(day: number, monthsAhead = 0) {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + monthsAhead;
+
+  while (month > 11) {
+    year += 1;
+    month -= 12;
+  }
+
+  const dueDate = new Date(Date.UTC(year, month, clampDayForMonth(year, month, day), 12, 0, 0));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (monthsAhead === 0 && dueDate.getTime() < today.getTime()) {
+    return createMonthlyDueDate(day, 1);
+  }
+
+  return dueDate;
+}
+
+function nextMonthlyDueDate(currentDueDate: Date, day: number) {
+  const year = currentDueDate.getUTCFullYear();
+  const month = currentDueDate.getUTCMonth() + 1;
+  const nextYear = month > 11 ? year + 1 : year;
+  const nextMonth = month > 11 ? 0 : month;
+  return new Date(Date.UTC(nextYear, nextMonth, clampDayForMonth(nextYear, nextMonth, day), 12, 0, 0));
 }
 
 function ensureAccountStorageAvailable(error: unknown): never {
@@ -90,18 +126,25 @@ export async function createAccountPayableRecord(input: FormData, actor: { id?: 
   const parsed = createAccountPayableSchema.parse({
     name: input.get("name"),
     amount: input.get("amount"),
+    accountMode: input.get("accountMode"),
     dueDate: input.get("dueDate"),
+    dueDay: input.get("dueDay"),
     installmentTotal: input.get("installmentTotal"),
     notes: input.get("notes"),
   });
 
-  const firstDueDate = parseDateOnly(parsed.dueDate);
-  const installments = Array.from({ length: parsed.installmentTotal }, (_, index) => ({
+  const amount = new Prisma.Decimal(parsed.amount).toDecimalPlaces(2);
+  const isRecurringMonthly = parsed.accountMode === "RECURRING";
+  const firstDueDate = isRecurringMonthly ? createMonthlyDueDate(parsed.dueDay ?? 1) : parseDateOnly(parsed.dueDate ?? "");
+  const installmentTotal = isRecurringMonthly ? 1 : parsed.installmentTotal;
+  const installments = Array.from({ length: installmentTotal }, (_, index) => ({
     name: parsed.name,
-    amount: new Prisma.Decimal(parsed.amount).toDecimalPlaces(2),
+    amount,
     dueDate: addMonths(firstDueDate, index),
+    isRecurringMonthly,
+    dueDay: isRecurringMonthly ? parsed.dueDay : undefined,
     installmentNumber: index + 1,
-    installmentTotal: parsed.installmentTotal,
+    installmentTotal,
     notes: emptyToUndefined(parsed.notes),
     createdById: actor.id,
   }));
@@ -121,9 +164,43 @@ export async function createAccountPayableRecord(input: FormData, actor: { id?: 
     metadata: {
       name: parsed.name,
       amount: parsed.amount,
-      installmentTotal: parsed.installmentTotal,
+      mode: parsed.accountMode,
+      dueDay: parsed.dueDay,
+      installmentTotal,
       count: created.count,
     },
+  });
+}
+
+async function createNextRecurringAccountIfNeeded(
+  account: Awaited<ReturnType<typeof updateAccountPayableStatus>>,
+  actor: { id?: string },
+) {
+  if (!account.isRecurringMonthly || !account.dueDay || account.status !== AccountPayableStatus.PAID) {
+    return;
+  }
+
+  const nextDueDate = nextMonthlyDueDate(account.dueDate, account.dueDay);
+  const alreadyExists = await hasPendingRecurringAccount({
+    name: account.name,
+    dueDate: nextDueDate,
+    dueDay: account.dueDay,
+  });
+
+  if (alreadyExists) {
+    return;
+  }
+
+  await createAccountPayable({
+    name: account.name,
+    amount: account.amount,
+    dueDate: nextDueDate,
+    isRecurringMonthly: true,
+    dueDay: account.dueDay,
+    installmentNumber: 1,
+    installmentTotal: 1,
+    notes: account.notes ?? undefined,
+    createdById: actor.id,
   });
 }
 
@@ -141,6 +218,7 @@ export async function updateAccountPayableStatusRecord(input: FormData, actor: {
       status: parsed.status,
       updatedById: actor.id,
     });
+    await createNextRecurringAccountIfNeeded(updated, actor);
   } catch (error) {
     ensureAccountStorageAvailable(error);
   }
@@ -175,6 +253,7 @@ export async function uploadAccountPayableReceiptRecord(input: FormData, actor: 
       receiptMimeType: emptyToUndefined(parsed.receiptMimeType),
       updatedById: actor.id,
     });
+    await createNextRecurringAccountIfNeeded(updated, actor);
   } catch (error) {
     ensureAccountStorageAvailable(error);
   }

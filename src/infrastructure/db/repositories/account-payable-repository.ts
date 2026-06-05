@@ -148,6 +148,8 @@ export async function createAccountPayables(
     name: string;
     amount: Prisma.Decimal;
     dueDate: Date;
+    isRecurringMonthly?: boolean;
+    dueDay?: number;
     installmentNumber: number;
     installmentTotal: number;
     notes?: string;
@@ -155,6 +157,22 @@ export async function createAccountPayables(
   }>,
 ) {
   return prisma.accountPayable.createMany({
+    data,
+  });
+}
+
+export async function createAccountPayable(data: {
+  name: string;
+  amount: Prisma.Decimal;
+  dueDate: Date;
+  isRecurringMonthly?: boolean;
+  dueDay?: number;
+  installmentNumber?: number;
+  installmentTotal?: number;
+  notes?: string;
+  createdById?: string;
+}) {
+  return prisma.accountPayable.create({
     data,
   });
 }
@@ -174,6 +192,23 @@ export async function updateAccountPayableStatus(data: {
       paidAt: data.status === AccountPayableStatus.PAID ? new Date() : null,
     },
   });
+}
+
+export async function hasPendingRecurringAccount(data: { name: string; dueDate: Date; dueDay: number }) {
+  const existing = await prisma.accountPayable.findFirst({
+    where: {
+      name: data.name,
+      dueDate: data.dueDate,
+      dueDay: data.dueDay,
+      isRecurringMonthly: true,
+      status: AccountPayableStatus.PENDING,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(existing);
 }
 
 export async function uploadAccountPayableReceipt(data: {
