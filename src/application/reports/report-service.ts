@@ -69,10 +69,12 @@ export type ReportPaymentRow = {
 };
 
 type ReportCashMovementSummary = {
+  openingAmount: number;
   cashSalesAmount: number;
   supplyAmount: number;
   withdrawalAmount: number;
   netCashFlow: number;
+  finalCashBalance: number;
 };
 
 type ReportCategoryRow = {
@@ -171,6 +173,23 @@ type SaleForReport = {
     amount: Prisma.Decimal;
   }>;
 };
+
+async function getCashOpeningAmount(cashSessionId?: string) {
+  if (!cashSessionId) {
+    return 0;
+  }
+
+  const session = await prisma.cashSession.findUnique({
+    where: {
+      id: cashSessionId,
+    },
+    select: {
+      openingAmount: true,
+    },
+  });
+
+  return toNumber(session?.openingAmount);
+}
 
 function toNumber(value: Prisma.Decimal | null | undefined) {
   if (!value) {
@@ -539,7 +558,7 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
         },
       };
 
-  const [sales, cancelledSalesCount, cashMovements] = await Promise.all([
+  const [sales, cancelledSalesCount, cashMovements, openingAmount] = await Promise.all([
     prisma.sale.findMany({
       where: completedSaleWhere,
       select: {
@@ -586,6 +605,7 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
         amount: true,
       },
     }),
+    getCashOpeningAmount(range.cashSessionId),
   ]);
 
   let itemsCount = 0;
@@ -705,10 +725,12 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
     summary,
     paymentRows,
     cashMovementSummary: {
+      openingAmount: round2(openingAmount),
       cashSalesAmount: round2(cashSalesAmount),
       supplyAmount: round2(supplyAmount),
       withdrawalAmount: round2(withdrawalAmount),
       netCashFlow: round2(cashSalesAmount + supplyAmount - withdrawalAmount),
+      finalCashBalance: round2(openingAmount + cashSalesAmount + supplyAmount - withdrawalAmount),
     },
     categoryRows,
     itemRows,

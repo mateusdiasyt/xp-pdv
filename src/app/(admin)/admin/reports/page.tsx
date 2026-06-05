@@ -220,6 +220,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 {formatCurrency(active.cashMovementSummary.cashSalesAmount)}
               </p>
             </div>
+            <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Abertura</p>
+              <p className="mt-2 text-lg font-black text-foreground">
+                {formatCurrency(active.cashMovementSummary.openingAmount)}
+              </p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Suprimento</p>
@@ -235,9 +241,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </div>
             </div>
             <div className="rounded-2xl border border-primary/25 bg-primary/10 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Liquido dinheiro</p>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Saldo final do caixa</p>
               <p className="mt-2 text-xl font-black text-foreground">
-                {formatCurrency(active.cashMovementSummary.netCashFlow)}
+                {formatCurrency(active.cashMovementSummary.finalCashBalance)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Liquido dinheiro {formatCurrency(active.cashMovementSummary.netCashFlow)}
               </p>
             </div>
           </CardContent>

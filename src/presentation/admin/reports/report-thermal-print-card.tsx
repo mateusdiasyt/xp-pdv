@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
@@ -31,8 +31,56 @@ function printCode(report: ReportPeriodData) {
   return report.period === "custom" ? "CUSTOM" : report.period.toUpperCase();
 }
 
+function buildWhatsappReportMessage(report: ReportPeriodData, generatedAt: string) {
+  const lines = [
+    `*RELATORIO XP - ${report.label.toUpperCase()}*`,
+    "",
+    `*Gerado:* ${generatedAtFormatter.format(new Date(generatedAt))}`,
+    `*Periodo:* ${report.range.businessStartDate} ate ${report.range.businessEndDate}`,
+    `*Turno:* ${report.range.startsAt}-${report.range.endsAt}`,
+    report.range.cashSessionLabel ? `*Caixa:* ${report.range.cashSessionLabel}` : null,
+    "",
+    "*RESUMO*",
+    `*Total vendido:* ${formatCurrency(report.summary.netRevenue)}`,
+    `*Vendas:* ${report.summary.salesCount}`,
+    `*Itens:* ${report.summary.itemsCount}`,
+    `*Ticket medio:* ${formatCurrency(report.summary.averageTicket)}`,
+    `*Desconto:* ${formatCurrency(report.summary.discountAmount)}`,
+    "",
+    "*PAGAMENTOS*",
+    ...report.paymentRows.map((row) => `*${row.label}:* ${formatCurrency(row.amount)} (${formatPercent(row.sharePercent)})`),
+    "",
+    "*CAIXA*",
+    `*Abertura:* ${formatCurrency(report.cashMovementSummary.openingAmount)}`,
+    `*Dinheiro vendas:* ${formatCurrency(report.cashMovementSummary.cashSalesAmount)}`,
+    `*Suprimento:* ${formatCurrency(report.cashMovementSummary.supplyAmount)}`,
+    `*Sangria:* ${formatCurrency(report.cashMovementSummary.withdrawalAmount)}`,
+    `*Saldo final do caixa:* ${formatCurrency(report.cashMovementSummary.finalCashBalance)}`,
+    "",
+    "*RESULTADO*",
+    `*Bruto:* ${formatCurrency(report.summary.grossRevenue)}`,
+    `*Custo:* ${formatCurrency(report.summary.totalCost)}`,
+    `*Lucro:* ${formatCurrency(report.summary.grossProfit)} (${formatPercent(report.summary.grossMarginPercent)})`,
+  ];
+
+  const topItems = report.itemRows.slice(0, 6);
+  if (topItems.length > 0) {
+    lines.push("", "*ITENS MAIS VENDIDOS*");
+    for (const item of topItems) {
+      lines.push(`*${item.item}:* ${item.quantity} un. - ${formatCurrency(item.grossRevenue)}`);
+    }
+  }
+
+  return lines.filter((line): line is string => line !== null).join("\n");
+}
+
+function buildWhatsappHref(report: ReportPeriodData, generatedAt: string) {
+  return `https://wa.me/?text=${encodeURIComponent(buildWhatsappReportMessage(report, generatedAt))}`;
+}
+
 export function ReportThermalPrintCard({ report, generatedAt }: ReportThermalPrintCardProps) {
   const topItems = report.itemRows.slice(0, 6);
+  const whatsappHref = buildWhatsappHref(report, generatedAt);
 
   return (
     <section className="space-y-4 print:block">
@@ -43,6 +91,15 @@ export function ReportThermalPrintCard({ report, generatedAt }: ReportThermalPri
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar aos relatorios
+        </a>
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500 px-3 text-sm font-medium text-white shadow-[0_14px_30px_-18px_rgba(16,185,129,0.75)] transition-colors hover:bg-emerald-500/90"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Enviar para o WhatsApp
         </a>
         <PrintReceiptButton>Imprimir relatorio</PrintReceiptButton>
       </div>
@@ -94,6 +151,10 @@ export function ReportThermalPrintCard({ report, generatedAt }: ReportThermalPri
             <div className="space-y-1 border-b-2 border-black pb-2 text-[8.5px] font-medium leading-3 text-black">
               <p className="text-[7px] font-black uppercase tracking-[0.08em]">Caixa</p>
               <div className="flex items-center justify-between gap-2">
+                <span>Abertura</span>
+                <span className="font-black">{formatCurrency(report.cashMovementSummary.openingAmount)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
                 <span>Dinheiro vendas</span>
                 <span className="font-black">{formatCurrency(report.cashMovementSummary.cashSalesAmount)}</span>
               </div>
@@ -104,6 +165,10 @@ export function ReportThermalPrintCard({ report, generatedAt }: ReportThermalPri
               <div className="flex items-center justify-between gap-2">
                 <span>Sangria</span>
                 <span className="font-black">{formatCurrency(report.cashMovementSummary.withdrawalAmount)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 border-t border-black pt-1">
+                <span>Saldo final</span>
+                <span className="font-black">{formatCurrency(report.cashMovementSummary.finalCashBalance)}</span>
               </div>
             </div>
 
