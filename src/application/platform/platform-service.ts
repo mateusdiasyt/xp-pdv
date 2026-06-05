@@ -96,6 +96,44 @@ export async function findLoginTenantAccessBySlug(slug: string, email: string) {
   });
 }
 
+export async function syncPlatformTenantUserAccess(data: {
+  tenantSlug: string;
+  email: string;
+  name: string;
+  role?: string;
+}) {
+  const platformPrisma = getPlatformPrisma();
+  const tenant = await platformPrisma.platformTenant.findUnique({
+    where: { slug: normalizeTenantSlug(data.tenantSlug) },
+    select: { id: true },
+  });
+
+  if (!tenant) {
+    return;
+  }
+
+  await platformPrisma.platformTenantUser.upsert({
+    where: {
+      tenantId_email: {
+        tenantId: tenant.id,
+        email: data.email.trim().toLowerCase(),
+      },
+    },
+    update: {
+      name: data.name,
+      role: data.role ?? "user",
+    },
+    create: {
+      tenantId: tenant.id,
+      email: data.email.trim().toLowerCase(),
+      name: data.name,
+      role: data.role ?? "user",
+      isOwner: false,
+      isPlatformAdmin: false,
+    },
+  });
+}
+
 export async function resolveTenantDatabaseUrlForLogin(slug: string) {
   const tenant = await getActiveTenantBySlug(slug);
 

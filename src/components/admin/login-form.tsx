@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn } from "lucide-react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,11 +20,26 @@ const loginSchema = z.object({
 
 type LoginSchema = z.infer<typeof loginSchema>;
 
+function extractWorkspaceFromCallbackUrl(callbackUrl: string | null) {
+  if (!callbackUrl) {
+    return "";
+  }
+
+  try {
+    const url = callbackUrl.startsWith("/") ? new URL(callbackUrl, "https://xp.local") : new URL(callbackUrl);
+    const match = url.pathname.match(/^\/app\/([^/]+)\/admin(?:\/|$)/);
+    return match?.[1] ?? "";
+  } catch {
+    const match = callbackUrl.match(/^\/app\/([^/]+)\/admin(?:\/|$)/);
+    return match?.[1] ?? "";
+  }
+}
+
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const workspace = searchParams.get("workspace")?.trim() || "";
-  const callbackUrl = searchParams.get("callbackUrl") ?? (workspace ? `/app/${workspace}/admin` : "/admin");
+  const rawCallbackUrl = searchParams.get("callbackUrl");
+  const workspace = searchParams.get("workspace")?.trim() || extractWorkspaceFromCallbackUrl(rawCallbackUrl);
+  const callbackUrl = rawCallbackUrl ?? (workspace ? `/app/${workspace}/admin` : "/admin");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const form = useForm<LoginSchema>({
@@ -52,8 +67,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push(result.url ?? callbackUrl);
-    router.refresh();
+    window.location.assign(result.url ?? callbackUrl);
   }
 
   return (

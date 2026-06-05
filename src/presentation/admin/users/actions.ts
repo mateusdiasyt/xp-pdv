@@ -14,7 +14,7 @@ export async function createUserAction(
   void prevState;
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
-    await createUserRecord(formData, session.user.id);
+    await createUserRecord(formData, session.user.id, session.user.tenantSlug);
     return { status: "success", message: "Usuario criado com sucesso." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

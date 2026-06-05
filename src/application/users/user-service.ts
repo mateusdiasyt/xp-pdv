@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 
+import { syncPlatformTenantUserAccess } from "@/application/platform/platform-service";
 import { createUserSchema, updateUserAccessSchema, updateUserStatusSchema } from "@/domain/users/schemas";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
@@ -28,7 +29,7 @@ export async function getPermissions() {
   return listPermissions();
 }
 
-export async function createUserRecord(input: FormData, actorId?: string) {
+export async function createUserRecord(input: FormData, actorId?: string, tenantSlug?: string) {
   const parsed = createUserSchema.parse({
     name: input.get("name"),
     email: input.get("email"),
@@ -46,6 +47,19 @@ export async function createUserRecord(input: FormData, actorId?: string) {
     roleId: parsed.roleId,
     status: parsed.status,
   });
+
+  if (tenantSlug) {
+    try {
+      await syncPlatformTenantUserAccess({
+        tenantSlug,
+        email: created.email,
+        name: created.name,
+        role: "user",
+      });
+    } catch (error) {
+      console.warn("[USERS] Usuario criado, mas falhou ao sincronizar indice da plataforma.", error);
+    }
+  }
 
   await createAuditLog({
     userId: actorId,
