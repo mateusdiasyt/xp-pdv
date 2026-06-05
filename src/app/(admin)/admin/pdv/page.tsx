@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Fragment } from "react";
 
 import { PaymentMethod, PaymentStatus, RefundStatus, SaleStatus } from "@prisma/client";
@@ -553,12 +552,12 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                         <TableCell className="text-right">{formatCurrency(Number(sale.totalAmount))}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-wrap items-center justify-end gap-2">
-                            <Link
+                            <a
                               href={`/admin/pdv?receipt=${sale.id}`}
                               className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
                             >
                               Comprovante
-                            </Link>
+                            </a>
                             {sale.fiscalDanfeUrl ? (
                               <a
                                 href={sale.fiscalDanfeUrl}
@@ -572,6 +571,8 @@ export default async function PdvPage({ searchParams }: PdvPageProps) {
                             {sale.fiscalReference || sale.fiscalXmlUrl ? (
                               <a
                                 href={`/api/fiscal/sales/${sale.id}/xml`}
+                                target="_blank"
+                                rel="noreferrer"
                                 className="inline-flex h-8 items-center justify-center rounded-xl border border-border/80 bg-background/85 px-3 text-[0.8rem] font-medium text-foreground shadow-sm transition-colors hover:border-border hover:bg-muted/70"
                               >
                                 XML
