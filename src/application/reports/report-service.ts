@@ -174,21 +174,33 @@ type SaleForReport = {
   }>;
 };
 
-async function getCashOpeningAmount(cashSessionId?: string) {
-  if (!cashSessionId) {
-    return 0;
+async function getCashOpeningAmount(range: ReportRange) {
+  if (range.cashSessionId) {
+    const session = await prisma.cashSession.findUnique({
+      where: {
+        id: range.cashSessionId,
+      },
+      select: {
+        openingAmount: true,
+      },
+    });
+
+    return toNumber(session?.openingAmount);
   }
 
-  const session = await prisma.cashSession.findUnique({
+  const sessions = await prisma.cashSession.findMany({
     where: {
-      id: cashSessionId,
+      openedAt: {
+        gte: range.start,
+        lt: range.end,
+      },
     },
     select: {
       openingAmount: true,
     },
   });
 
-  return toNumber(session?.openingAmount);
+  return sessions.reduce((total, session) => total + toNumber(session.openingAmount), 0);
 }
 
 function toNumber(value: Prisma.Decimal | null | undefined) {
@@ -605,7 +617,7 @@ async function getReportPeriodData(period: ReportPeriod, range: ReportRange): Pr
         amount: true,
       },
     }),
-    getCashOpeningAmount(range.cashSessionId),
+    getCashOpeningAmount(range),
   ]);
 
   let itemsCount = 0;
