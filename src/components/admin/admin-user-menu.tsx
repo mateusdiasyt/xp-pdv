@@ -2,6 +2,7 @@
 
 import { LogOut, Megaphone, UserRound } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
 
 type AdminUserMenuProps = {
   userName?: string | null;
@@ -22,6 +24,8 @@ type AdminUserMenuProps = {
 
 export function AdminUserMenu({ userName, userEmail }: AdminUserMenuProps) {
   const [isPendingSignOut, startSignOutTransition] = useTransition();
+  const pathname = usePathname();
+  const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
 
   function handleSignOut() {
     startSignOutTransition(async () => {
@@ -50,11 +54,11 @@ export function AdminUserMenu({ userName, userEmail }: AdminUserMenuProps) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => window.location.assign("/admin/profile")}>
+        <DropdownMenuItem onClick={() => window.location.assign(toTenantAdminHref("/admin/profile", workspaceSlug))}>
           <UserRound className="h-4 w-4" />
           Perfil
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => window.location.assign("/admin/updates")}>
+        <DropdownMenuItem onClick={() => window.location.assign(toTenantAdminHref("/admin/updates", workspaceSlug))}>
           <Megaphone className="h-4 w-4" />
           Atualizacoes
         </DropdownMenuItem>

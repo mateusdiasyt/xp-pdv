@@ -5,11 +5,20 @@ import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import {
+  findLoginTenantAccessByEmail,
+  findLoginTenantAccessBySlug,
+  getActiveTenantBySlug,
+  normalizeTenantSlug,
+} from "@/application/platform/platform-service";
+import { getTenantPrismaClientBySlug } from "@/lib/prisma";
+
+const DEFAULT_WORKSPACE_SLUG = process.env.DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
 
 const credentialsSchema = z.object({
   email: z.string().email("Email invalido"),
   password: z.string().min(6, "Senha invalida"),
+  workspace: z.string().optional(),
 });
 
 export const authOptions: NextAuthOptions = {
@@ -31,6 +40,10 @@ export const authOptions: NextAuthOptions = {
           label: "Senha",
           type: "password",
         },
+        workspace: {
+          label: "Cliente",
+          type: "text",
+        },
       },
       async authorize(rawCredentials) {
         const parsed = credentialsSchema.safeParse(rawCredentials);
@@ -39,8 +52,27 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
+        const email = parsed.data.email.toLowerCase();
+        const requestedWorkspace = parsed.data.workspace ? normalizeTenantSlug(parsed.data.workspace) : null;
+        let tenant: Awaited<ReturnType<typeof getActiveTenantBySlug>> | null = null;
+        let isPlatformAdmin = false;
+
+        try {
+          const access = requestedWorkspace
+            ? await findLoginTenantAccessBySlug(requestedWorkspace, email)
+            : await findLoginTenantAccessByEmail(email);
+
+          tenant = access?.tenant ?? (requestedWorkspace ? await getActiveTenantBySlug(requestedWorkspace) : null);
+          isPlatformAdmin = Boolean(access?.isPlatformAdmin);
+        } catch (error) {
+          console.warn("[AUTH] Plataforma ainda nao disponivel para resolver tenant. Usando banco padrao.", error);
+        }
+
+        const tenantSlug = tenant?.slug ?? requestedWorkspace ?? DEFAULT_WORKSPACE_SLUG;
+        const tenantPrisma = await getTenantPrismaClientBySlug(tenantSlug);
+
+        const user = await tenantPrisma.user.findUnique({
+          where: { email },
           include: {
             role: {
               include: {
@@ -80,6 +112,9 @@ export const authOptions: NextAuthOptions = {
           roleSlug: user.role.slug,
           permissions: mergedPermissions,
           status: user.status,
+          tenantSlug,
+          tenantName: tenant?.name ?? "XP Arcade & Bar",
+          isPlatformAdmin,
         };
       },
     }),
@@ -90,6 +125,9 @@ export const authOptions: NextAuthOptions = {
         token.roleSlug = user.roleSlug;
         token.permissions = user.permissions;
         token.status = user.status;
+        token.tenantSlug = user.tenantSlug;
+        token.tenantName = user.tenantName;
+        token.isPlatformAdmin = user.isPlatformAdmin;
       }
 
       return token;
@@ -100,6 +138,9 @@ export const authOptions: NextAuthOptions = {
         session.user.roleSlug = token.roleSlug ?? "operador";
         session.user.permissions = token.permissions ?? [];
         session.user.status = token.status ?? "INACTIVE";
+        session.user.tenantSlug = token.tenantSlug ?? DEFAULT_WORKSPACE_SLUG;
+        session.user.tenantName = token.tenantName ?? "XP Arcade & Bar";
+        session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);
       }
 
       return session;

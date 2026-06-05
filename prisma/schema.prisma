@@ -110,6 +110,13 @@ enum AccountPayableStatus {
   PAID
 }
 
+enum PlatformTenantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  FAILED
+}
+
 model BusinessUnit {
   id        String   @id @default(cuid())
   name      String
@@ -829,6 +836,49 @@ model AccountPayable {
   @@index([isRecurringMonthly, dueDay])
   @@index([dueDate])
   @@index([createdAt])
+}
+
+model PlatformTenant {
+  id                     String               @id @default(cuid())
+  name                   String
+  slug                   String               @unique
+  status                 PlatformTenantStatus @default(PENDING)
+  planName               String?
+  planStatus             String               @default("pending")
+  ownerName              String
+  ownerEmail             String
+  ownerPasswordHash      String?
+  databaseName           String?              @unique
+  databaseUrlEncrypted   String?
+  isDefault              Boolean              @default(false)
+  approvedAt             DateTime?
+  suspendedAt            DateTime?
+  lastProvisioningError  String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  users PlatformTenantUser[]
+
+  @@index([status])
+  @@index([ownerEmail])
+  @@index([isDefault])
+}
+
+model PlatformTenantUser {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String
+  name      String
+  role      String   @default("owner")
+  isOwner   Boolean  @default(false)
+  isPlatformAdmin Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant PlatformTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([email])
 }
 
 model SystemUpdate {

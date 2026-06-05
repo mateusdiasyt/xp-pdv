@@ -8,6 +8,7 @@ import { BrandLogo } from "@/components/admin/brand-logo";
 import { adminNavigation } from "@/components/admin/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
 import { cn } from "@/lib/utils";
 
 type AdminMobileNavProps = {
@@ -18,6 +19,7 @@ type AdminMobileNavProps = {
 export function AdminMobileNav({ roleSlug, permissions }: AdminMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
   const isAdmin = roleSlug === "administrador";
   const items = adminNavigation.filter((item) => isAdmin || permissions.includes(item.permission));
 
@@ -35,15 +37,17 @@ export function AdminMobileNav({ roleSlug, permissions }: AdminMobileNavProps) {
         <div className="flex-1 space-y-1.5 p-3">
           {items.map((item) => {
             const Icon = item.icon;
+            const itemHref = toTenantAdminHref(item.href, workspaceSlug);
             const isActive =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname?.startsWith(item.href.replace("#novo-registro", ""));
+              itemHref.endsWith("/admin")
+                ? pathname === itemHref || pathname === "/admin"
+                : pathname?.startsWith(itemHref.replace("#novo-registro", "")) ||
+                  pathname?.startsWith(item.href.replace("#novo-registro", ""));
 
             return (
               <a
                 key={item.href}
-                href={item.href}
+                href={itemHref}
                 onClick={() => setOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",

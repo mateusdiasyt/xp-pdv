@@ -1,7 +1,5 @@
 import bcrypt from "bcryptjs";
-import { PlatformTenantStatus, PrismaClient, RecordStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { PrismaClient, RecordStatus } from "@prisma/client";
 
 const permissions = [
   { key: "dashboard:view", description: "Visualizar painel administrativo" },
@@ -61,45 +59,22 @@ const rolePermissions = {
   ],
 } as const;
 
-async function main() {
-  const defaultTenantSlug = process.env.DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
-  const defaultTenantName = process.env.DEFAULT_WORKSPACE_NAME ?? "XP Arcade & Bar";
-  const defaultAdminEmail = (process.env.DEFAULT_ADMIN_EMAIL ?? "admin@guildamaia.com").toLowerCase();
-
-  const defaultTenant = await prisma.platformTenant.upsert({
-    where: { slug: defaultTenantSlug },
-    update: {
-      name: defaultTenantName,
-      status: PlatformTenantStatus.ACTIVE,
-      ownerName: "Administrador Sistema",
-      ownerEmail: defaultAdminEmail.toLowerCase(),
-      isDefault: true,
-      approvedAt: new Date(),
-    },
-    create: {
-      slug: defaultTenantSlug,
-      name: defaultTenantName,
-      status: PlatformTenantStatus.ACTIVE,
-      ownerName: "Administrador Sistema",
-      ownerEmail: defaultAdminEmail.toLowerCase(),
-      isDefault: true,
-      approvedAt: new Date(),
-    },
-  });
-
-  await prisma.platformTenant.updateMany({
-    where: {
-      id: { not: defaultTenant.id },
-      isDefault: true,
-    },
-    data: {
-      isDefault: false,
-    },
-  });
-
+export async function seedTenantDatabase(
+  prisma: PrismaClient,
+  data: {
+    tenantName: string;
+    tenantSlug: string;
+    ownerName: string;
+    ownerEmail: string;
+    ownerPasswordHash?: string | null;
+    ownerPassword?: string | null;
+  },
+) {
   const defaultUnit = await prisma.businessUnit.upsert({
     where: { code: "HQ" },
-    update: {},
+    update: {
+      name: "Unidade Principal",
+    },
     create: {
       code: "HQ",
       name: "Unidade Principal",
@@ -170,22 +145,23 @@ async function main() {
     where: { slug: "administrador" },
   });
 
-  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD ?? "Admin123!";
-  const hashedPassword = await bcrypt.hash(adminPassword, 12);
+  const passwordHash =
+    data.ownerPasswordHash ??
+    (await bcrypt.hash(data.ownerPassword ?? process.env.DEFAULT_ADMIN_PASSWORD ?? "Admin123!", 12));
 
   await prisma.user.upsert({
-    where: { email: defaultAdminEmail },
+    where: { email: data.ownerEmail.toLowerCase() },
     update: {
-      name: "Administrador Sistema",
-      passwordHash: hashedPassword,
+      name: data.ownerName,
+      passwordHash,
       roleId: adminRole.id,
       status: RecordStatus.ACTIVE,
       unitId: defaultUnit.id,
     },
     create: {
-      name: "Administrador Sistema",
-      email: defaultAdminEmail,
-      passwordHash: hashedPassword,
+      name: data.ownerName,
+      email: data.ownerEmail.toLowerCase(),
+      passwordHash,
       roleId: adminRole.id,
       status: RecordStatus.ACTIVE,
       unitId: defaultUnit.id,
@@ -207,36 +183,24 @@ async function main() {
     },
   });
 
-  await prisma.platformTenantUser.upsert({
-    where: {
-      tenantId_email: {
-        tenantId: defaultTenant.id,
-        email: defaultAdminEmail.toLowerCase(),
-      },
-    },
+  await prisma.platformTenant.upsert({
+    where: { slug: data.tenantSlug },
     update: {
-      name: "Administrador Sistema",
-      role: "owner",
-      isOwner: true,
-      isPlatformAdmin: true,
+      name: data.tenantName,
+      status: "ACTIVE",
+      ownerName: data.ownerName,
+      ownerEmail: data.ownerEmail.toLowerCase(),
+      isDefault: true,
+      approvedAt: new Date(),
     },
     create: {
-      tenantId: defaultTenant.id,
-      email: defaultAdminEmail.toLowerCase(),
-      name: "Administrador Sistema",
-      role: "owner",
-      isOwner: true,
-      isPlatformAdmin: true,
+      slug: data.tenantSlug,
+      name: data.tenantName,
+      status: "ACTIVE",
+      ownerName: data.ownerName,
+      ownerEmail: data.ownerEmail.toLowerCase(),
+      isDefault: true,
+      approvedAt: new Date(),
     },
   });
 }
-
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (error) => {
-    console.error("Seed failure", error);
-    await prisma.$disconnect();
-    process.exit(1);
-  });

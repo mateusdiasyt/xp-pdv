@@ -1,10 +1,12 @@
 "use client";
 
 import { Bell, ExternalLink } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
 
 type AccountNotificationItem = {
   id: string;
@@ -37,6 +39,11 @@ export function AccountNotificationBell({
   items,
 }: AccountNotificationBellProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const accountsHref = toTenantAdminHref(
+    "/admin/accounts?status=PENDING&range=due",
+    getWorkspaceSlugFromPathname(pathname),
+  );
 
   return (
     <div className="relative">
@@ -74,7 +81,7 @@ export function AccountNotificationBell({
               items.map((item) => (
                 <a
                   key={item.id}
-                  href="/admin/accounts?status=PENDING&range=due"
+                  href={accountsHref}
                   className="block rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/55"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -90,7 +97,7 @@ export function AccountNotificationBell({
           </div>
 
           <a
-            href="/admin/accounts?status=PENDING&range=due"
+            href={accountsHref}
             className="flex items-center justify-between border-t border-border/60 px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
           >
             Acessar contas

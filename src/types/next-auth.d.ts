@@ -7,6 +7,9 @@ declare module "next-auth" {
       roleSlug: string;
       permissions: string[];
       status: "ACTIVE" | "INACTIVE";
+      tenantSlug: string;
+      tenantName?: string | null;
+      isPlatformAdmin: boolean;
     } & DefaultSession["user"];
   }
 
@@ -14,6 +17,9 @@ declare module "next-auth" {
     roleSlug: string;
     permissions: string[];
     status: "ACTIVE" | "INACTIVE";
+    tenantSlug: string;
+    tenantName?: string | null;
+    isPlatformAdmin: boolean;
   }
 }
 
@@ -22,5 +28,8 @@ declare module "next-auth/jwt" {
     roleSlug?: string;
     permissions?: string[];
     status?: "ACTIVE" | "INACTIVE";
+    tenantSlug?: string;
+    tenantName?: string | null;
+    isPlatformAdmin?: boolean;
   }
 }

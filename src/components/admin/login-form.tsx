@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 const loginSchema = z.object({
   email: z.string().email("Digite um email valido"),
   password: z.string().min(6, "Digite sua senha"),
+  workspace: z.string().optional(),
 });
 
 type LoginSchema = z.infer<typeof loginSchema>;
@@ -22,7 +23,8 @@ type LoginSchema = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/admin";
+  const workspace = searchParams.get("workspace")?.trim() || "";
+  const callbackUrl = searchParams.get("callbackUrl") ?? (workspace ? `/app/${workspace}/admin` : "/admin");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const form = useForm<LoginSchema>({
@@ -30,6 +32,7 @@ export function LoginForm() {
     defaultValues: {
       email: "",
       password: "",
+      workspace,
     },
   });
 
@@ -39,6 +42,7 @@ export function LoginForm() {
     const result = await signIn("credentials", {
       email: values.email,
       password: values.password,
+      workspace: values.workspace,
       callbackUrl,
       redirect: false,
     });
@@ -75,6 +79,16 @@ export function LoginForm() {
           <p className="text-xs text-rose-600">{form.formState.errors.password.message}</p>
         ) : null}
       </div>
+
+      {workspace ? (
+        <input type="hidden" {...form.register("workspace")} />
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor="workspace">Cliente</Label>
+          <Input id="workspace" placeholder="xp-arcade" {...form.register("workspace")} />
+          <p className="text-xs text-muted-foreground">Pode deixar em branco se seu email estiver vinculado a uma conta.</p>
+        </div>
+      )}
 
       {errorMessage ? <p className="text-sm text-rose-600">{errorMessage}</p> : null}
 

@@ -5,6 +5,7 @@ import {
   buildBrandThemeVariables,
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
+import { buildTenantAdminPath } from "@/application/platform/platform-service";
 import { BrandLogo } from "@/components/admin/brand-logo";
 import { LoginForm } from "@/components/admin/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ export default async function LoginPage() {
   const themeVariables = buildBrandThemeVariables(customization);
 
   if (session?.user) {
-    redirect("/admin");
+    redirect(buildTenantAdminPath(session.user.tenantSlug));
   }
 
   return (

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { BrandLogo } from "@/components/admin/brand-logo";
 import { adminNavigation } from "@/components/admin/navigation";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
 import { cn } from "@/lib/utils";
 
 type AdminSidebarProps = {
@@ -13,48 +14,75 @@ type AdminSidebarProps = {
 
 export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
   const pathname = usePathname();
+  const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
 
   const isAdmin = roleSlug === "administrador";
   const items = adminNavigation.filter((item) => isAdmin || permissions.includes(item.permission));
+  const groupedItems = ["Operacao", "Financeiro", "Cadastros", "Sistema"].map((group) => ({
+    group,
+    items: items.filter((item) => item.group === group),
+  }));
 
   return (
-    <aside className="group/sidebar sticky top-3 z-[80] my-3 ml-3 flex h-[calc(100vh-1.5rem)] w-[4.75rem] shrink-0 flex-col overflow-hidden rounded-[1.45rem] border border-sidebar-border/45 bg-sidebar/58 text-sidebar-foreground shadow-[24px_0_72px_-54px_rgba(0,0,0,0.95)] backdrop-blur-2xl transition-[width,background-color,border-color] duration-300 ease-out hover:w-[17rem] hover:border-sidebar-border/70 supports-[backdrop-filter]:bg-sidebar/46">
-      <div className="flex h-[4.75rem] shrink-0 items-center px-3">
+    <aside className="group/sidebar sticky top-0 z-[80] flex h-screen w-[4.75rem] shrink-0 flex-col overflow-hidden border-r border-sidebar-border/35 bg-sidebar/48 text-sidebar-foreground shadow-[18px_0_70px_-62px_rgba(0,0,0,0.9)] backdrop-blur-2xl transition-[width,background-color,border-color] duration-300 ease-out hover:w-64 hover:border-sidebar-border/55 hover:bg-sidebar/58 supports-[backdrop-filter]:bg-sidebar/38">
+      <div className="flex h-20 shrink-0 items-center px-4">
         <BrandLogo
           priority
-          className="h-10 w-10 shrink-0 overflow-hidden transition-[width] duration-300 ease-out group-hover/sidebar:w-36"
+          className="h-11 w-11 shrink-0 overflow-hidden transition-[width] duration-300 ease-out group-hover/sidebar:w-40"
         />
       </div>
 
-      <nav className="admin-scrollbar flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-3 pb-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname?.startsWith(item.href.replace("#novo-registro", ""));
+      <nav className="admin-scrollbar flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-3 pb-5">
+        {groupedItems.map(({ group, items: groupItems }) => {
+          if (groupItems.length === 0) {
+            return null;
+          }
 
           return (
-            <a
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              className={cn(
-                "flex h-12 w-full items-center justify-center gap-3 rounded-2xl text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar group-hover/sidebar:justify-start group-hover/sidebar:px-3",
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_16px_28px_-16px_color-mix(in_oklab,var(--sidebar-primary)_78%,transparent)]"
-                  : "border border-sidebar-border/35 bg-sidebar-accent/28 text-sidebar-foreground/72 hover:border-sidebar-border/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
-                {item.label}
-              </span>
-            </a>
+            <div key={group} className="space-y-2">
+              <p className="h-0 overflow-hidden px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/38 opacity-0 transition-all duration-200 group-hover/sidebar:h-5 group-hover/sidebar:opacity-100">
+                {group}
+              </p>
+
+              <div className="space-y-1.5">
+                {groupItems.map((item) => {
+                  const Icon = item.icon;
+                  const itemHref = toTenantAdminHref(item.href, workspaceSlug);
+                  const isActive =
+                    itemHref.endsWith("/admin")
+                      ? pathname === itemHref || pathname === "/admin"
+                      : pathname?.startsWith(itemHref.replace("#novo-registro", "")) ||
+                        pathname?.startsWith(item.href.replace("#novo-registro", ""));
+
+                  return (
+                    <a
+                      key={item.href}
+                      href={itemHref}
+                      aria-label={item.label}
+                      className={cn(
+                        "flex h-11 w-full items-center justify-center gap-3 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar group-hover/sidebar:justify-start group-hover/sidebar:px-3",
+                        isActive
+                          ? "border border-sidebar-primary/30 bg-sidebar-primary/14 text-sidebar-foreground shadow-[0_12px_28px_-22px_color-mix(in_oklab,var(--sidebar-primary)_82%,transparent)]"
+                          : "border border-transparent text-sidebar-foreground/64 hover:border-sidebar-border/45 hover:bg-sidebar-accent/44 hover:text-sidebar-foreground",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-[18px] w-[18px] shrink-0",
+                          isActive ? "text-sidebar-primary" : "text-sidebar-foreground/64",
+                        )}
+                      />
+                      <span className="w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
+                        {item.label}
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
-
     </aside>
   );
 }
