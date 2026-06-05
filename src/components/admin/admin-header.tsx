@@ -1,39 +1,49 @@
-import { Bell } from "lucide-react";
-
+import { AccountNotificationBell } from "@/components/admin/account-notification-bell";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav";
-import { Button } from "@/components/ui/button";
 
 type AdminHeaderProps = {
   userName?: string | null;
   userEmail?: string | null;
   roleSlug: string;
   permissions: string[];
+  accountNotifications: {
+    count: number;
+    overdueCount: number;
+    dueSoonCount: number;
+    items: Array<{
+      id: string;
+      name: string;
+      amount: number;
+      dueDate: string;
+    }>;
+  };
 };
 
-export function AdminHeader({ userName, userEmail, roleSlug, permissions }: AdminHeaderProps) {
+export function AdminHeader({
+  userName,
+  userEmail,
+  roleSlug,
+  permissions,
+  accountNotifications,
+}: AdminHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/78 px-4 py-3 backdrop-blur-xl md:px-8">
-      <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="md:hidden">
-          <AdminMobileNav roleSlug={roleSlug} permissions={permissions} />
+    <header className="sticky top-0 z-30 bg-background/64 px-4 py-3 backdrop-blur-2xl md:px-6 xl:px-8">
+      <div className="mx-auto flex h-11 w-full max-w-[1600px] items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="md:hidden">
+            <AdminMobileNav roleSlug={roleSlug} permissions={permissions} />
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-border/50 bg-card/42 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[0_8px_24px_-22px_rgba(0,0,0,0.8)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            XP ERP
+          </div>
         </div>
-        <div className="space-y-0.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            Painel Administrativo
-          </p>
-          <h2 className="text-sm font-semibold tracking-[-0.01em] text-foreground md:text-base">Operacao interna</h2>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-3">
-        <AdminUserMenu userName={userName} userEmail={userEmail} />
-        <Button variant="outline" size="icon-sm" className="rounded-full">
-          <Bell className="h-4 w-4" />
-          <span className="sr-only">Alertas</span>
-        </Button>
-      </div>
+        <div className="flex items-center gap-2">
+          <AdminUserMenu userName={userName} userEmail={userEmail} />
+          <AccountNotificationBell {...accountNotifications} />
+        </div>
       </div>
     </header>
   );
