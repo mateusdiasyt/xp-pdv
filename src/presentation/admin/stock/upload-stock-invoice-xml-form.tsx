@@ -1,38 +1,48 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useRef, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
 import { HelpCircle } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import { uploadStockInvoiceXmlAction } from "@/presentation/admin/stock/actions";
 
 export function UploadStockInvoiceXmlForm() {
-  const router = useRouter();
+  const pathname = usePathname();
+  const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState(uploadStockInvoiceXmlAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (state.status === "success") {
-      formRef.current?.reset();
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
 
-      const reviewUrl =
-        state.data && typeof state.data === "object" && "reviewUrl" in state.data
-          ? String((state.data as { reviewUrl?: unknown }).reviewUrl ?? "")
-          : "";
+    startTransition(async () => {
+      const result = await uploadStockInvoiceXmlAction(initialActionState, formData);
+      setState(result);
 
-      if (reviewUrl) {
-        router.push(reviewUrl);
+      if (result.status === "success") {
+        formRef.current?.reset();
+        const reviewUrl =
+          result.data && typeof result.data === "object" && "reviewUrl" in result.data
+            ? String((result.data as { reviewUrl?: unknown }).reviewUrl ?? "")
+            : "";
+
+        if (reviewUrl) {
+          window.location.assign(toTenantAdminHref(reviewUrl, workspaceSlug));
+        }
       }
-    }
-  }, [router, state]);
+    });
+  }
 
   return (
-    <form ref={formRef} action={formAction} className="grid gap-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="grid gap-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Label htmlFor="xmlFile">Arquivo XML da NF-e</Label>
@@ -48,7 +58,9 @@ export function UploadStockInvoiceXmlForm() {
       </div>
 
       <div className="flex flex-col items-start gap-3">
-        <FormSubmitButton>Salvar XML e gerar previa</FormSubmitButton>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Salvando..." : "Salvar XML e gerar previa"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>

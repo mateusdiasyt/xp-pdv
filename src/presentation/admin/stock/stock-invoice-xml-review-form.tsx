@@ -1,18 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { StockUnit } from "@prisma/client";
-import { ImageIcon, PackageCheck } from "lucide-react";
-import type { ChangeEvent } from "react";
-import { useActionState, useEffect, useState } from "react";
+import { ImageIcon, Loader2, PackageCheck } from "lucide-react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useState, useTransition } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import { importReviewedStockInvoiceXmlAction } from "@/presentation/admin/stock/actions";
 
 type ReviewCategory = {
@@ -660,33 +660,41 @@ export function StockInvoiceXmlReviewForm({
   products,
   items,
 }: StockInvoiceXmlReviewFormProps) {
-  const router = useRouter();
-  const [state, formAction] = useActionState(importReviewedStockInvoiceXmlAction, initialActionState);
+  const pathname = usePathname();
+  const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (state.status !== "success") {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!window.confirm("Confirmar a entrada revisada deste XML no estoque?")) {
       return;
     }
 
-    const stockUrl =
-      state.data && typeof state.data === "object" && "stockUrl" in state.data
-        ? String((state.data as { stockUrl?: unknown }).stockUrl ?? "")
-        : "";
+    const formData = new FormData(event.currentTarget);
 
-    if (stockUrl) {
-      router.push(stockUrl);
-    }
-  }, [router, state]);
+    startTransition(async () => {
+      const result = await importReviewedStockInvoiceXmlAction(initialActionState, formData);
+      setState(result);
+
+      if (result.status !== "success") {
+        return;
+      }
+
+      const stockUrl =
+        result.data && typeof result.data === "object" && "stockUrl" in result.data
+          ? String((result.data as { stockUrl?: unknown }).stockUrl ?? "")
+          : "/admin/stock";
+
+      window.location.assign(toTenantAdminHref(stockUrl, workspaceSlug));
+    });
+  }
 
   return (
     <form
-      action={formAction}
+      onSubmit={handleSubmit}
       className="space-y-5"
-      onSubmit={(event) => {
-        if (!window.confirm("Confirmar a entrada revisada deste XML no estoque?")) {
-          event.preventDefault();
-        }
-      }}
     >
       <input type="hidden" name="stockInvoiceXmlId" value={stockInvoiceXmlId} />
 
@@ -701,7 +709,10 @@ export function StockInvoiceXmlReviewForm({
               Escolha o destino de cada linha, ajuste precos e confirme. Nada entra no estoque antes deste passo.
             </p>
           </div>
-          <FormSubmitButton>Confirmar entrada revisada</FormSubmitButton>
+          <Button type="submit" disabled={isPending} className="gap-2">
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isPending ? "Confirmando..." : "Confirmar entrada revisada"}
+          </Button>
         </div>
         <div className="mt-3">
           <ActionFeedback state={state} />
@@ -713,7 +724,10 @@ export function StockInvoiceXmlReviewForm({
       ))}
 
       <div className="flex flex-col items-start gap-3 rounded-[1.75rem] border border-border/80 bg-card/55 p-4">
-        <FormSubmitButton>Confirmar entrada revisada</FormSubmitButton>
+        <Button type="submit" disabled={isPending} className="gap-2">
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isPending ? "Confirmando..." : "Confirmar entrada revisada"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>

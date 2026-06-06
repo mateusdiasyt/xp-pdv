@@ -183,7 +183,7 @@ export async function importReviewedStockInvoiceXmlAction(
       message: `Entrada XML confirmada: ${summaryParts.join(" | ")}.`,
       data: {
         stockInvoiceXmlId: result.stockInvoiceXmlId,
-        stockUrl: "/admin/stock?panel=xml",
+        stockUrl: "/admin/stock",
       },
     };
   } catch (error) {
