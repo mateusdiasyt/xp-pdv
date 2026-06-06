@@ -64,6 +64,20 @@ function getStatusBadge(status: GameplayReleaseStatus) {
     };
   }
 
+  if (status === GameplayReleaseStatus.PAUSADA) {
+    return {
+      label: "PAUSADA",
+      className: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+    };
+  }
+
+  if (status === GameplayReleaseStatus.CANCELADA) {
+    return {
+      label: "CANCELADA",
+      className: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
+    };
+  }
+
   return {
     label: "FALHA_ENVIO",
     className: "bg-rose-100 text-rose-700 hover:bg-rose-100",
@@ -80,6 +94,15 @@ function formatJsonPreview(value: unknown) {
 
 function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseData>>["releases"][number] | undefined, now: Date) {
   if (!release?.releasedUntil) {
+    if (release?.status === GameplayReleaseStatus.PAUSADA) {
+      return {
+        label: "PAUSADO",
+        helper: "Tempo pausado",
+        className: "border-amber-300/45 bg-amber-400/10",
+        badgeClassName: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+      };
+    }
+
     return {
       label: "LIVRE",
       helper: "Disponivel para venda",
@@ -89,6 +112,15 @@ function getServiceState(release: Awaited<ReturnType<typeof getGameplayReleaseDa
   }
 
   const serviceStartsAt = release.serviceStartsAt ?? release.paidAt;
+  if (release.status === GameplayReleaseStatus.PAUSADA) {
+    return {
+      label: "PAUSADO",
+      helper: "Tempo pausado",
+      className: "border-amber-300/45 bg-amber-400/10",
+      badgeClassName: "bg-amber-100 text-amber-800 hover:bg-amber-100",
+    };
+  }
+
   const isPreparing = serviceStartsAt.getTime() > now.getTime();
   const isPaidOpenMode = Boolean(getManualPaidOpenBillingConfig(release));
   const isFreeMode = !isPaidOpenMode && (release.durationMinutes === 0 || release.planCode === "MANUAL-LIVRE");
@@ -179,9 +211,10 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
   const now = new Date();
   const activeReleases = serviceSnapshot.releases.filter(
     (release) =>
-      release.status === GameplayReleaseStatus.LIBERADA &&
-      release.releasedUntil &&
-      release.releasedUntil.getTime() > now.getTime(),
+      (release.status === GameplayReleaseStatus.LIBERADA &&
+        release.releasedUntil &&
+        release.releasedUntil.getTime() > now.getTime()) ||
+      release.status === GameplayReleaseStatus.PAUSADA,
   );
 
   return (
@@ -196,7 +229,10 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
         {stationCatalog.map((station) => {
           const release = activeReleases.find((item) => item.stationId === station.id);
           const state = getServiceState(release, now);
-          const paidOpenCharge = release ? calculateManualPaidOpenCharge(release, now) : null;
+          const paidOpenCharge =
+            release && release.status === GameplayReleaseStatus.LIBERADA
+              ? calculateManualPaidOpenCharge(release, now)
+              : null;
 
           return (
             <Card key={station.id} className={state.className}>
@@ -217,22 +253,31 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                       <span>Plano: {release.planCode}</span>
                       <span>{getReleaseDurationLabel(release)}</span>
                     </div>
-                    <ServiceCountdown
-                      durationMinutes={release.durationMinutes}
-                      planCode={release.planCode}
-                      releasedUntil={release.releasedUntil?.toISOString()}
-                      serviceStartsAt={(release.serviceStartsAt ?? release.paidAt).toISOString()}
-                      manualPaidOpenBilling={
-                        paidOpenCharge
-                          ? {
-                              productName: paidOpenCharge.productName,
-                              baseDurationMinutes: paidOpenCharge.baseDurationMinutes,
-                              basePriceInCents: paidOpenCharge.basePriceInCents,
-                              startedAt: paidOpenCharge.startedAt.toISOString(),
-                            }
-                          : null
-                      }
-                    />
+                    {release.status === GameplayReleaseStatus.PAUSADA ? (
+                      <div className="mt-4 rounded-2xl border border-amber-400/35 bg-amber-400/10 p-4">
+                        <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-amber-200">
+                          Tempo pausado
+                        </p>
+                        <p className="mt-2 text-2xl font-black text-foreground">Pausado</p>
+                      </div>
+                    ) : (
+                      <ServiceCountdown
+                        durationMinutes={release.durationMinutes}
+                        planCode={release.planCode}
+                        releasedUntil={release.releasedUntil?.toISOString()}
+                        serviceStartsAt={(release.serviceStartsAt ?? release.paidAt).toISOString()}
+                        manualPaidOpenBilling={
+                          paidOpenCharge
+                            ? {
+                                productName: paidOpenCharge.productName,
+                                baseDurationMinutes: paidOpenCharge.baseDurationMinutes,
+                                basePriceInCents: paidOpenCharge.basePriceInCents,
+                                startedAt: paidOpenCharge.startedAt.toISOString(),
+                              }
+                            : null
+                        }
+                      />
+                    )}
                   </>
                 ) : (
                   <p>Nenhuma venda ativa nesta estação.</p>
@@ -254,6 +299,16 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
                           baseDurationMinutes: paidOpenCharge.baseDurationMinutes,
                           basePriceInCents: paidOpenCharge.basePriceInCents,
                           startedAt: paidOpenCharge.startedAt.toISOString(),
+                        }
+                      : null
+                  }
+                  activeRelease={
+                    release
+                      ? {
+                          status: release.status,
+                          saleId: release.saleId,
+                          saleNumber: release.sale?.saleNumber ?? null,
+                          saleTotal: release.sale ? Number(release.sale.totalAmount) : null,
                         }
                       : null
                   }

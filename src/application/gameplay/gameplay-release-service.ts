@@ -4,14 +4,18 @@ import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repos
 import {
   countGameplayReleasesByStatus,
   createManualGameplayRelease,
+  cancelControllableGameplayReleaseByStationId,
   endActiveGameplayReleaseByStationId,
   getGameplayProductForManualBilling,
+  getControllableGameplayReleaseByStationId,
   extendActiveGameplayReleaseByStationId,
   getBusyGameplayReleasesByStationIds,
   getSaleGameplaySnapshot,
   listGameplayReleases,
   markGameplayReleaseFailureWithoutRequest,
   markGameplayReleaseResult,
+  pauseActiveGameplayReleaseByStationId,
+  resumePausedGameplayReleaseByStationId,
   upsertPendingGameplayRelease,
 } from "@/infrastructure/db/repositories/gameplay-release-repository";
 import {
@@ -93,6 +97,11 @@ function readPositiveInteger(value: unknown) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function readNonNegativeInteger(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function roundServiceMinutesUp(minutes: number) {
   return Math.max(5, Math.ceil(Math.max(1, minutes) / 5) * 5);
 }
@@ -167,6 +176,10 @@ export function calculateManualPaidOpenCharge(
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function getPayloadRecord(value: unknown) {
+  return isRecord(value) ? value : {};
 }
 
 function extractReleasedUntil(responsePayload: unknown, paidAt: Date, durationMinutes: number) {
@@ -766,6 +779,208 @@ export async function extendManualGameplayStation(data: {
   return {
     release,
     message: `${stationId.toUpperCase()} recebeu +${option.label}. Agora vai até ${formatReleaseTime(release.releasedUntil)}.`,
+  };
+}
+
+export async function pauseManualGameplayStation(data: {
+  stationId: string;
+  operator: string;
+  actorId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para pausar.");
+  }
+
+  const now = new Date();
+  const release = await getControllableGameplayReleaseByStationId(stationId, now);
+
+  if (!release || release.status !== GameplayReleaseStatus.LIBERADA || !release.releasedUntil) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo rodando para pausar.`);
+  }
+
+  const previousPayload = getPayloadRecord(release.responsePayload);
+  const paidOpenConfig = getManualPaidOpenBillingConfig(release);
+  const serviceStartsAt = release.serviceStartsAt ?? release.paidAt;
+  const accumulatedActiveSeconds = paidOpenConfig
+    ? Math.max(1, Math.ceil(Math.max(0, now.getTime() - serviceStartsAt.getTime()) / 1000))
+    : null;
+  const remainingSeconds =
+    paidOpenConfig || release.planCode === "MANUAL-LIVRE"
+      ? null
+      : Math.max(1, Math.ceil(Math.max(0, release.releasedUntil.getTime() - now.getTime()) / 1000));
+
+  const pausedRelease = await pauseActiveGameplayReleaseByStationId(stationId, {
+    now,
+    responsePayload: toJsonValue({
+      ...previousPayload,
+      status: "PAUSED",
+      pausedAt: now.toISOString(),
+      stationId,
+      planCode: release.planCode,
+      previousReleasedUntil: release.releasedUntil.toISOString(),
+      remainingSeconds,
+      accumulatedActiveSeconds,
+      operator: data.operator,
+    }),
+  });
+
+  if (!pausedRelease) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo rodando para pausar.`);
+  }
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_pause",
+    entity: "GameplayRelease",
+    entityId: pausedRelease.id,
+    metadata: {
+      stationId,
+      saleId: pausedRelease.saleId,
+      remainingSeconds,
+      accumulatedActiveSeconds,
+    },
+  });
+
+  return {
+    release: pausedRelease,
+    message: `${stationId.toUpperCase()} pausada.`,
+  };
+}
+
+export async function resumeManualGameplayStation(data: {
+  stationId: string;
+  operator: string;
+  actorId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para retomar.");
+  }
+
+  const now = new Date();
+  const release = await getControllableGameplayReleaseByStationId(stationId, now);
+
+  if (!release || release.status !== GameplayReleaseStatus.PAUSADA) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo pausado para retomar.`);
+  }
+
+  const previousPayload = getPayloadRecord(release.responsePayload);
+  const paidOpenConfig = getManualPaidOpenBillingConfig(release);
+  const accumulatedActiveSeconds = readNonNegativeInteger(previousPayload.accumulatedActiveSeconds) ?? 0;
+  const remainingSeconds = readPositiveInteger(previousPayload.remainingSeconds);
+  const isManualFree = release.planCode === "MANUAL-LIVRE";
+  const serviceStartsAt = paidOpenConfig
+    ? new Date(now.getTime() - accumulatedActiveSeconds * 1000)
+    : now;
+  const releasedUntil =
+    paidOpenConfig || isManualFree
+      ? MANUAL_FREE_RELEASE_UNTIL
+      : new Date(now.getTime() + (remainingSeconds ?? Math.max(1, release.durationMinutes * 60)) * 1000);
+
+  const resumedRelease = await resumePausedGameplayReleaseByStationId(stationId, {
+    now,
+    serviceStartsAt,
+    releasedUntil,
+    responsePayload: toJsonValue({
+      ...previousPayload,
+      status: "RESUMED",
+      resumedAt: now.toISOString(),
+      stationId,
+      planCode: release.planCode,
+      releasedUntil: releasedUntil.toISOString(),
+      accumulatedActiveSeconds: paidOpenConfig ? accumulatedActiveSeconds : null,
+      operator: data.operator,
+    }),
+  });
+
+  if (!resumedRelease) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo pausado para retomar.`);
+  }
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_resume",
+    entity: "GameplayRelease",
+    entityId: resumedRelease.id,
+    metadata: {
+      stationId,
+      saleId: resumedRelease.saleId,
+      remainingSeconds,
+      accumulatedActiveSeconds,
+    },
+  });
+
+  return {
+    release: resumedRelease,
+    message: `${stationId.toUpperCase()} retomada.`,
+  };
+}
+
+export async function cancelManualGameplayStation(data: {
+  stationId: string;
+  operator: string;
+  reason: string;
+  actorId?: string;
+}) {
+  const stationId = data.stationId.trim().toLowerCase();
+  const reason = data.reason.trim();
+
+  if (!stationId) {
+    throw new Error("Informe a TV para cancelar.");
+  }
+
+  if (reason.length < 3) {
+    throw new Error("Informe o motivo do cancelamento.");
+  }
+
+  const now = new Date();
+  const release = await getControllableGameplayReleaseByStationId(stationId, now);
+
+  if (!release) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo ativo ou pausado para cancelar.`);
+  }
+
+  const previousPayload = getPayloadRecord(release.responsePayload);
+  const cancelledRelease = await cancelControllableGameplayReleaseByStationId(stationId, {
+    now,
+    responsePayload: toJsonValue({
+      ...previousPayload,
+      status: "CANCELLED_MANUALLY",
+      cancelledAt: now.toISOString(),
+      stationId,
+      planCode: release.planCode,
+      reason,
+      operator: data.operator,
+      saleId: release.saleId,
+    }),
+  });
+
+  if (!cancelledRelease) {
+    throw new Error(`${stationId.toUpperCase()} nao possui tempo ativo ou pausado para cancelar.`);
+  }
+
+  await createAuditLog({
+    userId: data.actorId,
+    action: "admin.services.manual_cancel",
+    entity: "GameplayRelease",
+    entityId: cancelledRelease.id,
+    metadata: {
+      stationId,
+      saleId: release.saleId,
+      reason,
+    },
+  });
+
+  return {
+    release: cancelledRelease,
+    saleId: release.saleId,
+    saleNumber: release.sale?.saleNumber,
+    message: release.saleId
+      ? `${stationId.toUpperCase()} cancelada. Venda vinculada enviada para cancelamento.`
+      : `${stationId.toUpperCase()} cancelada sem gerar venda.`,
   };
 }
 

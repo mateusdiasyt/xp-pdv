@@ -72,6 +72,8 @@ enum SaleStatus {
 
 enum GameplayReleaseStatus {
   LIBERADA
+  PAUSADA
+  CANCELADA
   PENDENTE_ENVIO
   FALHA_ENVIO
 }

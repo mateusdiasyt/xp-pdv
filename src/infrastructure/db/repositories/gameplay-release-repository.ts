@@ -214,6 +214,41 @@ export async function getBusyGameplayReleasesByStationIds(stationIds: string[], 
   });
 }
 
+export async function getControllableGameplayReleaseByStationId(stationId: string, now = new Date()) {
+  return prisma.gameplayRelease.findFirst({
+    where: {
+      stationId,
+      OR: [
+        {
+          status: GameplayReleaseStatus.LIBERADA,
+          releasedUntil: {
+            gt: now,
+          },
+          ...completedSaleOrManualReleaseWhere,
+        },
+        {
+          status: GameplayReleaseStatus.PAUSADA,
+          ...completedSaleOrManualReleaseWhere,
+        },
+      ],
+    },
+    include: {
+      sale: {
+        select: {
+          id: true,
+          saleNumber: true,
+          status: true,
+          fiscalStatus: true,
+          totalAmount: true,
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  });
+}
+
 export async function createManualGameplayRelease(data: {
   stationId: string;
   planCode: string;
@@ -265,6 +300,114 @@ export async function getGameplayProductForManualBilling(productId: string) {
       gameplayDurationMinutes: true,
       salePrice: true,
       categoryId: true,
+    },
+  });
+}
+
+export async function pauseActiveGameplayReleaseByStationId(
+  stationId: string,
+  data: {
+    now?: Date;
+    responsePayload: Prisma.InputJsonValue;
+  },
+) {
+  const now = data.now ?? new Date();
+  const activeRelease = await prisma.gameplayRelease.findFirst({
+    where: {
+      stationId,
+      status: GameplayReleaseStatus.LIBERADA,
+      releasedUntil: {
+        gt: now,
+      },
+      ...completedSaleOrManualReleaseWhere,
+    },
+    orderBy: {
+      releasedUntil: "desc",
+    },
+  });
+
+  if (!activeRelease) {
+    return null;
+  }
+
+  return prisma.gameplayRelease.update({
+    where: {
+      id: activeRelease.id,
+    },
+    data: {
+      status: GameplayReleaseStatus.PAUSADA,
+      releasedUntil: now,
+      responsePayload: data.responsePayload,
+      lastError: null,
+      lastAttemptAt: now,
+    },
+  });
+}
+
+export async function resumePausedGameplayReleaseByStationId(
+  stationId: string,
+  data: {
+    now?: Date;
+    serviceStartsAt: Date;
+    releasedUntil: Date;
+    responsePayload: Prisma.InputJsonValue;
+  },
+) {
+  const now = data.now ?? new Date();
+  const pausedRelease = await prisma.gameplayRelease.findFirst({
+    where: {
+      stationId,
+      status: GameplayReleaseStatus.PAUSADA,
+      ...completedSaleOrManualReleaseWhere,
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  });
+
+  if (!pausedRelease) {
+    return null;
+  }
+
+  return prisma.gameplayRelease.update({
+    where: {
+      id: pausedRelease.id,
+    },
+    data: {
+      status: GameplayReleaseStatus.LIBERADA,
+      serviceStartsAt: data.serviceStartsAt,
+      releasedUntil: data.releasedUntil,
+      responsePayload: data.responsePayload,
+      lastError: null,
+      lastAttemptAt: now,
+    },
+  });
+}
+
+export async function cancelControllableGameplayReleaseByStationId(
+  stationId: string,
+  data: {
+    now?: Date;
+    responsePayload: Prisma.InputJsonValue;
+  },
+) {
+  const now = data.now ?? new Date();
+  const release = await getControllableGameplayReleaseByStationId(stationId, now);
+
+  if (!release) {
+    return null;
+  }
+
+  return prisma.gameplayRelease.update({
+    where: {
+      id: release.id,
+    },
+    data: {
+      status: GameplayReleaseStatus.CANCELADA,
+      releasedUntil: now,
+      responsePayload: data.responsePayload,
+      lastError: null,
+      lastAttemptAt: now,
     },
   });
 }

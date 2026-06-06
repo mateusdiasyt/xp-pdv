@@ -1,7 +1,7 @@
 "use client";
 
-import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
-import { CreditCard, Gift, Play, Square, Ticket, X } from "lucide-react";
+import { CouponDiscountType, GameplayReleaseStatus, PaymentMethod, ProductKind, RefundStatus } from "@prisma/client";
+import { Ban, CreditCard, Gift, Pause, Play, RotateCcw, Square, Ticket, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -11,11 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
+  cancelServiceSessionAction,
   endPaidOpenServiceSessionAction,
   endServiceSessionAction,
   extendServiceSessionAction,
   manualServiceReleaseAction,
+  pauseServiceSessionAction,
   paidServiceReleaseAction,
+  resumeServiceSessionAction,
 } from "@/presentation/admin/gameplay/actions";
 import {
   calculateCouponDiscountInCents,
@@ -60,6 +63,7 @@ type ManualServiceControlFormProps = {
   gameplayProducts: GameplayProductOption[];
   coupons: PdvCouponOption[];
   activePaidOpenBilling?: ActivePaidOpenBilling | null;
+  activeRelease?: ActiveReleaseControl | null;
 };
 
 type ActivePaidOpenBilling = {
@@ -70,6 +74,13 @@ type ActivePaidOpenBilling = {
   baseDurationMinutes: number;
   basePriceInCents: number;
   startedAt: string;
+};
+
+type ActiveReleaseControl = {
+  status: GameplayReleaseStatus;
+  saleId?: string | null;
+  saleNumber?: string | null;
+  saleTotal?: number | null;
 };
 
 const durationOptions = [
@@ -85,6 +96,13 @@ const paymentLabels: Record<PaymentMethod, string> = {
   PIX: "Pix",
   CREDIT_CARD: "Crédito",
   DEBIT_CARD: "Débito",
+};
+
+const refundStatusLabels: Record<RefundStatus, string> = {
+  NOT_REQUIRED: "Sem estorno",
+  PENDING: "Estorno pendente",
+  CONFIRMED: "Estorno confirmado",
+  FAILED: "Falhou",
 };
 
 function isCardPayment(method: PaymentMethod) {
@@ -258,12 +276,16 @@ export function ManualServiceControlForm({
   gameplayProducts,
   coupons,
   activePaidOpenBilling,
+  activeRelease,
 }: ManualServiceControlFormProps) {
   const [releaseState, setReleaseState] = useState<ActionState>(initialActionState);
   const [extendState, setExtendState] = useState<ActionState>(initialActionState);
   const [paidState, setPaidState] = useState<ActionState>(initialActionState);
   const [endState, setEndState] = useState<ActionState>(initialActionState);
+  const [controlState, setControlState] = useState<ActionState>(initialActionState);
+  const [cancelState, setCancelState] = useState<ActionState>(initialActionState);
   const [open, setOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [durationPreset, setDurationPreset] = useState("30");
   const [mode, setMode] = useState<"free" | "paid">("free");
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -277,8 +299,10 @@ export function ManualServiceControlForm({
   const [endCashReceived, setEndCashReceived] = useState("");
   const [endShowCoupon, setEndShowCoupon] = useState(false);
   const [endCouponCode, setEndCouponCode] = useState("");
+  const [refundStatus, setRefundStatus] = useState<RefundStatus>(RefundStatus.PENDING);
+  const [refundMethod, setRefundMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   const [liveNow, setLiveNow] = useState(() => Date.now());
-  const [pendingAction, setPendingAction] = useState<"free" | "paid" | "end" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"free" | "paid" | "end" | "pause" | "resume" | "cancel" | null>(null);
 
   const effectiveDurationPreset = isBusy && durationPreset === "FREE" ? "15" : durationPreset;
   const durationMinutes = effectiveDurationPreset === "FREE" ? 0 : Number(effectiveDurationPreset);
@@ -355,16 +379,21 @@ export function ManualServiceControlForm({
   const isFreePending = pendingAction === "free";
   const isPaidPending = pendingAction === "paid";
   const isEndPending = pendingAction === "end";
+  const isPausePending = pendingAction === "pause";
+  const isResumePending = pendingAction === "resume";
+  const isCancelPending = pendingAction === "cancel";
+  const isPaused = activeRelease?.status === GameplayReleaseStatus.PAUSADA;
+  const hasLinkedSale = Boolean(activeRelease?.saleId);
 
   useEffect(() => {
-    setPdvModalOpen(open || endPaymentOpen);
+    setPdvModalOpen(open || endPaymentOpen || cancelOpen);
 
     return () => {
-      if (open || endPaymentOpen) {
+      if (open || endPaymentOpen || cancelOpen) {
         setPdvModalOpen(false);
       }
     };
-  }, [endPaymentOpen, open]);
+  }, [cancelOpen, endPaymentOpen, open]);
 
   useEffect(() => {
     if (!activePaidOpenBilling) {
@@ -392,6 +421,65 @@ export function ManualServiceControlForm({
   function closeEndPaymentDialog() {
     setPdvModalOpen(false);
     setEndPaymentOpen(false);
+  }
+
+  function closeCancelDialog() {
+    setPdvModalOpen(false);
+    setCancelOpen(false);
+  }
+
+  async function handleControlSubmit(
+    formData: FormData,
+    action: "pause" | "resume",
+    request: (prevState: ActionState, formData: FormData) => Promise<ActionState>,
+  ) {
+    setPendingAction(action);
+    setControlState(initialActionState);
+
+    try {
+      const result = await request(initialActionState, formData);
+      setControlState(result);
+
+      if (result.status === "success") {
+        reloadPage();
+      }
+    } catch (error) {
+      setControlState(localActionError(error));
+    } finally {
+      setPendingAction((currentAction) => (currentAction === action ? null : currentAction));
+    }
+  }
+
+  async function handlePauseSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await handleControlSubmit(new FormData(event.currentTarget), "pause", pauseServiceSessionAction);
+  }
+
+  async function handleResumeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await handleControlSubmit(new FormData(event.currentTarget), "resume", resumeServiceSessionAction);
+  }
+
+  async function handleCancelSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
+    setPendingAction("cancel");
+    setCancelState(initialActionState);
+
+    try {
+      const result = await cancelServiceSessionAction(initialActionState, formData);
+      setCancelState(result);
+
+      if (result.status === "success") {
+        closeCancelDialog();
+        reloadPage();
+      }
+    } catch (error) {
+      setCancelState(localActionError(error));
+    } finally {
+      setPendingAction((currentAction) => (currentAction === "cancel" ? null : currentAction));
+    }
   }
 
   async function handleFreeSubmit(event: FormEvent<HTMLFormElement>) {
@@ -527,6 +615,8 @@ export function ManualServiceControlForm({
       <ActionFeedback state={releaseState} />
       <ActionFeedback state={extendState} />
       <ActionFeedback state={paidState} />
+      <ActionFeedback state={controlState} />
+      <ActionFeedback state={cancelState} />
 
       <ServiceReleaseModal
         open={open}
@@ -891,33 +981,242 @@ export function ManualServiceControlForm({
         ) : null}
       </ServiceReleaseModal>
 
-      {isBusy && activePaidOpenBilling ? (
-        <div className="space-y-2">
+      <ServiceReleaseModal
+        open={cancelOpen}
+        title={`Cancelar ${stationId.toUpperCase()}`}
+        titleId={`service-cancel-title-${stationId}`}
+        onClose={closeCancelDialog}
+      >
+        <form onSubmit={handleCancelSubmit} className="space-y-3">
+          <input type="hidden" name="stationId" value={stationId} />
+
+          {hasLinkedSale ? (
+            <div className="rounded-2xl border border-rose-400/35 bg-rose-400/10 p-3">
+              <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-rose-200">
+                Venda vinculada
+              </span>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {activeRelease?.saleNumber ?? "Venda"} será cancelada no PDV.
+              </p>
+              {activeRelease?.saleTotal ? (
+                <p className="mt-1 text-lg font-black text-foreground">
+                  {formatCurrencyFromCents(centsFromMoney(activeRelease.saleTotal))}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3 text-sm text-muted-foreground">
+              Cancelar este tempo não gera venda nem nota fiscal.
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor={`service-cancel-reason-${stationId}`}>Motivo</Label>
+            <Input
+              id={`service-cancel-reason-${stationId}`}
+              name="cancelReason"
+              placeholder="Ex.: cliente desistiu"
+              required
+              minLength={3}
+            />
+          </div>
+
+          {hasLinkedSale ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`service-refund-status-${stationId}`}>Estorno</Label>
+                  <select
+                    id={`service-refund-status-${stationId}`}
+                    name="refundStatus"
+                    className="admin-native-select"
+                    value={refundStatus}
+                    onChange={(event) => setRefundStatus(event.target.value as RefundStatus)}
+                  >
+                    {Object.values(RefundStatus).map((status) => (
+                      <option key={status} value={status}>
+                        {refundStatusLabels[status]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {refundStatus === RefundStatus.CONFIRMED ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-refund-method-${stationId}`}>Forma</Label>
+                    <select
+                      id={`service-refund-method-${stationId}`}
+                      name="refundMethod"
+                      className="admin-native-select"
+                      value={refundMethod}
+                      onChange={(event) => setRefundMethod(event.target.value as PaymentMethod)}
+                    >
+                      {Object.values(PaymentMethod).map((method) => (
+                        <option key={method} value={method}>
+                          {paymentLabels[method]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <input type="hidden" name="refundMethod" value="" />
+                )}
+              </div>
+
+              {refundStatus === RefundStatus.CONFIRMED ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-refund-amount-${stationId}`}>Valor estornado</Label>
+                    <Input
+                      id={`service-refund-amount-${stationId}`}
+                      name="refundAmount"
+                      inputMode="decimal"
+                      defaultValue={activeRelease?.saleTotal ? activeRelease.saleTotal.toFixed(2) : ""}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-refund-nsu-${stationId}`}>NSU / ID Pix</Label>
+                    <Input id={`service-refund-nsu-${stationId}`} name="refundNsu" />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <input type="hidden" name="refundAmount" value="" />
+                  <input type="hidden" name="refundNsu" value="" />
+                </>
+              )}
+
+              <input type="hidden" name="refundAuthorizationCode" value="" />
+              <input type="hidden" name="refundTerminalId" value="" />
+              <input type="hidden" name="refundExternalTransactionId" value="" />
+              <input type="hidden" name="refundReceiptText" value="" />
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="refundStatus" value={RefundStatus.NOT_REQUIRED} />
+              <input type="hidden" name="refundMethod" value="" />
+              <input type="hidden" name="refundAmount" value="" />
+              <input type="hidden" name="refundNsu" value="" />
+              <input type="hidden" name="refundAuthorizationCode" value="" />
+              <input type="hidden" name="refundTerminalId" value="" />
+              <input type="hidden" name="refundExternalTransactionId" value="" />
+              <input type="hidden" name="refundReceiptText" value="" />
+            </>
+          )}
+
+          <Button type="submit" variant="destructive" className="w-full gap-2" disabled={isCancelPending}>
+            <Ban className="h-4 w-4" />
+            Cancelar serviço
+          </Button>
+          <ActionFeedback state={cancelState} />
+        </form>
+      </ServiceReleaseModal>
+
+      {isBusy && isPaused ? (
+        <div className="flex flex-wrap gap-2">
+          <form onSubmit={handleResumeSubmit}>
+            <input type="hidden" name="stationId" value={stationId} />
+            <Button type="submit" size="sm" className="gap-2" disabled={isResumePending}>
+              <RotateCcw className="h-4 w-4" />
+              Retomar
+            </Button>
+          </form>
           <Button
             type="button"
             size="sm"
             variant="destructive"
             className="gap-2"
-            disabled={isEndPending}
+            disabled={isCancelPending}
             onClick={() => {
-              setEndState(initialActionState);
-              setEndPaymentOpen(true);
+              setCancelState(initialActionState);
+              setCancelOpen(true);
             }}
           >
-            <Square className="h-4 w-4" />
-            Encerrar e cobrar
+            <Ban className="h-4 w-4" />
+            Cancelar
           </Button>
+        </div>
+      ) : isBusy && activePaidOpenBilling ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <form onSubmit={handlePauseSubmit}>
+              <input type="hidden" name="stationId" value={stationId} />
+              <Button type="submit" size="sm" variant="secondary" className="gap-2" disabled={isPausePending}>
+                <Pause className="h-4 w-4" />
+                Pausar
+              </Button>
+            </form>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="gap-2"
+              disabled={isEndPending}
+              onClick={() => {
+                setEndState(initialActionState);
+                setEndPaymentOpen(true);
+              }}
+            >
+              <Square className="h-4 w-4" />
+              Encerrar e cobrar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={isCancelPending}
+              onClick={() => {
+                setCancelState(initialActionState);
+                setCancelOpen(true);
+              }}
+            >
+              <Ban className="h-4 w-4" />
+              Cancelar
+            </Button>
+          </div>
           <ActionFeedback state={endState} />
         </div>
       ) : isBusy ? (
-        <form onSubmit={handleEndSubmit} className="space-y-2">
-          <input type="hidden" name="stationId" value={stationId} />
-          <Button type="submit" size="sm" variant="destructive" className="gap-2" disabled={isEndPending}>
-            <Square className="h-4 w-4" />
-            Encerrar tempo
-          </Button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <form onSubmit={handlePauseSubmit}>
+              <input type="hidden" name="stationId" value={stationId} />
+              <Button type="submit" size="sm" variant="secondary" className="gap-2" disabled={isPausePending}>
+                <Pause className="h-4 w-4" />
+                Pausar
+              </Button>
+            </form>
+            <form onSubmit={handleEndSubmit}>
+              <input type="hidden" name="stationId" value={stationId} />
+              <Button type="submit" size="sm" variant="destructive" className="gap-2" disabled={isEndPending}>
+                <Square className="h-4 w-4" />
+                Encerrar tempo
+              </Button>
+            </form>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={isCancelPending}
+              onClick={() => {
+                setCancelState(initialActionState);
+                setCancelOpen(true);
+              }}
+            >
+              <Ban className="h-4 w-4" />
+              Cancelar
+            </Button>
+          </div>
           <ActionFeedback state={endState} />
-        </form>
+        </div>
+      ) : null}
+      {isBusy ? (
+        <div className="space-y-1">
+          <ActionFeedback state={controlState} />
+          <ActionFeedback state={cancelState} />
+        </div>
       ) : null}
     </div>
   );

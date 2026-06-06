@@ -4,13 +4,16 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
+  cancelManualGameplayStation,
   endManualGameplayStation,
   extendManualGameplayStation,
   getManualPaidOpenChargeByStationId,
+  pauseManualGameplayStation,
   releaseManualGameplayStation,
+  resumeManualGameplayStation,
   triggerGameplayReleaseForSale,
 } from "@/application/gameplay/gameplay-release-service";
-import { createSaleRecord } from "@/application/pdv/pdv-service";
+import { cancelSaleRecord, createSaleRecord } from "@/application/pdv/pdv-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
@@ -260,6 +263,117 @@ export async function endPaidOpenServiceSessionAction(
       data: {
         saleId: saleResult.saleId,
       },
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function pauseServiceSessionAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+
+  try {
+    const stationId = String(formData.get("stationId") ?? "");
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const result = await pauseManualGameplayStation({
+      stationId,
+      actorId: session.user.id,
+      operator: getOperatorName(session.user),
+    });
+
+    revalidatePath("/admin/services");
+    revalidatePath("/admin/pdv");
+
+    return {
+      status: "success",
+      message: result.message,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function resumeServiceSessionAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+
+  try {
+    const stationId = String(formData.get("stationId") ?? "");
+    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const result = await resumeManualGameplayStation({
+      stationId,
+      actorId: session.user.id,
+      operator: getOperatorName(session.user),
+    });
+
+    revalidatePath("/admin/services");
+    revalidatePath("/admin/pdv");
+
+    return {
+      status: "success",
+      message: result.message,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function cancelServiceSessionAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+
+  try {
+    const stationId = String(formData.get("stationId") ?? "");
+    const cancelReason = String(formData.get("cancelReason") ?? "").trim();
+    const session = await requirePermission(PERMISSIONS.PDV_CANCEL);
+    const result = await cancelManualGameplayStation({
+      stationId,
+      reason: cancelReason,
+      actorId: session.user.id,
+      operator: getOperatorName(session.user),
+    });
+
+    let saleCancelMessage = "";
+    if (result.saleId) {
+      const saleCancelFormData = new FormData();
+      saleCancelFormData.set("saleId", result.saleId);
+      saleCancelFormData.set("cancelReason", cancelReason);
+      saleCancelFormData.set("refundStatus", String(formData.get("refundStatus") ?? "PENDING"));
+      saleCancelFormData.set("refundMethod", String(formData.get("refundMethod") ?? ""));
+      saleCancelFormData.set("refundAmount", String(formData.get("refundAmount") ?? ""));
+      saleCancelFormData.set("refundNsu", String(formData.get("refundNsu") ?? ""));
+      saleCancelFormData.set("refundAuthorizationCode", String(formData.get("refundAuthorizationCode") ?? ""));
+      saleCancelFormData.set("refundTerminalId", String(formData.get("refundTerminalId") ?? ""));
+      saleCancelFormData.set("refundExternalTransactionId", String(formData.get("refundExternalTransactionId") ?? ""));
+      saleCancelFormData.set("refundReceiptText", String(formData.get("refundReceiptText") ?? ""));
+
+      const saleCancelResult = await cancelSaleRecord(saleCancelFormData, session.user.id);
+      saleCancelMessage = saleCancelResult.message;
+    }
+
+    revalidatePath("/admin/services");
+    revalidatePath("/admin/pdv");
+    revalidatePath("/admin/reports");
+
+    return {
+      status: "success",
+      message: [result.message, saleCancelMessage].filter(Boolean).join(" "),
     };
   } catch (error) {
     return {
