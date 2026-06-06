@@ -26,6 +26,9 @@ export async function listCashSessions() {
       },
       movements: true,
       sales: {
+        where: {
+          status: SaleStatus.COMPLETED,
+        },
         select: {
           id: true,
           totalAmount: true,
@@ -64,6 +67,9 @@ export async function listOpenCashSessions() {
       },
       movements: true,
       sales: {
+        where: {
+          status: SaleStatus.COMPLETED,
+        },
         select: {
           id: true,
           status: true,
@@ -100,6 +106,9 @@ export async function getCashSessionForClosing(cashSessionId: string) {
       },
       movements: true,
       sales: {
+        where: {
+          status: SaleStatus.COMPLETED,
+        },
         select: {
           id: true,
           status: true,
@@ -187,6 +196,9 @@ export async function openCashSession(data: {
         },
         movements: true,
         sales: {
+          where: {
+            status: SaleStatus.COMPLETED,
+          },
           select: {
             id: true,
             status: true,

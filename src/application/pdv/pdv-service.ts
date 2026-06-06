@@ -44,6 +44,7 @@ import {
   listPdvOpenSessions,
   listPdvProductOptions,
   listRecentSales,
+  listSalesHistory,
   resolveGameplayStationIdsForSelections,
   updateSaleCancellationFiscalData,
 } from "@/infrastructure/db/repositories/sale-repository";
@@ -362,6 +363,25 @@ export async function getPdvData() {
       operatorsResult.issue,
     ].filter(Boolean) as string[],
   };
+}
+
+export async function getSalesHistoryData(input: {
+  query?: string;
+  status?: string;
+}) {
+  const normalizedStatus = String(input.status ?? "").trim().toUpperCase();
+  const status =
+    normalizedStatus === SaleStatus.COMPLETED
+      ? SaleStatus.COMPLETED
+      : normalizedStatus === SaleStatus.CANCELLED
+        ? SaleStatus.CANCELLED
+        : undefined;
+
+  return listSalesHistory({
+    query: input.query,
+    status,
+    limit: 300,
+  });
 }
 
 export async function updatePdvHappyHourRecord(input: FormData, actor: { id: string; name?: string | null }) {

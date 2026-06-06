@@ -1,14 +1,14 @@
 "use client";
 
-import { CircleX } from "lucide-react";
-import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { CircleX, X } from "lucide-react";
+import type { FormEvent, ReactNode } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import { PaymentMethod, RefundStatus } from "@prisma/client";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +18,14 @@ import { cancelSaleRequest } from "@/presentation/admin/pdv/actions";
 type CancelSaleFormProps = {
   saleId: string;
   totalAmount: number;
+  defaultRefundMethod?: PaymentMethod | null;
 };
+
+declare global {
+  interface Window {
+    __PDV_MODAL_OPEN__?: boolean;
+  }
+}
 
 const refundStatusLabels: Record<RefundStatus, string> = {
   CONFIRMED: "Estorno confirmado",
@@ -34,11 +41,91 @@ const refundMethodLabels: Record<PaymentMethod, string> = {
   DEBIT_CARD: "Cartao de debito",
 };
 
-export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
+function setPdvModalOpen(isOpen: boolean) {
+  window.__PDV_MODAL_OPEN__ = isOpen;
+}
+
+function reloadPage() {
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 100);
+}
+
+function CancelSaleModal({
+  open,
+  titleId,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  titleId: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) {
+      setPdvModalOpen(false);
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    setPdvModalOpen(true);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      setPdvModalOpen(false);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] grid place-items-center px-4 py-6">
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-xs" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 grid max-h-[calc(100vh-3rem)] w-full max-w-[min(560px,95vw)] gap-0 overflow-hidden rounded-xl border border-border/80 bg-card text-sm ring-1 ring-foreground/10"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4">
+          <div className="space-y-1.5 pr-6">
+            <h2 id={titleId} className="text-base font-medium leading-none text-foreground">
+              Cancelar venda
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Registre motivo e estorno. O historico da venda fica salvo.
+            </p>
+          </div>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </Button>
+        </div>
+        <div className="admin-scrollbar overflow-y-auto">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+export function CancelSaleForm({ saleId, totalAmount, defaultRefundMethod }: CancelSaleFormProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ActionState>(initialActionState);
   const [isPending, startTransition] = useTransition();
   const suggestedRefundAmount = totalAmount.toFixed(2);
+  const titleId = `cancel-sale-title-${saleId}`;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,22 +139,23 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
 
       if (result.status === "success") {
         setOpen(false);
+        reloadPage();
       }
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button type="button" variant="outline" size="icon-sm" className="text-destructive hover:text-destructive" />}>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        className="text-destructive hover:text-destructive"
+        onClick={() => setOpen(true)}
+      >
         <CircleX className="h-4 w-4" />
-      </DialogTrigger>
-      <DialogContent className="max-w-[min(560px,95vw)] gap-0 border-border/80 bg-card p-0 sm:max-w-[min(560px,95vw)]">
-        <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
-          <DialogTitle>Cancelar venda</DialogTitle>
-          <DialogDescription>
-            Registre o motivo, o estorno e os dados de conferencia. A venda sera cancelada sem apagar o historico.
-          </DialogDescription>
-        </DialogHeader>
+      </Button>
+      <CancelSaleModal open={open} titleId={titleId} onClose={() => setOpen(false)}>
         <form onSubmit={handleSubmit} className="space-y-3 p-5">
           <input type="hidden" name="saleId" value={saleId} />
 
@@ -88,7 +176,7 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
               <select
                 id={`refund-status-${saleId}`}
                 name="refundStatus"
-                defaultValue={RefundStatus.PENDING}
+                defaultValue={RefundStatus.CONFIRMED}
                 className="h-10 w-full rounded-xl border border-input/80 bg-card/85 px-3 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-ring focus:ring-4 focus:ring-ring/20"
               >
                 {Object.values(RefundStatus).map((status) => (
@@ -103,7 +191,7 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
               <select
                 id={`refund-method-${saleId}`}
                 name="refundMethod"
-                defaultValue=""
+                defaultValue={defaultRefundMethod ?? ""}
                 className="h-10 w-full rounded-xl border border-input/80 bg-card/85 px-3 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-ring focus:ring-4 focus:ring-ring/20"
               >
                 <option value="">Nao informado</option>
@@ -158,7 +246,7 @@ export function CancelSaleForm({ saleId, totalAmount }: CancelSaleFormProps) {
           </Button>
           <ActionFeedback state={state} />
         </form>
-      </DialogContent>
-    </Dialog>
+      </CancelSaleModal>
+    </>
   );
 }

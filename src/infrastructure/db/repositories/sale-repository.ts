@@ -467,6 +467,9 @@ export async function listPdvOpenSessions() {
       },
       movements: true,
       sales: {
+        where: {
+          status: SaleStatus.COMPLETED,
+        },
         select: {
           id: true,
           status: true,
@@ -489,37 +492,67 @@ export async function listPdvOpenSessions() {
   });
 }
 
-export async function listRecentSales() {
-  const recentSalesLimit = 30;
-
-  return prisma.sale.findMany({
-    include: {
-      operator: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      cashSession: {
-        include: {
-          cashRegister: true,
-        },
-      },
-      items: {
-        select: {
-          id: true,
-          quantity: true,
-        },
-      },
-      payments: true,
-      gameplayRelease: true,
-      cancellation: true,
+const saleHistoryInclude = {
+  operator: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
     },
+  },
+  cashSession: {
+    include: {
+      cashRegister: true,
+    },
+  },
+  items: {
+    select: {
+      id: true,
+      quantity: true,
+    },
+  },
+  payments: true,
+  gameplayRelease: true,
+  cancellation: true,
+} satisfies Prisma.SaleInclude;
+
+export async function listRecentSales(limit = 5) {
+  return prisma.sale.findMany({
+    include: saleHistoryInclude,
     orderBy: {
       createdAt: "desc",
     },
-    take: recentSalesLimit,
+    take: Math.max(1, Math.min(limit, 30)),
+  });
+}
+
+export async function listSalesHistory(input: {
+  query?: string;
+  status?: SaleStatus;
+  limit?: number;
+}) {
+  const query = input.query?.trim();
+  const where: Prisma.SaleWhereInput = {
+    ...(input.status ? { status: input.status } : {}),
+    ...(query
+      ? {
+          OR: [
+            { saleNumber: { contains: query, mode: "insensitive" } },
+            { customerName: { contains: query, mode: "insensitive" } },
+            { fiscalAccessKey: { contains: query, mode: "insensitive" } },
+            { fiscalReference: { contains: query, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  return prisma.sale.findMany({
+    where,
+    include: saleHistoryInclude,
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: Math.max(1, Math.min(input.limit ?? 300, 500)),
   });
 }
 
