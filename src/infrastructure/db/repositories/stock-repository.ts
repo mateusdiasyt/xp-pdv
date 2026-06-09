@@ -157,6 +157,55 @@ export async function listStockInvoiceXmls() {
   });
 }
 
+export type ListStockInvoiceXmlFilesFilters = {
+  startDate: Date;
+  endDate: Date;
+  take?: number;
+};
+
+export async function findStockInvoiceXmlFileById(stockInvoiceXmlId: string) {
+  return prisma.stockInvoiceXml.findUnique({
+    where: {
+      id: stockInvoiceXmlId,
+    },
+    select: {
+      id: true,
+      accessKey: true,
+      invoiceNumber: true,
+      invoiceSeries: true,
+      supplierName: true,
+      createdAt: true,
+      sourceFileName: true,
+      rawXml: true,
+    },
+  });
+}
+
+export async function listStockInvoiceXmlFiles(filters: ListStockInvoiceXmlFilesFilters) {
+  return prisma.stockInvoiceXml.findMany({
+    where: {
+      createdAt: {
+        gte: filters.startDate,
+        lte: filters.endDate,
+      },
+    },
+    select: {
+      id: true,
+      accessKey: true,
+      invoiceNumber: true,
+      invoiceSeries: true,
+      supplierName: true,
+      createdAt: true,
+      sourceFileName: true,
+      rawXml: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    take: filters.take ?? 500,
+  });
+}
+
 type CreateStockInvoiceXmlInput = {
   accessKey: string;
   invoiceNumber?: string;

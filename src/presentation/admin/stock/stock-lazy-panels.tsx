@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { FileText, History, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { Archive, Download, FileText, History, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,11 @@ type LoadState = {
   message?: string;
 };
 
+type XmlExportState = {
+  status: "idle" | "loading" | "error";
+  message?: string;
+};
+
 const movementFilterOptions = [
   { label: "Todos os tipos", value: "all" },
   { label: "Entradas", value: "IN" },
@@ -125,6 +130,13 @@ function formatDate(value: string | null, mode: "date" | "dateTime" = "dateTime"
   return mode === "date" ? dateOnlyFormatter.format(date) : dateFormatter.format(date);
 }
 
+function extractDownloadFileName(headers: Headers, fallback: string) {
+  const disposition = headers.get("content-disposition");
+  const match = disposition?.match(/filename="([^"]+)"/i);
+
+  return match?.[1] || fallback;
+}
+
 async function fetchPanel<TPayload>(panel: Panel, params?: URLSearchParams) {
   const query = new URLSearchParams(params);
   query.set("panel", panel);
@@ -148,6 +160,11 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [logData, setLogData] = useState<StockLogPayload | null>(null);
   const [xmlData, setXmlData] = useState<StockXmlPayload | null>(null);
+  const [xmlExportState, setXmlExportState] = useState<XmlExportState>({ status: "idle" });
+  const [xmlExportFilters, setXmlExportFilters] = useState({
+    startDate: "",
+    endDate: "",
+  });
   const [logFilters, setLogFilters] = useState({
     q: "",
     categoryId: "all",
@@ -173,6 +190,7 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
         params.set("movementType", logFilters.movementType);
         setLogData(await fetchPanel<StockLogPayload>("log", params));
       } else {
+        setXmlExportState({ status: "idle" });
         setXmlData(await fetchPanel<StockXmlPayload>("xml"));
       }
 
@@ -216,6 +234,43 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
 
   function goToReview(xmlId: string) {
     window.location.assign(toTenantAdminHref(`/admin/stock/xml/${xmlId}`, workspaceSlug));
+  }
+
+  async function handleXmlExportSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setXmlExportState({ status: "loading" });
+
+    try {
+      const params = new URLSearchParams({
+        startDate: xmlExportFilters.startDate,
+        endDate: xmlExportFilters.endDate,
+      });
+      const response = await fetch(`/api/admin/stock/xml/export?${params.toString()}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Nao foi possivel exportar os XMLs.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = extractDownloadFileName(response.headers, "xml-estoque.zip");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setXmlExportState({ status: "idle" });
+    } catch (error) {
+      setXmlExportState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel exportar os XMLs.",
+      });
+    }
   }
 
   return (
@@ -384,6 +439,55 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
 
               {loadState.status === "success" && openPanel === "xml" && xmlData ? (
                 <div className="space-y-3">
+                  {!xmlData.setupPending && xmlData.entries.length > 0 ? (
+                    <form
+                      onSubmit={handleXmlExportSubmit}
+                      className="grid gap-3 rounded-2xl border border-border/75 bg-card/55 p-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Exportar XMLs em ZIP</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Filtra pela data em que o XML foi salvo no sistema.
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">Data inicial</span>
+                        <Input
+                          type="date"
+                          value={xmlExportFilters.startDate}
+                          onChange={(event) =>
+                            setXmlExportFilters((current) => ({ ...current, startDate: event.target.value }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground">Data final</span>
+                        <Input
+                          type="date"
+                          value={xmlExportFilters.endDate}
+                          onChange={(event) =>
+                            setXmlExportFilters((current) => ({ ...current, endDate: event.target.value }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col justify-end gap-2">
+                        <Button type="submit" className="gap-2" disabled={xmlExportState.status === "loading"}>
+                          {xmlExportState.status === "loading" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Archive className="h-4 w-4" />
+                          )}
+                          {xmlExportState.status === "loading" ? "Exportando..." : "Exportar ZIP"}
+                        </Button>
+                        {xmlExportState.status === "error" ? (
+                          <p className="text-xs text-destructive">{xmlExportState.message}</p>
+                        ) : null}
+                      </div>
+                    </form>
+                  ) : null}
+
                   {xmlData.setupPending ? (
                     <p className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-4 text-sm text-amber-200">
                       Tabela de XML pendente no banco.
@@ -420,11 +524,20 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
                             <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pendente</Badge>
                           )}
                         </div>
-                        {canManage && !xmlEntry.importedAt ? (
-                          <Button type="button" onClick={() => goToReview(xmlEntry.id)}>
-                            Conferir entrada
-                          </Button>
-                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            className={stockActionButtonClass}
+                            href={`/api/admin/stock/xml/${xmlEntry.id}/download`}
+                          >
+                            <Download className="h-4 w-4" />
+                            Baixar XML
+                          </a>
+                          {canManage && !xmlEntry.importedAt ? (
+                            <Button type="button" onClick={() => goToReview(xmlEntry.id)}>
+                              Conferir entrada
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
 
                       {xmlEntry.previewError ? (

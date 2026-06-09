@@ -11,9 +11,11 @@ import { listProductOptions } from "@/infrastructure/db/repositories/product-rep
 import {
   createStockInvoiceXmlRecord,
   findStockInvoiceXmlById,
+  findStockInvoiceXmlFileById,
   importReviewedStockInvoiceItems,
   importStockInvoiceItems,
   isMissingStockInvoiceXmlTableError,
+  listStockInvoiceXmlFiles,
   listStockInvoiceReviewProducts,
   listStockInvoiceXmls,
   listStockMovements,
@@ -25,6 +27,7 @@ import { listCategoryOptions } from "@/infrastructure/db/repositories/category-r
 
 const MAX_XML_FILE_SIZE_BYTES = 2_000_000;
 const FOCUS_NFE_RECEIVED_BASE_URL = "https://api.focusnfe.com.br";
+const STOCK_XML_EXPORT_LIMIT = 500;
 
 type ParsedStockInvoiceItem = {
   lineNumber: number;
@@ -917,6 +920,27 @@ export async function getStockInvoiceXmlHistory() {
 
     throw error;
   }
+}
+
+export async function getStockInvoiceXmlFile(stockInvoiceXmlId: string) {
+  const xmlRecord = await findStockInvoiceXmlFileById(stockInvoiceXmlId);
+  if (!xmlRecord) {
+    throw new Error("XML nao encontrado.");
+  }
+
+  return xmlRecord;
+}
+
+export async function getStockInvoiceXmlFilesForExport(input: { startDate: Date; endDate: Date }) {
+  if (input.startDate.getTime() > input.endDate.getTime()) {
+    throw new Error("A data inicial precisa ser menor ou igual a data final.");
+  }
+
+  return listStockInvoiceXmlFiles({
+    startDate: input.startDate,
+    endDate: input.endDate,
+    take: STOCK_XML_EXPORT_LIMIT,
+  });
 }
 
 export async function getStockInvoiceXmlReview(stockInvoiceXmlId: string) {
