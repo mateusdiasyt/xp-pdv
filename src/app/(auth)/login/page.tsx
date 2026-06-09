@@ -1,12 +1,10 @@
-import type { CSSProperties, ComponentType } from "react";
+import type { CSSProperties, ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  BadgeCheck,
   Banknote,
   BarChart3,
   Boxes,
-  ChevronRight,
   Clock3,
   FileCheck2,
   Gamepad2,
@@ -30,8 +28,7 @@ import {
 import { buildTenantAdminPath } from "@/application/platform/platform-service";
 import { BrandLogo } from "@/components/admin/brand-logo";
 import { LoginForm } from "@/components/admin/login-form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LandingRegisterModal } from "@/components/platform/landing-register-modal";
 import { getServerAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -41,90 +38,307 @@ type FeatureItem = {
   description: string;
 };
 
+type ModuleItem = FeatureItem & {
+  highlight: string;
+  preview: ReactNode;
+};
+
 type StepItem = {
   title: string;
   description: string;
 };
 
-const modules: FeatureItem[] = [
-  {
-    icon: ReceiptText,
-    title: "PDV rapido e comandas",
-    description: "Venda direta, comanda avulsa, cupom, multiplos pagamentos e comprovante pronto para impressora termica.",
-  },
+const conversionPoints: FeatureItem[] = [
   {
     icon: Banknote,
-    title: "Caixa de verdade",
-    description: "Abertura, operador, suprimento, sangria, fechamento e relatorio resumido para conferir o dia.",
+    title: "Caixa sem divergência",
+    description: "Venda, pagamento, sangria, suprimento e fechamento no mesmo fluxo.",
   },
   {
     icon: Boxes,
-    title: "Estoque e XML",
-    description: "Entrada por XML, produto fracionado, perda, receitas, baixa automatica e log para saber o que mudou.",
+    title: "Estoque que acompanha a venda",
+    description: "XML, produto fracionado, perdas e baixa automática deixam menos sobra fantasma.",
   },
   {
     icon: FileCheck2,
-    title: "Fiscal sem gambiarra",
-    description: "NFC-e, XML, DANFE, configuracao Focus NFe por cliente e ambiente de homologacao ou producao.",
+    title: "Fiscal dentro do PDV",
+    description: "Focus NFe configurada por cliente, com XML, DANFE e ambiente fiscal.",
   },
   {
     icon: Gamepad2,
-    title: "Servicos por tempo",
-    description: "PS5, simulador, sinuca ou qualquer servico por minuto, com tempo livre, pausa, cancelamento e cobranca.",
-  },
-  {
-    icon: BarChart3,
-    title: "Relatorios claros",
-    description: "Vendas, lucro, caixa, Pix, dinheiro, credito, debito, itens vendidos e envio do resumo pelo WhatsApp.",
+    title: "Serviço por tempo",
+    description: "Smart TVs, PS5, simulador e sinuca cobrados por tempo, sem controle paralelo.",
   },
 ];
 
 const reasons: FeatureItem[] = [
   {
     icon: Layers3,
-    title: "Nao e um PDV generico",
-    description: "Ele junta bar, estoque, fiscal, comandas e servicos por tempo no mesmo fluxo operacional.",
+    title: "Não é um PDV genérico",
+    description: "Ele junta bar, estoque, fiscal, comandas e serviços por tempo no mesmo fluxo operacional.",
   },
   {
     icon: ShieldCheck,
     title: "Conta isolada por cliente",
-    description: "Cada cliente aprovado pode operar com dados, produtos, vendas e configuracoes fiscais separados.",
+    description: "Cada cliente aprovado opera com dados, produtos, vendas e configurações fiscais separados.",
   },
   {
     icon: Sparkles,
-    title: "Menos tela, mais acao",
-    description: "A interface mostra a etapa certa na hora certa, reduzindo bagunca visual no caixa.",
+    title: "Menos tela, mais ação",
+    description: "A interface mostra a etapa certa na hora certa, reduzindo bagunça visual no caixa.",
   },
 ];
 
 const steps: StepItem[] = [
   {
     title: "Crie a conta",
-    description: "O cadastro entra para aprovacao e prepara a base do cliente com ambiente separado.",
+    description: "O cadastro entra para aprovação e prepara um ambiente próprio para o cliente.",
   },
   {
-    title: "Configure a operacao",
-    description: "Cadastre produtos, categorias, estoque, fiscal, formas de pagamento e servicos por tempo.",
+    title: "Configure a operação",
+    description: "Cadastre produtos, categorias, estoque, fiscal, formas de pagamento e serviços por tempo.",
   },
   {
     title: "Venda e acompanhe",
-    description: "Abra o caixa, venda, imprima tickets, controle estornos e veja relatorios sem planilha paralela.",
+    description: "Abra o caixa, venda, imprima tickets, controle estornos e veja relatórios sem planilha paralela.",
   },
 ];
 
-const conversionPoints = [
-  "Reduz erro de caixa porque venda, pagamento e fechamento ficam conectados.",
-  "Ajuda a evitar estoque fantasma com entrada por XML, perdas e baixa automatica.",
-  "Economiza tempo no fiscal com XML, DANFE e configuracao Focus NFe dentro do sistema.",
-  "Vende servico por tempo sem depender de controle manual fora do PDV.",
+const faq = [
+  {
+    question: "Preciso contratar a Focus NFe por fora?",
+    answer:
+      "Sim. O XP PDV integra com a API da Focus NFe, e cada cliente informa os próprios tokens, CNPJ, ambiente e dados fiscais dentro do sistema.",
+  },
+  {
+    question: "Funciona para bar com comanda e produto fracionado?",
+    answer:
+      "Funciona. Você vende por comanda, venda rápida, dose, chopp por mililitro, perda de estoque e baixa automática quando usa receita.",
+  },
+  {
+    question: "Dá para cobrar videogame por tempo?",
+    answer:
+      "Sim. O módulo de Smart TV controla tempo de PS5, simulador, sinuca ou qualquer serviço por minuto, com cobrança, pausa e cancelamento.",
+  },
+  {
+    question: "Consigo importar XML de compra?",
+    answer:
+      "Sim. O módulo de XML permite salvar o arquivo, revisar os itens e dar entrada no estoque com conferência.",
+  },
+  {
+    question: "O sistema imprime em térmica?",
+    answer:
+      "Sim. O fluxo foi pensado para ticket de retirada, comprovante operacional e relatório resumido em impressora térmica.",
+  },
+  {
+    question: "Cada cliente fica separado?",
+    answer:
+      "Sim. Cada conta aprovada pode ter dados, produtos, vendas, estoque e configuração fiscal isolados dos outros clientes.",
+  },
+];
+
+function MiniCommandPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="grid grid-cols-3 gap-2">
+        {["#12", "#13", "#14"].map((table, index) => (
+          <div
+            key={table}
+            className={cn(
+              "rounded-xl border p-3 text-sm font-black",
+              index === 0
+                ? "border-primary/35 bg-primary/12 text-white"
+                : "border-white/10 bg-white/[0.035] text-white/52"
+            )}
+          >
+            {table}
+            <span className="mt-4 block text-[0.62rem] font-bold uppercase tracking-[0.16em] text-white/36">
+              {index === 0 ? "Aberta" : "Livre"}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs text-white/58">
+        <div className="flex justify-between gap-3">
+          <span>Chopp Pilsen</span>
+          <strong className="text-white">R$ 12,00</strong>
+        </div>
+        <div className="mt-2 flex justify-between gap-3">
+          <span>Batata</span>
+          <strong className="text-white">R$ 37,00</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniCashPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          ["Dinheiro", "R$ 239,00"],
+          ["Pix", "R$ 178,00"],
+          ["Cartão", "R$ 454,50"],
+          ["Final", "R$ 439,00"],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+            <p className="text-[0.58rem] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+            <p className="mt-2 text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[0.68rem] font-bold text-white/62">
+        <span className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2 py-1">Suprimento</span>
+        <span className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-2 py-1">Sangria</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniXmlPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/40">XMLs</span>
+        <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[0.62rem] font-black text-primary">
+          Prévia
+        </span>
+      </div>
+      {[
+        ["Grupo Irani", "6 itens"],
+        ["Atacado S.A.", "14 itens"],
+        ["República Bebidas", "3 itens"],
+      ].map(([supplier, items]) => (
+        <div key={supplier} className="flex items-center justify-between border-t border-white/8 py-2 text-xs">
+          <span className="font-bold text-white">{supplier}</span>
+          <span className="text-white/42">{items}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniFiscalPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
+        <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-emerald-200">Autorizada</p>
+        <p className="mt-2 text-lg font-black text-white">NFC-e #298</p>
+        <p className="mt-1 text-xs text-white/52">Produção • Focus NFe</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black">
+        <span className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-white/70">DANFE</span>
+        <span className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-white/70">XML salvo</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniTvPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="rounded-xl border border-primary/35 bg-primary/12 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-white">TV 02 • Simulador</p>
+            <p className="mt-1 text-xs text-white/54">Tempo livre pago</p>
+          </div>
+          <span className="rounded-full bg-emerald-300 px-2 py-1 text-[0.58rem] font-black uppercase text-black">
+            Em uso
+          </span>
+        </div>
+        <p className="mt-4 text-2xl font-black text-white">35 min</p>
+        <div className="mt-3 h-2 rounded-full bg-white/12">
+          <div className="h-full w-3/5 rounded-full bg-emerald-300" />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs text-white/58">
+        <span>Arredonda 5 em 5</span>
+        <strong className="text-white">R$ 17,50</strong>
+      </div>
+    </div>
+  );
+}
+
+function MiniReportPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div>
+          <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/40">Relatório</p>
+          <p className="mt-1 text-lg font-black text-white">R$ 671,50</p>
+        </div>
+        <MessageCircle className="h-5 w-5 text-primary" />
+      </div>
+      {[
+        ["Pix", "R$ 178,00"],
+        ["Débito", "R$ 400,50"],
+        ["Saldo caixa", "R$ 239,00"],
+      ].map(([label, value]) => (
+        <div key={label} className="flex justify-between border-b border-white/8 py-2 text-xs">
+          <span className="text-white/50">{label}</span>
+          <strong className="text-white">{value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const modules: ModuleItem[] = [
+  {
+    icon: ReceiptText,
+    title: "PDV rápido e comandas",
+    highlight: "Venda limpa, com cupom e múltiplos pagamentos.",
+    description:
+      "Venda direta, comanda avulsa, comprovante, cancelamento e histórico sem precisar recarregar a página.",
+    preview: <MiniCommandPreview />,
+  },
+  {
+    icon: Banknote,
+    title: "Caixa operacional",
+    highlight: "Abertura, operador e fechamento do dia.",
+    description: "Controle dinheiro real do caixa, suprimento, sangria, estorno e relatório de fechamento.",
+    preview: <MiniCashPreview />,
+  },
+  {
+    icon: Boxes,
+    title: "Estoque e XML",
+    highlight: "Entrada por XML com conferência.",
+    description: "Salve XMLs de compra, revise os itens, dê entrada no estoque e registre perdas quando precisar.",
+    preview: <MiniXmlPreview />,
+  },
+  {
+    icon: FileCheck2,
+    title: "NFe e NFC-e com Focus NFe",
+    highlight: "API fiscal integrada no sistema.",
+    description:
+      "Configure tokens, CNPJ, homologação e produção direto no PDV, sem depender de variável por cliente.",
+    preview: <MiniFiscalPreview />,
+  },
+  {
+    icon: Gamepad2,
+    title: "App TV para Smart TVs",
+    highlight: "Cobrança por tempo para qualquer videogame.",
+    description:
+      "Controle PS5, simulador, sinuca ou serviço por minuto, com tempo livre, pausa, cancelamento e cobrança.",
+    preview: <MiniTvPreview />,
+  },
+  {
+    icon: BarChart3,
+    title: "Relatórios claros",
+    highlight: "Resumo de vendas, caixa e pagamentos.",
+    description: "Veja dinheiro, Pix, crédito, débito, lucro, itens vendidos e envie o resumo pelo WhatsApp.",
+    preview: <MiniReportPreview />,
+  },
 ];
 
 function ProductScene() {
   return (
     <div aria-hidden className="absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(112deg,#11090d_0%,#160b10_42%,#351209_100%)]" />
-      <div className="absolute left-1/2 top-24 hidden h-[620px] w-[1100px] -translate-x-[18%] rounded-[2rem] border border-white/10 bg-black/35 shadow-[0_80px_180px_-95px_rgba(255,0,92,0.85)] backdrop-blur-sm lg:block" />
-      <div className="absolute right-[-120px] top-28 hidden w-[760px] rotate-[-2deg] rounded-[1.25rem] border border-white/10 bg-[#111111]/95 p-4 shadow-[0_44px_140px_-70px_rgba(0,0,0,0.95)] lg:block">
+      <div className="absolute left-1/2 top-24 hidden h-[560px] w-[980px] -translate-x-[8%] rounded-[2rem] border border-white/10 bg-black/35 shadow-[0_80px_180px_-95px_rgba(255,0,92,0.85)] backdrop-blur-sm lg:block" />
+      <div className="absolute right-[-160px] top-28 hidden w-[690px] rotate-[-2deg] rounded-[1.25rem] border border-white/10 bg-[#111111]/95 p-4 shadow-[0_44px_140px_-70px_rgba(0,0,0,0.95)] xl:right-[-80px] xl:w-[740px] lg:block">
         <div className="mb-4 flex items-center justify-between border-b border-white/8 pb-3">
           <div>
             <p className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-primary">Painel operacional</p>
@@ -156,8 +370,8 @@ function ProductScene() {
             <div className="space-y-2">
               {[
                 ["Pix", "72%"],
-                ["Debito", "54%"],
-                ["Credito", "38%"],
+                ["Débito", "54%"],
+                ["Crédito", "38%"],
                 ["Dinheiro", "24%"],
               ].map(([label, width]) => (
                 <div key={label} className="grid grid-cols-[70px,1fr] items-center gap-2 text-xs text-white/65">
@@ -170,23 +384,13 @@ function ProductScene() {
             </div>
           </div>
           <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
-            <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Servico ativo</p>
-            <p className="mt-3 text-lg font-black text-white">TV 02 - Simulador</p>
+            <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Serviço ativo</p>
+            <p className="mt-3 text-lg font-black text-white">TV 02 • Simulador</p>
             <p className="mt-1 text-sm text-white/55">Tempo livre pago</p>
             <div className="mt-4 h-2 rounded-full bg-white/10">
               <div className="h-full w-3/5 rounded-full bg-emerald-300" />
             </div>
           </div>
-        </div>
-      </div>
-      <div className="absolute bottom-8 left-8 hidden w-[320px] rounded-[1rem] border border-white/10 bg-white/[0.06] p-4 shadow-[0_34px_120px_-80px_rgba(0,0,0,0.9)] backdrop-blur-md 2xl:block">
-        <p className="text-[0.65rem] font-black uppercase tracking-[0.2em] text-white/45">Ticket termico</p>
-        <p className="mt-3 text-3xl font-black text-white">#A7K2P</p>
-        <div className="my-3 h-px bg-white/20" />
-        <div className="space-y-2 text-sm text-white/65">
-          <div className="flex justify-between"><span>Chopp Pilsen</span><strong className="text-white">R$ 12,00</strong></div>
-          <div className="flex justify-between"><span>PS5 - 30 min</span><strong className="text-white">R$ 25,00</strong></div>
-          <div className="flex justify-between"><span>Pix</span><strong className="text-white">OK</strong></div>
         </div>
       </div>
     </div>
@@ -204,6 +408,36 @@ function FeatureCard({ item, className }: { item: FeatureItem; className?: strin
       <h3 className="text-lg font-black text-white">{item.title}</h3>
       <p className="mt-2 text-sm leading-6 text-white/58">{item.description}</p>
     </div>
+  );
+}
+
+function ModuleCard({ item }: { item: ModuleItem }) {
+  const Icon = item.icon;
+
+  return (
+    <div className="grid min-h-full gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition-colors hover:border-primary/28 hover:bg-white/[0.05]">
+      <div>
+        <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <h3 className="text-xl font-black text-white">{item.title}</h3>
+        <p className="mt-2 text-sm font-bold text-primary">{item.highlight}</p>
+        <p className="mt-3 text-sm leading-6 text-white/58">{item.description}</p>
+      </div>
+      {item.preview}
+    </div>
+  );
+}
+
+function LandingButton({ label, className }: { label: string; className?: string }) {
+  return (
+    <LandingRegisterModal
+      label={label}
+      className={cn(
+        "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-28px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-[0_24px_70px_-30px_hsl(var(--primary))]",
+        className
+      )}
+    />
   );
 }
 
@@ -226,8 +460,8 @@ export default async function LoginPage() {
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
             <a href="#produto" className="transition-colors hover:text-white">Produto</a>
-            <a href="#modulos" className="transition-colors hover:text-white">Modulos</a>
-            <a href="#funciona" className="transition-colors hover:text-white">Como funciona</a>
+            <a href="#modulos" className="transition-colors hover:text-white">Módulos</a>
+            <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
             <a href="#entrar" className="transition-colors hover:text-white">Login</a>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -237,44 +471,40 @@ export default async function LoginPage() {
             >
               Login
             </a>
-            <Link
-              href="/register"
-              className="inline-flex h-8 items-center justify-center rounded-xl border border-primary bg-primary px-2.5 text-[0.72rem] font-semibold text-primary-foreground shadow-[0_14px_34px_-22px_hsl(var(--primary))] transition-colors hover:bg-primary/92 sm:h-9 sm:px-3 sm:text-sm"
-            >
-              <span className="sm:hidden">Criar</span>
-              <span className="hidden sm:inline">Cadastrar</span>
-            </Link>
+            <LandingRegisterModal
+              label="Cadastrar"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-primary bg-primary px-2.5 text-[0.72rem] font-semibold text-primary-foreground shadow-[0_14px_34px_-22px_hsl(var(--primary))] transition-colors hover:bg-primary/92 sm:h-9 sm:px-3 sm:text-sm"
+            />
           </div>
         </div>
       </header>
 
-      <section id="produto" className="relative flex min-h-[88svh] items-center overflow-hidden px-4 pb-16 pt-32">
+      <section id="produto" className="relative flex min-h-[82svh] items-center overflow-hidden px-4 pb-16 pt-32">
         <ProductScene />
         <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <div className="max-w-[22rem] sm:max-w-3xl">
+          <div className="max-w-[22rem] sm:max-w-2xl">
             <div className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-primary">
               XP PDV
             </div>
-            <h1 className="mt-6 max-w-[21rem] text-[2.75rem] font-black leading-[0.98] tracking-tight text-white sm:max-w-3xl sm:text-5xl md:text-7xl">
-              XP PDV para operacao que nao pode travar.
+            <h1 className="mt-6 max-w-[21rem] text-[2.75rem] font-black leading-[0.98] tracking-tight text-white sm:max-w-2xl sm:text-5xl md:text-6xl xl:text-7xl">
+              O PDV completo para operações que não podem travar.
             </h1>
-            <p className="mt-6 max-w-[22rem] text-base leading-7 text-white/68 sm:max-w-2xl md:text-xl md:leading-8">
-              Um PDV completo para bares, restaurantes, lojas e operacoes com servico por tempo: venda, caixa,
-              estoque, fiscal, relatorios, comandas, cupons e app de TV no mesmo sistema.
+            <p className="mt-6 max-w-[22rem] text-base leading-7 text-white/70 sm:max-w-2xl md:text-xl md:leading-8">
+              Venda, caixa, estoque, fiscal, relatórios, comandas, cupons e app de controle de tempo para Smart TVs no mesmo sistema.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button render={<Link href="/register" />} size="lg" className="gap-2 shadow-[0_18px_52px_-26px_hsl(var(--primary))]">
-                Criar conta
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button render={<a href="#entrar" />} variant="outline" size="lg" className="border-white/15 bg-white/5 text-white hover:bg-white/10">
+              <LandingButton label="Criar conta" />
+              <a
+                href="#entrar"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-black text-white transition-colors hover:bg-white/10"
+              >
                 Entrar no painel
-              </Button>
+              </a>
             </div>
-            <div className="mt-8 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em] text-white/44">
+            <div className="mt-8 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em] text-white/48">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Banco isolado por cliente</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">NFC-e e XML</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Caixa e relatorio</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Focus NFe integrada</span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">XML de compra</span>
             </div>
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.055] p-4 shadow-[0_28px_90px_-64px_rgba(0,0,0,0.95)] md:hidden">
               <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
@@ -290,7 +520,7 @@ export default async function LoginPage() {
                 {[
                   ["Vendido", "R$ 2.840,50"],
                   ["Pix", "R$ 920,00"],
-                  ["Servico", "TV 02"],
+                  ["Serviço", "TV 02"],
                   ["Ticket", "R$ 37,86"],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-white/10 bg-black/22 p-3">
@@ -304,34 +534,76 @@ export default async function LoginPage() {
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-white/[0.025] px-4 py-5">
-        <div className="mx-auto grid max-w-7xl gap-3 text-sm text-white/58 sm:grid-cols-2 lg:grid-cols-4">
-          {conversionPoints.map((point) => (
-            <div key={point} className="flex gap-3">
-              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span>{point}</span>
-            </div>
-          ))}
+      <section className="border-y border-white/10 bg-white/[0.025] px-4 py-8">
+        <div className="mx-auto grid max-w-7xl justify-items-center gap-3 sm:grid-cols-2 sm:justify-items-stretch lg:grid-cols-4">
+          {conversionPoints.map((point) => {
+            const Icon = point.icon;
+
+            return (
+              <div key={point.title} className="w-full max-w-[22rem] rounded-2xl border border-white/10 bg-black/24 p-4 sm:max-w-none">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-black text-white">{point.title}</h2>
+                    <p className="mt-1 break-words text-sm leading-6 text-white/58">{point.description}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <section id="modulos" className="px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-2xl">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Sistema inteiro conectado</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Módulos do PDV</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Tudo que o caixa precisa, sem abrir cinco ferramentas.
+              Uma operação real, mostrada em cards reais.
             </h2>
-            <p className="mt-4 text-base leading-7 text-white/58">
-              O XP PDV foi pensado para operacao real: vender rapido, controlar dinheiro, emitir fiscal,
-              acompanhar estoque e entender o resultado no fim do turno.
+            <p className="mt-4 text-base leading-7 text-white/60">
+              Cada módulo resolve uma parte do caixa: venda, estoque, fiscal, controle de tempo, relatório e conferência.
             </p>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {modules.map((item) => (
-              <FeatureCard key={item.title} item={item} />
+              <ModuleCard key={item.title} item={item} />
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-20">
+        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-3">
+          {[
+            {
+              icon: Tv,
+              title: "App de tempo para Smart TVs",
+              text: "Controle PS5, simulador, sinuca ou qualquer videogame por tempo, com cobrança por minuto e bloqueio pela TV.",
+            },
+            {
+              icon: FileCheck2,
+              title: "Módulo fiscal Focus NFe",
+              text: "API integrada para emissão fiscal, com ambiente de homologação ou produção configurado pelo próprio cliente.",
+            },
+            {
+              icon: Boxes,
+              title: "XML de compra",
+              text: "Entrada, conferência e salvamento do XML para transformar compra em estoque sem digitar item por item.",
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div key={item.title} className="rounded-3xl border border-primary/25 bg-primary/10 p-6">
+                <Icon className="h-7 w-7 text-primary" />
+                <h3 className="mt-5 text-2xl font-black text-white">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/66">{item.text}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -340,16 +612,12 @@ export default async function LoginPage() {
           <div className="rounded-3xl border border-primary/25 bg-primary/10 p-6 md:p-8">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Por que escolher</p>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Melhor para quem precisa operar, nao apenas registrar venda.
+              Melhor para quem precisa operar, não apenas registrar venda.
             </h2>
-            <p className="mt-5 text-base leading-7 text-white/62">
-              Um PDV comum anota pedidos. O XP PDV fecha o ciclo: vende, baixa estoque, controla caixa,
-              imprime ticket, registra fiscal, acompanha servicos e mostra o resultado.
+            <p className="mt-5 text-base leading-7 text-white/64">
+              Um PDV comum anota pedidos. O XP PDV fecha o ciclo: vende, baixa estoque, controla caixa, imprime ticket, registra fiscal, acompanha serviços e mostra o resultado.
             </p>
-            <Button render={<Link href="/register" />} className="mt-7 gap-2">
-              Comecar cadastro
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <LandingButton label="Começar cadastro" className="mt-7" />
           </div>
           <div className="grid gap-4">
             {reasons.map((item) => (
@@ -388,9 +656,9 @@ export default async function LoginPage() {
           <div className="grid gap-4 lg:grid-cols-4">
             {[
               { icon: Store, label: "Bares e lanchonetes", value: "Comanda, chopp, dose e ticket" },
-              { icon: Tv, label: "Games e servicos", value: "TV, PS5, simulador e tempo livre" },
-              { icon: WalletCards, label: "Pagamento", value: "Pix, dinheiro, credito e debito" },
-              { icon: MessageCircle, label: "Gestao", value: "Relatorio para WhatsApp" },
+              { icon: Tv, label: "Games e serviços", value: "TV, PS5, simulador e tempo livre" },
+              { icon: WalletCards, label: "Pagamento", value: "Pix, dinheiro, crédito e débito" },
+              { icon: MessageCircle, label: "Gestão", value: "Relatório para WhatsApp" },
             ].map((item) => {
               const Icon = item.icon;
 
@@ -406,19 +674,61 @@ export default async function LoginPage() {
         </div>
       </section>
 
+      <section id="faq" className="px-4 pb-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">FAQ</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
+              Perguntas antes de começar.
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            {faq.map((item) => (
+              <div key={item.question} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <h3 className="text-lg font-black text-white">{item.question}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/60">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-20">
+        <div className="mx-auto max-w-7xl rounded-3xl border border-primary/25 bg-[linear-gradient(135deg,rgba(255,0,92,0.16),rgba(255,255,255,0.035)_42%,rgba(0,0,0,0.24))] p-6 md:p-10">
+          <div className="max-w-4xl">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Próximo passo</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-6xl">
+              Crie sua conta agora e veja o XP PDV rodando na sua operação.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-white/64">
+              O cadastro abre um pedido de acesso. Depois da aprovação, você configura produtos, fiscal, caixa, usuários e módulos sem misturar seus dados com outros clientes.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <LandingButton label="Criar conta agora" />
+              <a
+                href="#entrar"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-black text-white transition-colors hover:bg-white/10"
+              >
+                Já sou cliente
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="entrar" className="px-4 pb-24">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-start">
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6 md:p-8">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Proximo passo</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Acesso do cliente</p>
             <h2 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-white md:text-5xl">
-              Crie a conta agora e coloque sua operacao dentro de um PDV mais inteligente.
+              Entre no painel quando sua conta estiver aprovada.
             </h2>
             <div className="mt-8 grid gap-3 md:grid-cols-2">
               {[
-                [LockKeyhole, "Acesso protegido por usuario e permissoes."],
+                [LockKeyhole, "Acesso protegido por usuário e permissões."],
                 [MonitorSmartphone, "Painel web e app TV para controle de tempo."],
                 [TicketPercent, "Cupons por produto, categoria ou venda inteira."],
-                [Clock3, "Turno operacional, caixa e relatorio do dia."],
+                [Clock3, "Turno operacional, caixa e relatório do dia."],
               ].map(([Icon, text]) => {
                 const TypedIcon = Icon as ComponentType<{ className?: string }>;
 
@@ -432,24 +742,23 @@ export default async function LoginPage() {
             </div>
           </div>
 
-          <Card className="border-white/10 bg-white/[0.055] text-white shadow-[0_32px_110px_-70px_rgba(0,0,0,0.95)]">
-            <CardHeader className="space-y-3">
-              <BrandLogo priority className="mx-auto h-14 w-48" />
-              <CardTitle className="text-2xl text-white">Entrar no painel</CardTitle>
-              <CardDescription className="text-white/55">
-                Ja e cliente? Acesse seu ambiente. Se ainda nao tem conta, faca o cadastro e aguarde aprovacao.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-6 text-white shadow-[0_32px_110px_-70px_rgba(0,0,0,0.95)]">
+            <BrandLogo priority className="mx-auto h-14 w-48" />
+            <h2 className="mt-6 text-2xl font-black text-white">Entrar no painel</h2>
+            <p className="mt-2 text-sm leading-6 text-white/55">
+              Já é cliente? Acesse seu ambiente com email, senha e link do cliente.
+            </p>
+            <div className="mt-5 space-y-5 [&_label]:text-white/72 [&_input]:border-white/12 [&_input]:bg-black/28 [&_input]:text-white [&_input]:placeholder:text-white/28 [&_p]:text-white/45">
               <LoginForm />
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/58">
-                Ainda nao tem acesso?{" "}
-                <Link href="/register" className="font-bold text-primary transition-colors hover:text-primary/80">
-                  Cadastrar nova conta
-                </Link>
+                Ainda não tem acesso?{" "}
+                <LandingRegisterModal
+                  label="Cadastrar nova conta"
+                  className="font-bold text-primary transition-colors hover:text-primary/80"
+                />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </section>
     </main>
