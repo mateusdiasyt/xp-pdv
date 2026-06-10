@@ -5,14 +5,10 @@ import {
   Banknote,
   BarChart3,
   Boxes,
-  Clock3,
   FileCheck2,
   Gamepad2,
-  LockKeyhole,
   MessageCircle,
-  MonitorSmartphone,
   ReceiptText,
-  TicketPercent,
 } from "lucide-react";
 
 import {
@@ -612,31 +608,7 @@ export default async function LoginPage() {
       </section>
 
       <section id="entrar" className="px-4 pb-24">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-start">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6 md:p-8">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Acesso do cliente</p>
-            <h2 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-white md:text-5xl">
-              Entre no painel quando sua conta estiver aprovada.
-            </h2>
-            <div className="mt-8 grid gap-3 md:grid-cols-2">
-              {[
-                [LockKeyhole, "Acesso protegido por usuário e permissões."],
-                [MonitorSmartphone, "Painel web e app TV para controle de tempo."],
-                [TicketPercent, "Cupons por produto, categoria ou venda inteira."],
-                [Clock3, "Turno operacional, caixa e relatório do dia."],
-              ].map(([Icon, text]) => {
-                const TypedIcon = Icon as ComponentType<{ className?: string }>;
-
-                return (
-                  <div key={text as string} className="flex gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <TypedIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                    <p className="text-sm leading-6 text-white/62">{text as string}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
+        <div className="mx-auto max-w-[430px]">
           <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-6 text-white shadow-[0_32px_110px_-70px_rgba(0,0,0,0.95)]">
             <BrandLogo priority className="mx-auto h-14 w-48" />
             <h2 className="mt-6 text-2xl font-black text-white">Entrar no painel</h2>
