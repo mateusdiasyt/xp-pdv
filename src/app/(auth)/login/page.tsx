@@ -32,12 +32,19 @@ type FeatureItem = {
 type ModuleItem = FeatureItem & {
   highlight: string;
   tooltip: string;
+  premium?: boolean;
   preview: ReactNode;
 };
 
 type StepItem = {
   title: string;
   description: string;
+};
+
+type PricingPlan = {
+  title: string;
+  idealFor: string;
+  prices: Array<[string, string]>;
 };
 
 const conversionPoints: FeatureItem[] = [
@@ -108,6 +115,30 @@ const faq = [
     question: "Cada cliente fica separado?",
     answer:
       "Sim. Cada conta aprovada pode ter dados, produtos, vendas, estoque e configuração fiscal isolados dos outros clientes.",
+  },
+];
+
+const pricingPlans: PricingPlan[] = [
+  {
+    title: "Plano Ouro",
+    idealFor: "Ideal para pequenos comércios, lanchonetes, conveniências e bares.",
+    prices: [
+      ["1 mês", "R$ 99,90"],
+      ["3 meses", "R$ 269,90"],
+      ["6 meses", "R$ 499,90"],
+      ["12 meses", "R$ 899,90"],
+    ],
+  },
+  {
+    title: "Plano Platina",
+    idealFor:
+      "Ideal para empresas que precisam de recursos avançados, múltiplos usuários, relatórios completos, integrações e suporte prioritário.",
+    prices: [
+      ["1 mês", "R$ 149,90"],
+      ["3 meses", "R$ 399,90"],
+      ["6 meses", "R$ 749,90"],
+      ["12 meses", "R$ 1.349,90"],
+    ],
   },
 ];
 
@@ -316,6 +347,7 @@ const modules: ModuleItem[] = [
       "Configure tokens, CNPJ, homologação e produção direto no PDV, sem depender de variável por cliente.",
     tooltip:
       "Cada cliente informa seus próprios dados da Focus NFe no painel. Dá para usar homologação para testes e produção quando a emissão fiscal estiver pronta.",
+    premium: true,
     preview: <MiniFiscalPreview />,
   },
   {
@@ -326,6 +358,7 @@ const modules: ModuleItem[] = [
       "Controle PS5, simulador, sinuca ou serviço por minuto, com tempo livre, pausa, cancelamento e cobrança.",
     tooltip:
       "Funciona em TVs com Google TV/Android TV compatíveis. O app controla bloqueio, tempo liberado, atualização obrigatória e cobrança por minuto conforme o serviço cadastrado.",
+    premium: true,
     preview: <MiniTvPreview />,
   },
   {
@@ -336,6 +369,7 @@ const modules: ModuleItem[] = [
       "Defina um link exclusivo para acessar o PDV, conferir disponibilidade e deixar o ambiente com cara da sua operação.",
     tooltip:
       "O cliente escolhe um endereço único para acessar o painel. O sistema verifica se o link está disponível e aplica no ambiente, sem misturar com outros PDVs.",
+    premium: true,
     preview: <MiniLinkPreview />,
   },
   {
@@ -423,8 +457,20 @@ function ModuleCard({ item }: { item: ModuleItem }) {
       className="group/module relative grid min-h-full gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 outline-none transition-all hover:z-20 hover:border-primary/28 hover:bg-white/[0.05] focus-visible:z-20 focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-primary/25"
     >
       <div>
-        <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em]",
+              item.premium
+                ? "border-amber-300/28 bg-amber-300/10 text-amber-100"
+                : "border-emerald-300/24 bg-emerald-300/10 text-emerald-200"
+            )}
+          >
+            {item.premium ? "Premium" : "Incluso"}
+          </span>
         </div>
         <h3 className="text-xl font-black text-white">{item.title}</h3>
         <p className="mt-2 text-sm font-bold text-primary">{item.highlight}</p>
@@ -470,6 +516,7 @@ export default async function LoginPage() {
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
             <a href="#produto" className="transition-colors hover:text-white">Produto</a>
             <a href="#modulos" className="transition-colors hover:text-white">Módulos</a>
+            <a href="#planos" className="transition-colors hover:text-white">Planos</a>
             <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
             <LandingLoginModal className="transition-colors hover:text-white">Login</LandingLoginModal>
           </nav>
@@ -578,6 +625,57 @@ export default async function LoginPage() {
             {modules.map((item) => (
               <ModuleCard key={item.title} item={item} />
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="planos" className="border-y border-white/10 bg-white/[0.025] px-4 py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-[0.82fr,1.18fr] lg:items-start">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Planos</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
+                Escolha o plano ideal para sua operação.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-white/60">
+                O plano padrão já inclui PDV, comandas, caixa, estoque, XML e relatórios. NFe, App TV e link personalizado são módulos premium.
+              </p>
+              <div className="mt-6 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-white/70">
+                <strong className="text-white">Premium:</strong> módulos extras podem ser liberados conforme a necessidade do cliente.
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {pricingPlans.map((plan) => (
+                <article
+                  key={plan.title}
+                  className="rounded-3xl border border-white/10 bg-black/24 p-5 shadow-[0_28px_90px_-70px_rgba(0,0,0,0.95)]"
+                >
+                  <div className="border-b border-white/10 pb-5">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Mendoza PDV</p>
+                    <h3 className="mt-2 text-2xl font-black text-white">{plan.title}</h3>
+                    <p className="mt-3 text-sm leading-6 text-white/58">{plan.idealFor}</p>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    {plan.prices.map(([period, price]) => (
+                      <div
+                        key={period}
+                        className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3"
+                      >
+                        <span className="text-sm font-bold text-white/64">{period}</span>
+                        <strong className="text-lg font-black text-white">{price}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <LandingRegisterModal
+                    label="Começar com este plano"
+                    className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-28px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-[0_24px_70px_-30px_hsl(var(--primary))]"
+                  />
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
