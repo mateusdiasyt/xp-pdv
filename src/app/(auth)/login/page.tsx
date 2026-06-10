@@ -413,7 +413,7 @@ export default async function LoginPage() {
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
         <div className="mx-auto flex h-14 w-[calc(100vw-1.5rem)] max-w-7xl min-w-0 items-center justify-start gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 shadow-[0_18px_70px_-48px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:h-16 sm:w-full sm:justify-between sm:px-4">
           <Link href="/login" className="flex min-w-0 shrink items-center gap-3">
-            <MendozaLogo className="h-8 w-[9.5rem] sm:h-10 sm:w-[11rem]" />
+            <MendozaLogo className="h-12 w-[4.9rem] sm:h-14 sm:w-[5.8rem]" />
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
             <a href="#produto" className="transition-colors hover:text-white">Produto</a>

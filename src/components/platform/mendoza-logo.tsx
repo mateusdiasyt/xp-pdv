@@ -7,42 +7,54 @@ type MendozaLogoProps = {
 export function MendozaLogo({ className }: MendozaLogoProps) {
   return (
     <svg
-      viewBox="0 0 360 86"
+      viewBox="0 0 512 390"
       role="img"
       aria-label="Mendoza PDV"
       className={cn("block h-auto w-full", className)}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect x="2" y="7" width="72" height="72" rx="18" fill="hsl(var(--primary))" />
-      <path d="M50 7h6c10 0 18 8 18 18v36c0 10-8 18-18 18H34L50 7Z" fill="#ff004f" opacity="0.45" />
-      <rect x="2.5" y="7.5" width="71" height="71" rx="17.5" fill="none" stroke="rgba(255,255,255,0.22)" />
+      <defs>
+        <linearGradient id="mendoza-logo-gradient" x1="92" y1="40" x2="430" y2="318" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#ff496a" />
+          <stop offset="1" stopColor="#ff174f" />
+        </linearGradient>
+      </defs>
+
       <path
-        d="M18 58V26h11.5L38 40.3 46.5 26H58v32H46.6V43.7L38 57.2 29.4 43.7V58H18Z"
-        fill="white"
+        d="M105 220v-73c0-59 48-107 107-107h61c-44 29-72 78-72 134v46h-96Z"
+        fill="url(#mendoza-logo-gradient)"
       />
-      <path d="M63 18h-9v-5h9v5ZM23 73h-9v-5h9v5Z" fill="rgba(255,255,255,0.74)" />
+      <path
+        d="M224 220v-73c0-59 48-107 107-107h28c47 0 88 22 114 57h-73c-38 0-68 30-68 68v55H224Z"
+        fill="url(#mendoza-logo-gradient)"
+      />
+      <rect x="354" y="97" width="88" height="123" rx="44" fill="url(#mendoza-logo-gradient)" />
       <text
-        x="92"
-        y="40"
-        fill="white"
-        fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
-        fontSize="28"
+        x="256"
+        y="293"
+        fill="url(#mendoza-logo-gradient)"
+        fontFamily="Arial Black, Montserrat, Inter, ui-sans-serif, system-ui, sans-serif"
+        fontSize="52"
         fontWeight="900"
-        letterSpacing="2.4"
+        letterSpacing="10"
+        textAnchor="middle"
       >
         MENDOZA
       </text>
+      <line x1="116" y1="342" x2="205" y2="342" stroke="url(#mendoza-logo-gradient)" strokeWidth="4" />
       <text
-        x="94"
-        y="64"
-        fill="hsl(var(--primary))"
-        fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
-        fontSize="18"
+        x="256"
+        y="354"
+        fill="url(#mendoza-logo-gradient)"
+        fontFamily="Arial Black, Montserrat, Inter, ui-sans-serif, system-ui, sans-serif"
+        fontSize="34"
         fontWeight="900"
-        letterSpacing="7"
+        letterSpacing="18"
+        textAnchor="middle"
       >
         PDV
       </text>
+      <line x1="307" y1="342" x2="396" y2="342" stroke="url(#mendoza-logo-gradient)" strokeWidth="4" />
     </svg>
   );
 }

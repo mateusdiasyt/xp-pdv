@@ -66,7 +66,7 @@ export function LandingLoginModal({ label = "Login", className, children }: Land
               >
                 <div className="mb-6 flex items-start justify-between gap-4 border-b border-white/10 pb-5">
                   <div>
-                    <MendozaLogo className="h-14 w-[13rem]" />
+                    <MendozaLogo className="h-28 w-40" />
                     <h2 id="landing-login-title" className="mt-5 text-2xl font-black text-white">
                       Entrar no painel
                     </h2>
