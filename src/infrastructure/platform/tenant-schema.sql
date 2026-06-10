@@ -716,7 +716,7 @@ CREATE TABLE "PdvConfiguration" (
 -- CreateTable
 CREATE TABLE "BrandCustomization" (
     "id" TEXT NOT NULL,
-    "browserTitle" TEXT NOT NULL DEFAULT 'PDV - XP Arcade e Bar',
+    "browserTitle" TEXT NOT NULL DEFAULT 'Mendoza PDV',
     "primaryColor" TEXT NOT NULL DEFAULT '#d4a62a',
     "accentColor" TEXT NOT NULL DEFAULT '#b9882a',
     "backgroundColor" TEXT NOT NULL DEFAULT '#0a0a0a',

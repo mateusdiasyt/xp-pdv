@@ -72,7 +72,7 @@ export function LandingRegisterModal({
                 <div className="mb-6 flex items-start justify-between gap-4 border-b border-white/10 pb-5">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                      Cadastro XP PDV
+                      Cadastro Mendoza PDV
                     </p>
                     <h2 id="landing-register-title" className="mt-2 text-2xl font-black text-white">
                       Crie sua conta

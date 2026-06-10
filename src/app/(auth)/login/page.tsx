@@ -16,9 +16,9 @@ import {
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
 import { buildTenantAdminPath } from "@/application/platform/platform-service";
-import { BrandLogo } from "@/components/admin/brand-logo";
 import { LoginForm } from "@/components/admin/login-form";
 import { LandingRegisterModal } from "@/components/platform/landing-register-modal";
+import { MendozaLogo } from "@/components/platform/mendoza-logo";
 import { getServerAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -80,7 +80,7 @@ const faq = [
   {
     question: "Preciso contratar a Focus NFe por fora?",
     answer:
-      "Sim. O XP PDV integra com a API da Focus NFe, e cada cliente informa os próprios tokens, CNPJ, ambiente e dados fiscais dentro do sistema.",
+      "Sim. O Mendoza PDV integra com a API da Focus NFe, e cada cliente informa os próprios tokens, CNPJ, ambiente e dados fiscais dentro do sistema.",
   },
   {
     question: "Funciona para bar com comanda e produto fracionado?",
@@ -413,7 +413,7 @@ export default async function LoginPage() {
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
         <div className="mx-auto flex h-14 w-[calc(100vw-1.5rem)] max-w-7xl min-w-0 items-center justify-start gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 shadow-[0_18px_70px_-48px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:h-16 sm:w-full sm:justify-between sm:px-4">
           <Link href="/login" className="flex min-w-0 shrink items-center gap-3">
-            <BrandLogo priority className="h-8 w-14 justify-start sm:h-9 sm:w-24" />
+            <MendozaLogo className="h-8 w-[9.5rem] sm:h-10 sm:w-[11rem]" />
             <span className="hidden text-xs font-black uppercase tracking-[0.18em] text-white/45 sm:inline">PDV SaaS</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
@@ -442,7 +442,7 @@ export default async function LoginPage() {
         <div className="relative z-10 mx-auto w-full max-w-7xl">
           <div className="max-w-[22rem] sm:max-w-2xl">
             <div className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-primary">
-              XP PDV
+              Mendoza PDV
             </div>
             <h1 className="mt-6 max-w-[21rem] text-[2.75rem] font-black leading-[0.98] tracking-tight text-white sm:max-w-2xl sm:text-5xl md:text-6xl xl:text-7xl">
               O PDV completo para operações que não podem travar.
@@ -589,7 +589,7 @@ export default async function LoginPage() {
           <div className="max-w-4xl">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Próximo passo</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-6xl">
-              Crie sua conta agora e veja o XP PDV rodando na sua operação.
+              Crie sua conta agora e veja o Mendoza PDV rodando na sua operação.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-white/64">
               O cadastro abre um pedido de acesso. Depois da aprovação, você configura produtos, fiscal, caixa, usuários e módulos sem misturar seus dados com outros clientes.
@@ -610,7 +610,7 @@ export default async function LoginPage() {
       <section id="entrar" className="px-4 pb-24">
         <div className="mx-auto max-w-[430px]">
           <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-6 text-white shadow-[0_32px_110px_-70px_rgba(0,0,0,0.95)]">
-            <BrandLogo priority className="mx-auto h-14 w-48" />
+            <MendozaLogo className="mx-auto h-16 w-[15rem]" />
             <h2 className="mt-6 text-2xl font-black text-white">Entrar no painel</h2>
             <p className="mt-2 text-sm leading-6 text-white/55">
               Já é cliente? Acesse seu ambiente com email, senha e link do cliente.

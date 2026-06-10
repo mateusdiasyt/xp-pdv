@@ -36,7 +36,7 @@ export function AdminHeader({
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border/50 bg-card/42 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[0_8px_24px_-22px_rgba(0,0,0,0.8)]">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            XP ERP
+            Mendoza PDV
           </div>
         </div>
 

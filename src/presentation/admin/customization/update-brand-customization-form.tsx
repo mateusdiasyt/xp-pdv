@@ -116,7 +116,7 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
   }
 
   function restoreDefaults() {
-    setBrowserTitle("PDV - XP Arcade e Bar");
+    setBrowserTitle("Mendoza PDV");
     setPrimaryColor(defaultBrandColors.primaryColor);
     setAccentColor(defaultBrandColors.accentColor);
     setBackgroundColor(defaultBrandColors.backgroundColor);
@@ -141,7 +141,7 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
           name="browserTitle"
           value={browserTitle}
           onChange={(event) => setBrowserTitle(event.target.value)}
-          placeholder="Ex.: XP Arcade & Bar | Sistema"
+          placeholder="Ex.: Mendoza PDV"
           maxLength={80}
         />
       </section>

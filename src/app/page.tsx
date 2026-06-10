@@ -19,7 +19,7 @@ export default async function HomePage() {
         <div className="grid w-full gap-6 lg:grid-cols-[1.1fr,0.9fr]">
           <div className="flex flex-col justify-center gap-5">
             <div className="inline-flex w-fit rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              XP PDV
+              Mendoza PDV
             </div>
             <div className="space-y-3">
               <h1 className="max-w-2xl text-4xl font-bold tracking-tight md:text-6xl">PDV, estoque e fiscal para operacao real.</h1>
@@ -52,7 +52,7 @@ export default async function HomePage() {
                 Configuracoes Focus NFe ficam no banco do proprio cliente.
               </div>
               <div className="rounded-xl border border-border/70 bg-background/55 p-3">
-                Seu bar continua preservado como cliente XP Arcade.
+                Seu bar atual continua preservado como cliente.
               </div>
             </CardContent>
           </Card>

@@ -20,7 +20,7 @@ const MAX_LOGO_DATA_URL_LENGTH = 700_000;
 const MAX_FAVICON_DATA_URL_LENGTH = 220_000;
 
 export const defaultBrandCustomization = {
-  browserTitle: "PDV - XP Arcade e Bar",
+  browserTitle: "Mendoza PDV",
   primaryColor: "#D4A62A",
   accentColor: "#B9882A",
   backgroundColor: "#0A0A0A",

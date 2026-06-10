@@ -18,7 +18,7 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
 });
 
-const browserTitleFallback = "PDV - XP Arcade e Bar";
+const browserTitleFallback = "Mendoza PDV";
 
 export const dynamic = "force-dynamic";
 
