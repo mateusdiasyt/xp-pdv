@@ -8,17 +8,11 @@ import {
   Clock3,
   FileCheck2,
   Gamepad2,
-  Layers3,
   LockKeyhole,
   MessageCircle,
   MonitorSmartphone,
   ReceiptText,
-  ShieldCheck,
-  Sparkles,
-  Store,
   TicketPercent,
-  Tv,
-  WalletCards,
 } from "lucide-react";
 
 import {
@@ -68,24 +62,6 @@ const conversionPoints: FeatureItem[] = [
     icon: Gamepad2,
     title: "Serviço por tempo",
     description: "Smart TVs, PS5, simulador e sinuca cobrados por tempo, sem controle paralelo.",
-  },
-];
-
-const reasons: FeatureItem[] = [
-  {
-    icon: Layers3,
-    title: "Não é um PDV genérico",
-    description: "Ele junta bar, estoque, fiscal, comandas e serviços por tempo no mesmo fluxo operacional.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Conta isolada por cliente",
-    description: "Cada cliente aprovado opera com dados, produtos, vendas e configurações fiscais separados.",
-  },
-  {
-    icon: Sparkles,
-    title: "Menos tela, mais ação",
-    description: "A interface mostra a etapa certa na hora certa, reduzindo bagunça visual no caixa.",
   },
 ];
 
@@ -397,20 +373,6 @@ function ProductScene() {
   );
 }
 
-function FeatureCard({ item, className }: { item: FeatureItem; className?: string }) {
-  const Icon = item.icon;
-
-  return (
-    <div className={cn("rounded-2xl border border-white/10 bg-white/[0.035] p-5", className)}>
-      <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-        <Icon className="h-5 w-5" />
-      </div>
-      <h3 className="text-lg font-black text-white">{item.title}</h3>
-      <p className="mt-2 text-sm leading-6 text-white/58">{item.description}</p>
-    </div>
-  );
-}
-
 function ModuleCard({ item }: { item: ModuleItem }) {
   const Icon = item.icon;
 
@@ -575,58 +537,6 @@ export default async function LoginPage() {
         </div>
       </section>
 
-      <section className="px-4 pb-20">
-        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-3">
-          {[
-            {
-              icon: Tv,
-              title: "App de tempo para Smart TVs",
-              text: "Controle PS5, simulador, sinuca ou qualquer videogame por tempo, com cobrança por minuto e bloqueio pela TV.",
-            },
-            {
-              icon: FileCheck2,
-              title: "Módulo fiscal Focus NFe",
-              text: "API integrada para emissão fiscal, com ambiente de homologação ou produção configurado pelo próprio cliente.",
-            },
-            {
-              icon: Boxes,
-              title: "XML de compra",
-              text: "Entrada, conferência e salvamento do XML para transformar compra em estoque sem digitar item por item.",
-            },
-          ].map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <div key={item.title} className="rounded-3xl border border-primary/25 bg-primary/10 p-6">
-                <Icon className="h-7 w-7 text-primary" />
-                <h3 className="mt-5 text-2xl font-black text-white">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-white/66">{item.text}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="px-4 pb-20">
-        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.95fr,1.05fr]">
-          <div className="rounded-3xl border border-primary/25 bg-primary/10 p-6 md:p-8">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Por que escolher</p>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Melhor para quem precisa operar, não apenas registrar venda.
-            </h2>
-            <p className="mt-5 text-base leading-7 text-white/64">
-              Um PDV comum anota pedidos. O XP PDV fecha o ciclo: vende, baixa estoque, controla caixa, imprime ticket, registra fiscal, acompanha serviços e mostra o resultado.
-            </p>
-            <LandingButton label="Começar cadastro" className="mt-7" />
-          </div>
-          <div className="grid gap-4">
-            {reasons.map((item) => (
-              <FeatureCard key={item.title} item={item} className="min-h-0" />
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section id="funciona" className="border-y border-white/10 bg-white/[0.025] px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-10 lg:grid-cols-[0.8fr,1.2fr] lg:items-end">
@@ -651,43 +561,28 @@ export default async function LoginPage() {
         </div>
       </section>
 
-      <section className="px-4 py-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-4 lg:grid-cols-4">
-            {[
-              { icon: Store, label: "Bares e lanchonetes", value: "Comanda, chopp, dose e ticket" },
-              { icon: Tv, label: "Games e serviços", value: "TV, PS5, simulador e tempo livre" },
-              { icon: WalletCards, label: "Pagamento", value: "Pix, dinheiro, crédito e débito" },
-              { icon: MessageCircle, label: "Gestão", value: "Relatório para WhatsApp" },
-            ].map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-                  <Icon className="h-5 w-5 text-primary" />
-                  <p className="mt-5 text-sm font-black uppercase tracking-[0.16em] text-white/42">{item.label}</p>
-                  <p className="mt-2 text-xl font-black text-white">{item.value}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       <section id="faq" className="px-4 pb-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="max-w-2xl">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">FAQ</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Perguntas antes de começar.
+              Perguntas frequentes
             </h2>
           </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="mt-10 rounded-3xl border border-white/10 bg-white/[0.035] p-3 shadow-[0_32px_110px_-78px_rgba(0,0,0,0.95)] sm:p-5">
             {faq.map((item) => (
-              <div key={item.question} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-                <h3 className="text-lg font-black text-white">{item.question}</h3>
-                <p className="mt-3 text-sm leading-6 text-white/60">{item.answer}</p>
-              </div>
+              <details key={item.question} className="group border-b border-white/10 last:border-b-0">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-3 py-5 text-left text-base font-black text-white transition-colors hover:text-primary sm:px-5 sm:text-lg [&::-webkit-details-marker]:hidden">
+                  <span>{item.question}</span>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-black/24 text-xl font-light text-white/72 transition-colors group-open:border-primary/30 group-open:text-primary">
+                    <span className="group-open:hidden">+</span>
+                    <span className="hidden group-open:block">-</span>
+                  </span>
+                </summary>
+                <p className="px-3 pb-5 text-left text-sm leading-6 text-white/60 sm:px-5">
+                  {item.answer}
+                </p>
+              </details>
             ))}
           </div>
         </div>
