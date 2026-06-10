@@ -2,7 +2,17 @@ import type { CSSProperties, ComponentType } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Banknote, Boxes, FileCheck2, Gamepad2 } from "lucide-react";
+import {
+  Banknote,
+  Boxes,
+  FileCheck2,
+  Gamepad2,
+  Gem,
+  Hexagon,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
 import {
   buildBrandThemeVariables,
@@ -30,7 +40,13 @@ type StepItem = {
 type PricingPlan = {
   title: string;
   idealFor: string;
-  prices: Array<[string, string]>;
+  accent: "gold" | "platinum";
+  icon: ComponentType<{ className?: string }>;
+  prices: Array<{
+    period: string;
+    price: string;
+    discount?: string;
+  }>;
 };
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://xp-pdv.vercel.app").replace(
@@ -160,22 +176,26 @@ const pricingPlans: PricingPlan[] = [
   {
     title: "Plano Ouro",
     idealFor: "Ideal para pequenos comércios, lanchonetes, conveniências e bares.",
+    accent: "gold",
+    icon: Hexagon,
     prices: [
-      ["1 mês", "R$ 99,90"],
-      ["3 meses", "R$ 269,90"],
-      ["6 meses", "R$ 499,90"],
-      ["12 meses", "R$ 899,90"],
+      { period: "1 mês", price: "R$ 99,90" },
+      { period: "3 meses", price: "R$ 269,90", discount: "-10%" },
+      { period: "6 meses", price: "R$ 499,90", discount: "-17%" },
+      { period: "12 meses", price: "R$ 899,90", discount: "-25%" },
     ],
   },
   {
     title: "Plano Platina",
     idealFor:
       "Ideal para empresas que precisam de recursos avançados, múltiplos usuários, relatórios completos, integrações e suporte prioritário.",
+    accent: "platinum",
+    icon: Gem,
     prices: [
-      ["1 mês", "R$ 149,90"],
-      ["3 meses", "R$ 399,90"],
-      ["6 meses", "R$ 749,90"],
-      ["12 meses", "R$ 1.349,90"],
+      { period: "1 mês", price: "R$ 149,90" },
+      { period: "3 meses", price: "R$ 399,90", discount: "-11%" },
+      { period: "6 meses", price: "R$ 749,90", discount: "-17%" },
+      { period: "12 meses", price: "R$ 1.349,90", discount: "-25%" },
     ],
   },
 ];
@@ -488,53 +508,99 @@ export default async function LoginPage() {
 
       <LandingModulesSection />
 
-      <section id="planos" className="border-y border-white/10 bg-white/[0.025] px-4 py-20">
+      <section
+        id="planos"
+        className="relative overflow-hidden border-y border-white/10 bg-[linear-gradient(180deg,#08090d_0%,#0d0f14_52%,#08090d_100%)] px-4 py-24"
+      >
         <div className="mx-auto max-w-7xl">
-          <div className="grid gap-8 lg:grid-cols-[0.82fr,1.18fr] lg:items-start">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Planos</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-                Escolha o plano ideal para sua operação.
-              </h2>
-              <p className="mt-4 max-w-xl text-base leading-7 text-white/60">
-                O plano Ouro reúne os módulos essenciais do PDV. O plano Platina adiciona fiscal Focus NFe, App TV e link personalizado.
-              </p>
-              <div className="mt-6 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-white/70">
-                <strong className="text-white">Platina:</strong> indicado para operações que precisam de módulos avançados e mais controle.
-              </div>
+          <div className="max-w-5xl">
+            <p className="text-xs font-black uppercase tracking-[0.26em] text-primary">Planos</p>
+            <h2 className="mt-4 text-4xl font-black leading-[0.98] tracking-tight text-white md:text-6xl">
+              Escolha o plano ideal para sua operação.
+            </h2>
+            <div className="mt-6 space-y-2 text-base leading-7 text-white/64 md:text-lg">
+              <p>O plano Ouro reúne os módulos essenciais do PDV.</p>
+              <p>O plano Platina adiciona fiscal Focus NFe, App TV e link personalizado.</p>
             </div>
+            <div className="mt-8 inline-flex max-w-3xl items-center gap-3 rounded-xl border border-white/10 bg-white/[0.055] px-5 py-4 text-sm leading-6 text-white/72 shadow-[0_24px_90px_-70px_rgba(0,0,0,0.95)] backdrop-blur">
+              <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+              <span>
+                <strong className="text-white">Platina:</strong> indicado para operações que precisam de módulos avançados e mais controle.
+              </span>
+            </div>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {pricingPlans.map((plan) => (
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            {pricingPlans.map((plan) => {
+              const Icon = plan.icon;
+              const isGold = plan.accent === "gold";
+
+              return (
                 <article
                   key={plan.title}
-                  className="rounded-3xl border border-white/10 bg-black/24 p-5 shadow-[0_28px_90px_-70px_rgba(0,0,0,0.95)]"
+                  className="rounded-3xl border border-white/10 bg-white/[0.045] p-6 shadow-[0_32px_120px_-86px_rgba(0,0,0,0.98)] transition-colors hover:border-white/18 sm:p-8"
                 >
-                  <div className="border-b border-white/10 pb-5">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Mendoza PDV</p>
-                    <h3 className="mt-2 text-2xl font-black text-white">{plan.title}</h3>
-                    <p className="mt-3 text-sm leading-6 text-white/58">{plan.idealFor}</p>
+                  <div className="flex items-center gap-5">
+                    <div
+                      className={cn(
+                        "grid h-16 w-16 shrink-0 place-items-center rounded-2xl border bg-white/[0.04]",
+                        isGold
+                          ? "border-[#e4bd37]/45 text-[#e4bd37] shadow-[0_18px_46px_-34px_rgba(228,189,55,0.9)]"
+                          : "border-white/18 text-white/82 shadow-[0_18px_46px_-34px_rgba(255,255,255,0.55)]"
+                      )}
+                    >
+                      <Icon className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">Mendoza PDV</p>
+                      <h3 className="mt-2 text-3xl font-black tracking-tight text-white">{plan.title}</h3>
+                    </div>
                   </div>
 
-                  <div className="mt-5 space-y-3">
-                    {plan.prices.map(([period, price]) => (
+                  <div className="my-7 h-px bg-white/10" />
+
+                  <p className="max-w-xl text-base leading-7 text-white/64">{plan.idealFor}</p>
+
+                  <div className="mt-8">
+                    {plan.prices.map((row) => (
                       <div
-                        key={period}
-                        className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3"
+                        key={row.period}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-white/10 py-4 last:border-b-0"
                       >
-                        <span className="text-sm font-bold text-white/64">{period}</span>
-                        <strong className="text-lg font-black text-white">{price}</strong>
+                        <span className="text-base font-medium text-white/62 md:text-lg">{row.period}</span>
+                        <div className="flex items-center justify-end gap-3">
+                          <strong className="text-xl font-black tracking-tight text-white md:text-2xl">{row.price}</strong>
+                          {row.discount ? (
+                            <span className="rounded-full border border-primary/18 bg-primary/10 px-2.5 py-1 text-sm font-black text-primary">
+                              {row.discount}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     ))}
                   </div>
 
                   <LandingRegisterModal
                     label="Começar com este plano"
-                    className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-28px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary/92 hover:shadow-[0_24px_70px_-30px_hsl(var(--primary))]"
+                    className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-primary/30 bg-[linear-gradient(135deg,#ff496c,#ff0059)] px-5 text-base font-black text-black shadow-[0_22px_66px_-42px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-[0_28px_90px_-44px_hsl(var(--primary))]"
                   />
+
+                  <div className="mt-6 flex items-center gap-2 text-sm font-medium text-white/48">
+                    <LockKeyhole className="h-4 w-4" />
+                    <span>Ativação rápida e segura.</span>
+                  </div>
                 </article>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-5 text-sm text-white/50">
+            <span className="inline-flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Ambiente 100% seguro
+            </span>
+            <span className="hidden h-5 w-px bg-white/14 sm:block" />
+            <span>Cancelamento fácil quando quiser</span>
           </div>
         </div>
       </section>
