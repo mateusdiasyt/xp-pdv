@@ -7,8 +7,10 @@ import {
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
 import { getAccountNotificationData } from "@/application/accounts/account-payable-service";
+import { getTenantCompanyOnboardingState } from "@/application/platform/platform-service";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { CompanyNameOnboardingModal } from "@/components/admin/company-name-onboarding-modal";
 import { FooterCredit } from "@/components/admin/footer-credit";
 import { getServerAuthSession } from "@/lib/auth";
 
@@ -44,6 +46,7 @@ export default async function AdminLayout({
   }
 
   const accountNotificationData = await getAccountNotificationData();
+  const companyOnboarding = await getTenantCompanyOnboardingState(user.tenantSlug);
   const accountNotifications = {
     count: accountNotificationData.count,
     overdueCount: accountNotificationData.overdueCount,
@@ -85,6 +88,9 @@ export default async function AdminLayout({
           </footer>
         </div>
       </div>
+      {companyOnboarding?.shouldConfirmCompanyName ? (
+        <CompanyNameOnboardingModal initialCompanyName={companyOnboarding.companyName} />
+      ) : null}
     </div>
   );
 }

@@ -849,12 +849,16 @@ model PlatformTenant {
   planStatus             String               @default("pending")
   ownerName              String
   ownerEmail             String
+  ownerDocument          String?
+  ownerWhatsapp          String?
   ownerPasswordHash      String?
   databaseName           String?              @unique
   databaseUrlEncrypted   String?
   isDefault              Boolean              @default(false)
   approvedAt             DateTime?
   suspendedAt            DateTime?
+  companyNameConfirmedAt DateTime?
+  customSlugUpdatedAt    DateTime?
   lastProvisioningError  String?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { ZodError } from "zod";
 
 import { registerPlatformTenant } from "@/application/platform/platform-service";
 
@@ -13,13 +14,28 @@ export async function registerTenantAction(
   _previousState: RegisterTenantState,
   formData: FormData,
 ): Promise<RegisterTenantState> {
+  let registered = false;
+
   try {
-    const tenant = await registerPlatformTenant(formData);
-    redirect(`/login?workspace=${tenant.slug}&registered=1`);
+    await registerPlatformTenant(formData);
+    registered = true;
   } catch (error) {
     return {
       status: "error",
-      message: error instanceof Error ? error.message : "Nao foi possivel criar a conta.",
+      message:
+        error instanceof ZodError
+          ? error.issues[0]?.message ?? "Dados invalidos."
+          : error instanceof Error
+            ? error.message
+            : "Nao foi possivel criar a conta.",
     };
   }
+
+  if (registered) {
+    redirect("/login?registered=1");
+  }
+
+  return {
+    status: "idle",
+  };
 }

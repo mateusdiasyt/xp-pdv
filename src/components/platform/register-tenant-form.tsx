@@ -19,29 +19,33 @@ export function RegisterTenantForm() {
     <form action={action} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="companyName">Nome da empresa</Label>
-          <Input id="companyName" name="companyName" placeholder="Bar do Joao" required />
-        </div>
-
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="slug">Link do cliente</Label>
-          <Input id="slug" name="slug" placeholder="bar-do-joao" required />
-          <p className="text-xs text-muted-foreground">Vai ficar assim: /app/bar-do-joao/admin</p>
+          <Label htmlFor="fullName">Nome completo</Label>
+          <Input id="fullName" name="fullName" placeholder="Joao Silva" autoComplete="name" required />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="ownerName">Responsavel</Label>
-          <Input id="ownerName" name="ownerName" placeholder="Joao" required />
+          <Label htmlFor="document">CPF ou CNPJ</Label>
+          <Input id="document" name="document" inputMode="numeric" placeholder="000.000.000-00" required />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="ownerEmail">Email</Label>
-          <Input id="ownerEmail" name="ownerEmail" type="email" placeholder="joao@email.com" required />
+          <Input id="ownerEmail" name="ownerEmail" type="email" placeholder="joao@email.com" autoComplete="email" required />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Senha</Label>
+          <Input id="password" name="password" type="password" minLength={8} autoComplete="new-password" required />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Repetir senha</Label>
+          <Input id="confirmPassword" name="confirmPassword" type="password" minLength={8} autoComplete="new-password" required />
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="password">Senha inicial</Label>
-          <Input id="password" name="password" type="password" minLength={8} required />
+          <Label htmlFor="whatsapp">Numero de WhatsApp</Label>
+          <Input id="whatsapp" name="whatsapp" inputMode="tel" placeholder="(11) 99999-9999" autoComplete="tel" required />
         </div>
       </div>
 

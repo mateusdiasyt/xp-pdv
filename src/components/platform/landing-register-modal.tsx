@@ -78,7 +78,7 @@ export function LandingRegisterModal({
                       Crie sua conta
                     </h2>
                     <p className="mt-2 max-w-xl text-sm leading-6 text-white/58">
-                      Envie os dados da operação. Depois da aprovação, seu ambiente fica isolado para começar a configurar produtos, caixa e fiscal.
+                      Envie seus dados. Depois da aprovacao, seu ambiente fica isolado para configurar produtos, caixa e fiscal.
                     </p>
                   </div>
                   <button

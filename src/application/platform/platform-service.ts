@@ -7,18 +7,34 @@ import { decryptSecretValue } from "@/lib/secret-crypto";
 import { getPlatformPrisma, getTenantPrismaClientBySlug } from "@/lib/prisma";
 
 const tenantRegistrationSchema = z.object({
-  companyName: z.string().trim().min(2, "Informe o nome da empresa").max(120),
-  slug: z
+  fullName: z.string().trim().min(2, "Informe seu nome completo").max(120),
+  document: z
     .string()
     .trim()
-    .min(2, "Informe o link do cliente")
-    .max(48)
-    .transform(normalizeTenantSlug)
-    .refine((value) => value.length >= 2, "Informe um link valido"),
-  ownerName: z.string().trim().min(2, "Informe seu nome").max(120),
+    .min(11, "Informe CPF ou CNPJ")
+    .max(24)
+    .transform((value) => onlyDigits(value))
+    .refine((value) => value.length === 11 || value.length === 14, "Informe um CPF ou CNPJ valido"),
   ownerEmail: z.string().trim().email("Informe um email valido").transform((value) => value.toLowerCase()),
+  whatsapp: z
+    .string()
+    .trim()
+    .min(10, "Informe o numero de WhatsApp")
+    .max(24)
+    .transform((value) => onlyDigits(value))
+    .refine((value) => value.length >= 10 && value.length <= 13, "Informe um WhatsApp valido"),
   password: z.string().min(8, "Use pelo menos 8 caracteres"),
+  confirmPassword: z.string().min(8, "Repita a senha"),
+}).refine((value) => value.password === value.confirmPassword, {
+  path: ["confirmPassword"],
+  message: "As senhas precisam ser iguais",
 });
+
+let platformTenantProfileColumnsPromise: Promise<void> | null = null;
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
 
 export function normalizeTenantSlug(value: string) {
   return value
@@ -30,6 +46,55 @@ export function normalizeTenantSlug(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+async function ensurePlatformTenantProfileColumns() {
+  if (!platformTenantProfileColumnsPromise) {
+    platformTenantProfileColumnsPromise = getPlatformPrisma()
+      .$executeRawUnsafe(`
+        ALTER TABLE "PlatformTenant"
+          ADD COLUMN IF NOT EXISTS "ownerDocument" TEXT,
+          ADD COLUMN IF NOT EXISTS "ownerWhatsapp" TEXT,
+          ADD COLUMN IF NOT EXISTS "companyNameConfirmedAt" TIMESTAMP(3),
+          ADD COLUMN IF NOT EXISTS "customSlugUpdatedAt" TIMESTAMP(3);
+      `)
+      .then(() => undefined)
+      .catch((error) => {
+        platformTenantProfileColumnsPromise = null;
+        throw error;
+      });
+  }
+
+  return platformTenantProfileColumnsPromise;
+}
+
+function buildTenantSlugBase(fullName: string, ownerEmail: string, document: string) {
+  const nameBase = normalizeTenantSlug(fullName);
+  const emailBase = normalizeTenantSlug(ownerEmail.split("@")[0] ?? "");
+  const documentSuffix = document.slice(-4);
+  const base = nameBase || emailBase || "cliente";
+
+  return `${base}${documentSuffix ? `-${documentSuffix}` : ""}`.slice(0, 48).replace(/-+$/g, "");
+}
+
+async function buildUniqueTenantSlug(base: string) {
+  const platformPrisma = getPlatformPrisma();
+  const normalizedBase = normalizeTenantSlug(base).slice(0, 48) || "cliente";
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+    const candidate = `${normalizedBase.slice(0, 48 - suffix.length)}${suffix}`;
+    const existing = await platformPrisma.platformTenant.findUnique({
+      where: { slug: candidate },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `${normalizedBase.slice(0, 39)}-${Date.now().toString(36)}`;
+}
+
 export function buildTenantAdminPath(slug: string, adminPath = "/admin") {
   const normalizedSlug = normalizeTenantSlug(slug);
   const normalizedPath = adminPath.startsWith("/admin") ? adminPath : `/admin${adminPath.startsWith("/") ? adminPath : `/${adminPath}`}`;
@@ -38,6 +103,7 @@ export function buildTenantAdminPath(slug: string, adminPath = "/admin") {
 }
 
 export async function listPlatformTenants() {
+  await ensurePlatformTenantProfileColumns();
   return getPlatformPrisma().platformTenant.findMany({
     orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     include: {
@@ -49,6 +115,7 @@ export async function listPlatformTenants() {
 }
 
 export async function getActiveTenantBySlug(slug: string) {
+  await ensurePlatformTenantProfileColumns();
   return getPlatformPrisma().platformTenant.findFirst({
     where: {
       slug: normalizeTenantSlug(slug),
@@ -63,6 +130,7 @@ export async function findLoginTenantByEmail(email: string) {
 }
 
 export async function findLoginTenantAccessByEmail(email: string) {
+  await ensurePlatformTenantProfileColumns();
   const normalizedEmail = email.trim().toLowerCase();
 
   const access = await getPlatformPrisma().platformTenantUser.findFirst({
@@ -82,6 +150,7 @@ export async function findLoginTenantAccessByEmail(email: string) {
 }
 
 export async function findLoginTenantAccessBySlug(slug: string, email: string) {
+  await ensurePlatformTenantProfileColumns();
   return getPlatformPrisma().platformTenantUser.findFirst({
     where: {
       email: email.trim().toLowerCase(),
@@ -102,6 +171,7 @@ export async function syncPlatformTenantUserAccess(data: {
   name: string;
   role?: string;
 }) {
+  await ensurePlatformTenantProfileColumns();
   const platformPrisma = getPlatformPrisma();
   const tenant = await platformPrisma.platformTenant.findUnique({
     where: { slug: normalizeTenantSlug(data.tenantSlug) },
@@ -153,39 +223,37 @@ export async function getTenantPrismaForLogin(slug: string) {
 }
 
 export async function registerPlatformTenant(input: FormData) {
+  await ensurePlatformTenantProfileColumns();
   const parsed = tenantRegistrationSchema.parse({
-    companyName: input.get("companyName"),
-    slug: input.get("slug"),
-    ownerName: input.get("ownerName"),
+    fullName: input.get("fullName"),
+    document: input.get("document"),
     ownerEmail: input.get("ownerEmail"),
+    whatsapp: input.get("whatsapp"),
     password: input.get("password"),
+    confirmPassword: input.get("confirmPassword"),
   });
 
   const platformPrisma = getPlatformPrisma();
   const passwordHash = await bcrypt.hash(parsed.password, 12);
-
-  const existing = await platformPrisma.platformTenant.findUnique({
-    where: { slug: parsed.slug },
-    select: { id: true },
-  });
-
-  if (existing) {
-    throw new Error("Esse link de cliente ja esta em uso.");
-  }
+  const tenantSlug = await buildUniqueTenantSlug(
+    buildTenantSlugBase(parsed.fullName, parsed.ownerEmail, parsed.document),
+  );
 
   const tenant = await platformPrisma.platformTenant.create({
     data: {
-      name: parsed.companyName,
-      slug: parsed.slug,
+      name: `Conta de ${parsed.fullName}`,
+      slug: tenantSlug,
       status: PlatformTenantStatus.PENDING,
       planStatus: "pending",
-      ownerName: parsed.ownerName,
+      ownerName: parsed.fullName,
       ownerEmail: parsed.ownerEmail,
+      ownerDocument: parsed.document,
+      ownerWhatsapp: parsed.whatsapp,
       ownerPasswordHash: passwordHash,
       users: {
         create: {
           email: parsed.ownerEmail,
-          name: parsed.ownerName,
+          name: parsed.fullName,
           role: "owner",
           isOwner: true,
           isPlatformAdmin: false,
@@ -198,6 +266,7 @@ export async function registerPlatformTenant(input: FormData) {
 }
 
 export async function approvePlatformTenant(tenantId: string) {
+  await ensurePlatformTenantProfileColumns();
   const platformPrisma = getPlatformPrisma();
   const tenant = await platformPrisma.platformTenant.findUnique({
     where: { id: tenantId },
@@ -251,6 +320,7 @@ export async function approvePlatformTenant(tenantId: string) {
 }
 
 export async function suspendPlatformTenant(tenantId: string) {
+  await ensurePlatformTenantProfileColumns();
   return getPlatformPrisma().platformTenant.update({
     where: { id: tenantId },
     data: {
@@ -259,4 +329,196 @@ export async function suspendPlatformTenant(tenantId: string) {
       suspendedAt: new Date(),
     },
   });
+}
+
+export async function getTenantCompanyOnboardingState(slug: string) {
+  await ensurePlatformTenantProfileColumns();
+  const tenant = await getPlatformPrisma().platformTenant.findFirst({
+    where: {
+      slug: normalizeTenantSlug(slug),
+      status: PlatformTenantStatus.ACTIVE,
+    },
+    select: {
+      name: true,
+      ownerDocument: true,
+      ownerWhatsapp: true,
+      companyNameConfirmedAt: true,
+    },
+  });
+
+  if (!tenant) {
+    return null;
+  }
+
+  return {
+    companyName: tenant.name,
+    shouldConfirmCompanyName:
+      !tenant.companyNameConfirmedAt && Boolean(tenant.ownerDocument || tenant.ownerWhatsapp),
+  };
+}
+
+export async function confirmTenantCompanyName(slug: string, companyName: string) {
+  await ensurePlatformTenantProfileColumns();
+  const parsed = z.string().trim().min(2, "Informe o nome da empresa").max(120).parse(companyName);
+  const platformPrisma = getPlatformPrisma();
+  const normalizedSlug = normalizeTenantSlug(slug);
+  const tenant = await platformPrisma.platformTenant.findUnique({
+    where: { slug: normalizedSlug },
+    select: { id: true, slug: true },
+  });
+
+  if (!tenant) {
+    throw new Error("Cliente nao encontrado.");
+  }
+
+  const updated = await platformPrisma.platformTenant.update({
+    where: { id: tenant.id },
+    data: {
+      name: parsed,
+      companyNameConfirmedAt: new Date(),
+    },
+    select: {
+      name: true,
+      slug: true,
+    },
+  });
+
+  try {
+    const tenantPrisma = await getTenantPrismaClientBySlug(tenant.slug);
+    await tenantPrisma.platformTenant.updateMany({
+      where: { id: tenant.id },
+      data: { name: parsed },
+    });
+  } catch {
+    // A confirmacao central ja foi salva; a copia local sera ajustada quando o banco do cliente estiver disponivel.
+  }
+
+  return updated;
+}
+
+export async function getTenantCustomLinkState(slug: string) {
+  await ensurePlatformTenantProfileColumns();
+  const tenant = await getPlatformPrisma().platformTenant.findUnique({
+    where: { slug: normalizeTenantSlug(slug) },
+    select: {
+      slug: true,
+      customSlugUpdatedAt: true,
+    },
+  });
+
+  if (!tenant) {
+    throw new Error("Cliente nao encontrado.");
+  }
+
+  return tenant;
+}
+
+export async function checkTenantSlugAvailability(currentSlug: string, nextSlug: string) {
+  await ensurePlatformTenantProfileColumns();
+  const normalizedCurrentSlug = normalizeTenantSlug(currentSlug);
+  const normalizedNextSlug = normalizeTenantSlug(nextSlug);
+
+  if (normalizedNextSlug.length < 2) {
+    return {
+      slug: normalizedNextSlug,
+      available: false,
+      message: "Digite pelo menos 2 caracteres.",
+    };
+  }
+
+  const platformPrisma = getPlatformPrisma();
+  const [currentTenant, existingTenant] = await Promise.all([
+    platformPrisma.platformTenant.findUnique({
+      where: { slug: normalizedCurrentSlug },
+      select: { id: true },
+    }),
+    platformPrisma.platformTenant.findUnique({
+      where: { slug: normalizedNextSlug },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!currentTenant) {
+    throw new Error("Cliente nao encontrado.");
+  }
+
+  if (existingTenant && existingTenant.id !== currentTenant.id) {
+    return {
+      slug: normalizedNextSlug,
+      available: false,
+      message: "Esse link ja esta em uso.",
+    };
+  }
+
+  return {
+    slug: normalizedNextSlug,
+    available: true,
+    message: "Link disponivel.",
+  };
+}
+
+export async function updateTenantCustomSlug(currentSlug: string, nextSlug: string) {
+  await ensurePlatformTenantProfileColumns();
+  const normalizedCurrentSlug = normalizeTenantSlug(currentSlug);
+  const normalizedNextSlug = normalizeTenantSlug(nextSlug);
+
+  if (normalizedNextSlug.length < 2 || normalizedNextSlug.length > 48) {
+    throw new Error("Informe um link valido.");
+  }
+
+  const platformPrisma = getPlatformPrisma();
+  const currentTenant = await platformPrisma.platformTenant.findUnique({
+    where: { slug: normalizedCurrentSlug },
+    select: {
+      id: true,
+      slug: true,
+      status: true,
+    },
+  });
+
+  if (!currentTenant) {
+    throw new Error("Cliente nao encontrado.");
+  }
+
+  if (currentTenant.status !== PlatformTenantStatus.ACTIVE) {
+    throw new Error("Cliente precisa estar ativo para alterar o link.");
+  }
+
+  const availability = await checkTenantSlugAvailability(currentTenant.slug, normalizedNextSlug);
+  if (!availability.available) {
+    throw new Error(availability.message);
+  }
+
+  if (currentTenant.slug === normalizedNextSlug) {
+    return {
+      slug: normalizedNextSlug,
+      changed: false,
+    };
+  }
+
+  const tenantPrisma = await getTenantPrismaClientBySlug(currentTenant.slug);
+  const updated = await platformPrisma.platformTenant.update({
+    where: { id: currentTenant.id },
+    data: {
+      slug: normalizedNextSlug,
+      customSlugUpdatedAt: new Date(),
+    },
+    select: {
+      slug: true,
+    },
+  });
+
+  try {
+    await tenantPrisma.platformTenant.updateMany({
+      where: { id: currentTenant.id },
+      data: { slug: normalizedNextSlug },
+    });
+  } catch {
+    // O login ja usa a tabela central; a copia local nao pode bloquear o link novo.
+  }
+
+  return {
+    slug: updated.slug,
+    changed: true,
+  };
 }

@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
 import {
+  checkTenantSlugAvailability,
+  updateTenantCustomSlug,
+} from "@/application/platform/platform-service";
+import {
   updateFiscalConfigurationRecord,
   updateFiscalEnvironmentRecord,
 } from "@/application/fiscal/fiscal-configuration-service";
@@ -78,5 +82,46 @@ export async function updateFiscalSettingsAction(formData: FormData): Promise<Ac
     };
   } catch (error) {
     return { status: "error", message: `${toActionErrorMessage(error)} Contate o Mateus.` };
+  }
+}
+
+export async function checkTenantCustomLinkAction(formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_MANAGE);
+    const requestedSlug = String(formData.get("slug") ?? "");
+    const result = await checkTenantSlugAvailability(session.user.tenantSlug, requestedSlug);
+
+    return {
+      status: result.available ? "success" : "error",
+      message: result.message,
+      data: {
+        slug: result.slug,
+        available: result.available,
+      },
+    };
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
+  }
+}
+
+export async function updateTenantCustomLinkAction(formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_MANAGE);
+    const requestedSlug = String(formData.get("slug") ?? "");
+    const result = await updateTenantCustomSlug(session.user.tenantSlug, requestedSlug);
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/customization");
+
+    return {
+      status: "success",
+      message: result.changed ? "Link personalizado aplicado." : "Esse link ja esta aplicado.",
+      data: {
+        slug: result.slug,
+        changed: result.changed,
+      },
+    };
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
   }
 }
