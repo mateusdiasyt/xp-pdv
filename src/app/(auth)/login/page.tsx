@@ -131,8 +131,21 @@ function ProductScene() {
   return (
     <div aria-hidden className="absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(112deg,#11090d_0%,#160b10_42%,#351209_100%)]" />
-      <div className="absolute left-1/2 top-24 hidden h-[560px] w-[980px] -translate-x-[8%] rounded-[2rem] border border-white/10 bg-black/35 shadow-[0_80px_180px_-95px_rgba(255,0,92,0.85)] backdrop-blur-sm lg:block" />
-      <div className="absolute right-[-160px] top-28 hidden w-[690px] rotate-[-2deg] rounded-[1.25rem] border border-white/10 bg-[#111111]/95 p-4 shadow-[0_44px_140px_-70px_rgba(0,0,0,0.95)] xl:right-[-80px] xl:w-[740px] lg:block">
+      <div
+        className="absolute top-24 hidden h-[560px] rounded-[2rem] border border-white/10 bg-black/35 shadow-[0_80px_180px_-95px_rgba(255,0,92,0.85)] backdrop-blur-sm xl:block"
+        style={{
+          right: "max(2rem, calc((100vw - 80rem) / 2 + 2rem))",
+          width: "min(50vw, 760px)",
+        }}
+      />
+      <div
+        data-testid="landing-hero-dashboard"
+        className="absolute top-28 hidden rotate-[-1.5deg] rounded-[1.25rem] border border-white/10 bg-[#111111]/95 p-4 shadow-[0_44px_140px_-70px_rgba(0,0,0,0.95)] xl:block"
+        style={{
+          right: "max(2rem, calc((100vw - 80rem) / 2))",
+          width: "min(38vw, 560px)",
+        }}
+      >
         <div className="mb-4 flex items-center justify-between border-b border-white/8 pb-3">
           <div>
             <p className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-primary">Painel operacional</p>
@@ -142,7 +155,7 @@ function ProductScene() {
             Caixa aberto
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
           {[
             ["Vendido", "R$ 2.840,50"],
             ["Pix", "R$ 920,00"],
@@ -155,7 +168,7 @@ function ProductScene() {
             </div>
           ))}
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1.15fr,0.85fr]">
+        <div className="mt-4 grid gap-3 2xl:grid-cols-[1.15fr,0.85fr]">
           <div className="rounded-xl border border-white/8 bg-white/[0.035] p-3">
             <div className="mb-3 flex items-center justify-between text-xs text-white/50">
               <span>Vendas por forma</span>
