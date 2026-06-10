@@ -16,7 +16,7 @@ import {
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
 import { buildTenantAdminPath } from "@/application/platform/platform-service";
-import { LoginForm } from "@/components/admin/login-form";
+import { LandingLoginModal } from "@/components/platform/landing-login-modal";
 import { LandingRegisterModal } from "@/components/platform/landing-register-modal";
 import { MendozaLogo } from "@/components/platform/mendoza-logo";
 import { getServerAuthSession } from "@/lib/auth";
@@ -414,21 +414,19 @@ export default async function LoginPage() {
         <div className="mx-auto flex h-14 w-[calc(100vw-1.5rem)] max-w-7xl min-w-0 items-center justify-start gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 shadow-[0_18px_70px_-48px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:h-16 sm:w-full sm:justify-between sm:px-4">
           <Link href="/login" className="flex min-w-0 shrink items-center gap-3">
             <MendozaLogo className="h-8 w-[9.5rem] sm:h-10 sm:w-[11rem]" />
-            <span className="hidden text-xs font-black uppercase tracking-[0.18em] text-white/45 sm:inline">PDV SaaS</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
             <a href="#produto" className="transition-colors hover:text-white">Produto</a>
             <a href="#modulos" className="transition-colors hover:text-white">Módulos</a>
             <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
-            <a href="#entrar" className="transition-colors hover:text-white">Login</a>
+            <LandingLoginModal className="transition-colors hover:text-white">Login</LandingLoginModal>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <a
-              href="#entrar"
+            <LandingLoginModal
               className="inline-flex h-8 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2.5 text-[0.72rem] font-semibold text-white transition-colors hover:bg-white/10 sm:h-9 sm:px-3 sm:text-sm"
             >
               Login
-            </a>
+            </LandingLoginModal>
             <LandingRegisterModal
               label="Cadastrar"
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-primary bg-primary px-2.5 text-[0.72rem] font-semibold text-primary-foreground shadow-[0_14px_34px_-22px_hsl(var(--primary))] transition-colors hover:bg-primary/92 sm:h-9 sm:px-3 sm:text-sm"
@@ -452,12 +450,11 @@ export default async function LoginPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <LandingButton label="Criar conta" />
-              <a
-                href="#entrar"
+              <LandingLoginModal
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-black text-white transition-colors hover:bg-white/10"
               >
                 Entrar no painel
-              </a>
+              </LandingLoginModal>
             </div>
             <div className="mt-8 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em] text-white/48">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Banco isolado por cliente</span>
@@ -596,38 +593,16 @@ export default async function LoginPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <LandingButton label="Criar conta agora" />
-              <a
-                href="#entrar"
+              <LandingLoginModal
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-black text-white transition-colors hover:bg-white/10"
               >
                 Já sou cliente
-              </a>
+              </LandingLoginModal>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="entrar" className="px-4 pb-24">
-        <div className="mx-auto max-w-[430px]">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-6 text-white shadow-[0_32px_110px_-70px_rgba(0,0,0,0.95)]">
-            <MendozaLogo className="mx-auto h-16 w-[15rem]" />
-            <h2 className="mt-6 text-2xl font-black text-white">Entrar no painel</h2>
-            <p className="mt-2 text-sm leading-6 text-white/55">
-              Já é cliente? Acesse seu ambiente com email, senha e link do cliente.
-            </p>
-            <div className="mt-5 space-y-5 [&_label]:text-white/72 [&_input]:border-white/12 [&_input]:bg-black/28 [&_input]:text-white [&_input]:placeholder:text-white/28 [&_p]:text-white/45">
-              <LoginForm />
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/58">
-                Ainda não tem acesso?{" "}
-                <LandingRegisterModal
-                  label="Cadastrar nova conta"
-                  className="font-bold text-primary transition-colors hover:text-primary/80"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   );
 }
