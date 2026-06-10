@@ -1,4 +1,5 @@
 import type { CSSProperties, ComponentType } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Banknote, Boxes, FileCheck2, Gamepad2 } from "lucide-react";
@@ -32,25 +33,77 @@ type PricingPlan = {
   prices: Array<[string, string]>;
 };
 
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://xp-pdv.vercel.app").replace(
+  /\/$/,
+  "",
+);
+const landingPath = "/login";
+const landingUrl = `${siteUrl}${landingPath}`;
+const seoTitle = "Mendoza PDV | PDV completo com comanda, estoque e NFC-e";
+const seoDescription =
+  "Sistema PDV completo para bares, lanchonetes e conveniências: comanda, caixa, estoque, XML, NFC-e, cupons, relatórios e controle de tempo para Smart TVs.";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: seoTitle,
+  description: seoDescription,
+  alternates: {
+    canonical: landingPath,
+  },
+  openGraph: {
+    title: seoTitle,
+    description: seoDescription,
+    url: landingPath,
+    siteName: "Mendoza PDV",
+    locale: "pt_BR",
+    type: "website",
+    images: [
+      {
+        url: "/mendoza-logo.svg",
+        width: 512,
+        height: 390,
+        alt: "Mendoza PDV - sistema PDV completo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: seoTitle,
+    description: seoDescription,
+    images: ["/mendoza-logo.svg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
 const conversionPoints: FeatureItem[] = [
   {
     icon: Banknote,
-    title: "Caixa sem divergência",
+    title: "PDV com caixa sem divergência",
     description: "Venda, pagamento, sangria, suprimento e fechamento no mesmo fluxo.",
   },
   {
     icon: Boxes,
-    title: "Estoque que acompanha a venda",
+    title: "Controle de estoque para PDV",
     description: "XML, produto fracionado, perdas e baixa automática deixam menos sobra fantasma.",
   },
   {
     icon: FileCheck2,
-    title: "Fiscal dentro do PDV",
+    title: "Emissão fiscal NFC-e no PDV",
     description: "Focus NFe configurada por cliente, com XML, DANFE e ambiente fiscal.",
   },
   {
     icon: Gamepad2,
-    title: "Serviço por tempo",
+    title: "Controle de tempo para Smart TVs",
     description: "Smart TVs, PS5, simulador e sinuca cobrados por tempo, sem controle paralelo.",
   },
 ];
@@ -126,6 +179,108 @@ const pricingPlans: PricingPlan[] = [
     ],
   },
 ];
+
+const softwareFeatures = [
+  "PDV com venda rápida e comandas",
+  "Abertura e fechamento de caixa",
+  "Controle de estoque com XML de compra",
+  "Produtos fracionados, perdas e baixa automática",
+  "Cupons por venda, produto ou categoria",
+  "Relatórios de vendas por dinheiro, Pix, crédito e débito",
+  "NFC-e, DANFE e XML com Focus NFe",
+  "App para Smart TVs com controle de tempo",
+];
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      name: "Mendoza PDV",
+      url: siteUrl,
+      logo: `${siteUrl}/mendoza-logo.svg`,
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      name: "Mendoza PDV",
+      url: siteUrl,
+      publisher: {
+        "@id": `${siteUrl}/#organization`,
+      },
+      inLanguage: "pt-BR",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${landingUrl}#software`,
+      name: "Mendoza PDV",
+      alternateName: "Sistema PDV completo com comanda",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web, Android TV",
+      url: landingUrl,
+      image: `${siteUrl}/mendoza-logo.svg`,
+      description: seoDescription,
+      featureList: softwareFeatures,
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "BRL",
+        lowPrice: "99.90",
+        highPrice: "1349.90",
+        offerCount: "8",
+        url: landingUrl,
+      },
+      publisher: {
+        "@id": `${siteUrl}/#organization`,
+      },
+    },
+    {
+      "@type": "Product",
+      "@id": `${landingUrl}#product`,
+      name: "Mendoza PDV",
+      brand: {
+        "@type": "Brand",
+        name: "Mendoza PDV",
+      },
+      category: "Sistema PDV",
+      url: landingUrl,
+      image: `${siteUrl}/mendoza-logo.svg`,
+      description: seoDescription,
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "BRL",
+        lowPrice: "99.90",
+        highPrice: "1349.90",
+        offerCount: "8",
+        availability: "https://schema.org/InStock",
+        url: landingUrl,
+      },
+    },
+    {
+      "@type": "FAQPage",
+      "@id": `${landingUrl}#faq`,
+      mainEntity: faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    },
+  ],
+};
+
+function JsonLd() {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+      }}
+    />
+  );
+}
 
 function ProductScene() {
   return (
@@ -227,6 +382,7 @@ export default async function LoginPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#0d090b] text-white" style={themeVariables as CSSProperties}>
+      <JsonLd />
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
         <div className="mx-auto flex h-14 w-[calc(100vw-1.5rem)] max-w-7xl min-w-0 items-center justify-start gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 shadow-[0_18px_70px_-48px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:h-16 sm:w-full sm:justify-between sm:px-4">
           <Link href="/login" className="flex min-w-0 shrink items-center gap-3">
@@ -261,10 +417,10 @@ export default async function LoginPage() {
               Mendoza PDV
             </div>
             <h1 className="mt-6 max-w-[21rem] text-[2.75rem] font-black leading-[0.98] tracking-tight text-white sm:max-w-2xl sm:text-5xl md:text-6xl xl:text-7xl">
-              O PDV completo para operações que não podem travar.
+              PDV completo com comanda, estoque e NFC-e para operação real.
             </h1>
             <p className="mt-6 max-w-[22rem] text-base leading-7 text-white/70 sm:max-w-2xl md:text-xl md:leading-8">
-              Venda, caixa, estoque, fiscal, relatórios, comandas, cupons e app de controle de tempo para Smart TVs no mesmo sistema.
+              Sistema PDV para bares, lanchonetes, conveniências e operações com comanda: venda, caixa, estoque, fiscal, cupons, relatórios e app de controle de tempo para Smart TVs.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <LandingButton label="Criar conta" />
@@ -275,6 +431,7 @@ export default async function LoginPage() {
               </LandingLoginModal>
             </div>
             <div className="mt-8 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em] text-white/48">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">PDV com comanda</span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Banco isolado por cliente</span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Focus NFe integrada</span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">XML de compra</span>
