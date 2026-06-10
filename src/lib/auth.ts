@@ -20,7 +20,8 @@ import {
 } from "@/domain/auth/access-control-presets";
 import { getTenantPrismaClientBySlug } from "@/lib/prisma";
 
-const DEFAULT_WORKSPACE_SLUG = process.env.DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
+const DEFAULT_WORKSPACE_SLUG =
+  process.env.DEFAULT_WORKSPACE_SLUG ?? process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
 
 const credentialsSchema = z.object({
   email: z.string().email("Email invalido"),

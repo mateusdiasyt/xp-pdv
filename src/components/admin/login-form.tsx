@@ -22,6 +22,7 @@ const loginSchema = z.object({
 });
 
 type LoginSchema = z.infer<typeof loginSchema>;
+const DEFAULT_WORKSPACE_SLUG = process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
 
 function extractWorkspaceFromCallbackUrl(callbackUrl: string | null) {
   if (!callbackUrl) {
@@ -101,6 +102,11 @@ export function LoginForm() {
     const resolution = await resolveLoginTenantsAction(formData);
 
     if (resolution.status === "error" || !resolution.tenants?.length) {
+      if (!workspace) {
+        await signInToTenant(values, DEFAULT_WORKSPACE_SLUG);
+        return;
+      }
+
       setErrorMessage(resolution.message ?? "Credenciais invalidas ou usuario sem acesso.");
       return;
     }
