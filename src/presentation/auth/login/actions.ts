@@ -7,9 +7,13 @@ import { z } from "zod";
 import {
   findLoginTenantAccessBySlug,
   findLoginTenantAccessesByEmail,
+  getActiveTenantBySlug,
   normalizeTenantSlug,
 } from "@/application/platform/platform-service";
 import { getTenantPrismaClientBySlug } from "@/lib/prisma";
+
+const DEFAULT_WORKSPACE_SLUG =
+  process.env.DEFAULT_WORKSPACE_SLUG ?? process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
 
 const loginTenantResolutionSchema = z.object({
   email: z.string().trim().email("Digite um email valido").transform((value) => value.toLowerCase()),
@@ -48,6 +52,36 @@ async function isTenantPasswordValid(slug: string, email: string, password: stri
   }
 
   return bcrypt.compare(password, user.passwordHash);
+}
+
+async function addTenantChoiceIfPasswordMatches(
+  choices: Map<string, LoginTenantChoice>,
+  slug: string,
+  email: string,
+  password: string,
+) {
+  const normalizedSlug = normalizeTenantSlug(slug);
+
+  if (!normalizedSlug || choices.has(normalizedSlug)) {
+    return;
+  }
+
+  try {
+    const passwordMatches = await isTenantPasswordValid(normalizedSlug, email, password);
+
+    if (!passwordMatches) {
+      return;
+    }
+
+    const tenant = await getActiveTenantBySlug(normalizedSlug);
+
+    choices.set(normalizedSlug, {
+      slug: normalizedSlug,
+      name: tenant?.name ?? normalizedSlug,
+    });
+  } catch {
+    // Um PDV indisponivel nao deve impedir o usuario de acessar outro PDV valido.
+  }
 }
 
 export async function resolveLoginTenantsAction(formData: FormData): Promise<LoginTenantResolutionState> {
@@ -95,6 +129,13 @@ export async function resolveLoginTenantsAction(formData: FormData): Promise<Log
       // Um PDV indisponivel nao deve impedir o usuario de acessar outro PDV valido.
     }
   }
+
+  await addTenantChoiceIfPasswordMatches(
+    validTenants,
+    preferredWorkspace || DEFAULT_WORKSPACE_SLUG,
+    parsed.data.email,
+    parsed.data.password,
+  );
 
   const tenants = Array.from(validTenants.values());
 
