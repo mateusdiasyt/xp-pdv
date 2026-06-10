@@ -6,10 +6,10 @@ export async function requirePlatformAdmin() {
   const session = await getServerAuthSession();
 
   if (!session?.user || session.user.status !== "ACTIVE") {
-    redirect("/login");
+    redirect("/super-admin/login");
   }
 
-  if (!session.user.isPlatformAdmin) {
+  if (!session.user.isPlatformAdmin || session.user.accessScope !== "platform") {
     redirect("/forbidden");
   }
 

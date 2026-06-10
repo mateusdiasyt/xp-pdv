@@ -72,6 +72,7 @@ export function LoginForm() {
       email: values.email,
       password: values.password,
       workspace: tenantSlug,
+      accessScope: "tenant",
       callbackUrl: getCallbackUrlForTenant(tenantSlug),
       redirect: false,
     });

@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   findLoginTenantAccessByEmail,
   findLoginTenantAccessBySlug,
+  findLoginTenantAccessesByEmail,
   getActiveTenantBySlug,
   normalizeTenantSlug,
 } from "@/application/platform/platform-service";
@@ -25,6 +26,7 @@ const credentialsSchema = z.object({
   email: z.string().email("Email invalido"),
   password: z.string().min(6, "Senha invalida"),
   workspace: z.string().optional(),
+  accessScope: z.enum(["tenant", "platform"]).optional(),
 });
 
 async function ensureTenantAccessControlPresets(prisma: PrismaClient) {
@@ -98,6 +100,10 @@ export const authOptions: NextAuthOptions = {
           label: "PDV",
           type: "text",
         },
+        accessScope: {
+          label: "Escopo",
+          type: "text",
+        },
       },
       async authorize(rawCredentials) {
         const parsed = credentialsSchema.safeParse(rawCredentials);
@@ -108,18 +114,26 @@ export const authOptions: NextAuthOptions = {
 
         const email = parsed.data.email.toLowerCase();
         const requestedWorkspace = parsed.data.workspace ? normalizeTenantSlug(parsed.data.workspace) : null;
+        const accessScope = parsed.data.accessScope ?? "tenant";
         let tenant: Awaited<ReturnType<typeof getActiveTenantBySlug>> | null = null;
         let isPlatformAdmin = false;
 
         try {
-          const access = requestedWorkspace
-            ? await findLoginTenantAccessBySlug(requestedWorkspace, email)
-            : await findLoginTenantAccessByEmail(email);
+          const access =
+            accessScope === "platform"
+              ? (await findLoginTenantAccessesByEmail(email)).find((item) => item.isPlatformAdmin)
+              : requestedWorkspace
+                ? await findLoginTenantAccessBySlug(requestedWorkspace, email)
+                : await findLoginTenantAccessByEmail(email);
 
           tenant = access?.tenant ?? (requestedWorkspace ? await getActiveTenantBySlug(requestedWorkspace) : null);
           isPlatformAdmin = Boolean(access?.isPlatformAdmin);
         } catch (error) {
           console.warn("[AUTH] Plataforma ainda nao disponivel para resolver tenant. Usando banco padrao.", error);
+        }
+
+        if (accessScope === "platform" && !isPlatformAdmin) {
+          return null;
         }
 
         const tenantSlug = tenant?.slug ?? requestedWorkspace ?? DEFAULT_WORKSPACE_SLUG;
@@ -170,6 +184,7 @@ export const authOptions: NextAuthOptions = {
           tenantSlug,
           tenantName: tenant?.name ?? "XP Arcade & Bar",
           isPlatformAdmin,
+          accessScope,
         };
       },
     }),
@@ -183,6 +198,7 @@ export const authOptions: NextAuthOptions = {
         token.tenantSlug = user.tenantSlug;
         token.tenantName = user.tenantName;
         token.isPlatformAdmin = user.isPlatformAdmin;
+        token.accessScope = user.accessScope ?? "tenant";
       }
 
       return token;
@@ -196,6 +212,7 @@ export const authOptions: NextAuthOptions = {
         session.user.tenantSlug = token.tenantSlug ?? DEFAULT_WORKSPACE_SLUG;
         session.user.tenantName = token.tenantName ?? "XP Arcade & Bar";
         session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);
+        session.user.accessScope = token.accessScope ?? "tenant";
       }
 
       return session;

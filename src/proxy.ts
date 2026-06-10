@@ -97,6 +97,12 @@ const authenticatedProxy = withAuth(
     const pathname = request.nextUrl.pathname;
     const tenantRoute = parseTenantAdminPath(pathname);
 
+    if (request.nextauth.token?.accessScope === "platform") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/super-admin";
+      return NextResponse.redirect(url);
+    }
+
     if (tenantRoute) {
       const tokenTenantSlug = normalizeTenantSlug(request.nextauth.token?.tenantSlug);
 
@@ -136,11 +142,35 @@ const authenticatedProxy = withAuth(
   },
 );
 
+const superAdminProxy = withAuth(
+  function superAdminRoute() {
+    return NextResponse.next();
+  },
+  {
+    pages: {
+      signIn: "/super-admin/login",
+    },
+    callbacks: {
+      authorized: ({ token }) => {
+        return Boolean(token);
+      },
+    },
+  },
+);
+
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
 
   if (pathname === "/app/xp-tv.apk") {
     return NextResponse.next();
+  }
+
+  if (pathname === "/super-admin/login") {
+    return NextResponse.next();
+  }
+
+  if (pathname === "/super-admin" || pathname.startsWith("/super-admin/")) {
+    return superAdminProxy(request as NextRequestWithAuth, event);
   }
 
   const tenantRoute = parseTenantAdminPath(pathname);

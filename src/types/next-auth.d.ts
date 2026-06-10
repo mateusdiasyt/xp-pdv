@@ -10,6 +10,7 @@ declare module "next-auth" {
       tenantSlug: string;
       tenantName?: string | null;
       isPlatformAdmin: boolean;
+      accessScope?: "tenant" | "platform";
     } & DefaultSession["user"];
   }
 
@@ -20,6 +21,7 @@ declare module "next-auth" {
     tenantSlug: string;
     tenantName?: string | null;
     isPlatformAdmin: boolean;
+    accessScope?: "tenant" | "platform";
   }
 }
 
@@ -31,5 +33,6 @@ declare module "next-auth/jwt" {
     tenantSlug?: string;
     tenantName?: string | null;
     isPlatformAdmin?: boolean;
+    accessScope?: "tenant" | "platform";
   }
 }
