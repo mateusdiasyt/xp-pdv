@@ -28,6 +28,11 @@ export type LoginTenantResolutionState = {
   tenants?: LoginTenantChoice[];
 };
 
+function getOptionalString(input: FormData, key: string) {
+  const value = input.get(key);
+  return typeof value === "string" ? value : undefined;
+}
+
 async function isTenantPasswordValid(slug: string, email: string, password: string) {
   const tenantPrisma = await getTenantPrismaClientBySlug(slug);
   const user = await tenantPrisma.user.findUnique({
@@ -47,9 +52,9 @@ async function isTenantPasswordValid(slug: string, email: string, password: stri
 
 export async function resolveLoginTenantsAction(formData: FormData): Promise<LoginTenantResolutionState> {
   const parsed = loginTenantResolutionSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-    preferredWorkspace: formData.get("preferredWorkspace"),
+    email: getOptionalString(formData, "email"),
+    password: getOptionalString(formData, "password"),
+    preferredWorkspace: getOptionalString(formData, "preferredWorkspace"),
   });
 
   if (!parsed.success) {

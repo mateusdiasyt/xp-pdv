@@ -29,6 +29,10 @@ const credentialsSchema = z.object({
   accessScope: z.enum(["tenant", "platform"]).optional(),
 });
 
+function normalizeOptionalCredential(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
 async function ensureTenantAccessControlPresets(prisma: PrismaClient) {
   await prisma.$transaction(async (tx) => {
     for (const permission of ACCESS_PERMISSIONS) {
@@ -106,7 +110,12 @@ export const authOptions: NextAuthOptions = {
         },
       },
       async authorize(rawCredentials) {
-        const parsed = credentialsSchema.safeParse(rawCredentials);
+        const parsed = credentialsSchema.safeParse({
+          email: normalizeOptionalCredential(rawCredentials?.email),
+          password: normalizeOptionalCredential(rawCredentials?.password),
+          workspace: normalizeOptionalCredential(rawCredentials?.workspace),
+          accessScope: normalizeOptionalCredential(rawCredentials?.accessScope),
+        });
 
         if (!parsed.success) {
           return null;
