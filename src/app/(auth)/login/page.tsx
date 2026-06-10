@@ -7,6 +7,7 @@ import {
   Boxes,
   FileCheck2,
   Gamepad2,
+  Link2,
   MessageCircle,
   ReceiptText,
 } from "lucide-react";
@@ -30,6 +31,7 @@ type FeatureItem = {
 
 type ModuleItem = FeatureItem & {
   highlight: string;
+  tooltip: string;
   preview: ReactNode;
 };
 
@@ -257,6 +259,26 @@ function MiniReportPreview() {
   );
 }
 
+function MiniLinkPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
+        <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Link do PDV</p>
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-xs font-black text-white">
+          <Link2 className="h-4 w-4 shrink-0 text-primary" />
+          <span className="truncate">/app/seu-bar/admin</span>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs">
+        <span className="text-white/50">Status</span>
+        <strong className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-emerald-200">
+          Disponível
+        </strong>
+      </div>
+    </div>
+  );
+}
+
 const modules: ModuleItem[] = [
   {
     icon: ReceiptText,
@@ -264,6 +286,8 @@ const modules: ModuleItem[] = [
     highlight: "Venda limpa, com cupom e múltiplos pagamentos.",
     description:
       "Venda direta, comanda avulsa, comprovante, cancelamento e histórico sem precisar recarregar a página.",
+    tooltip:
+      "Ideal para balcão e mesa: o atendente monta a venda, usa cupom quando precisar, divide em várias formas de pagamento e imprime o ticket sem sair do fluxo.",
     preview: <MiniCommandPreview />,
   },
   {
@@ -271,6 +295,8 @@ const modules: ModuleItem[] = [
     title: "Caixa operacional",
     highlight: "Abertura, operador e fechamento do dia.",
     description: "Controle dinheiro real do caixa, suprimento, sangria, estorno e relatório de fechamento.",
+    tooltip:
+      "Antes de vender, o operador abre o caixa com valor inicial. Durante o dia registra sangria e suprimento. No fechamento, o sistema cruza dinheiro, Pix, cartão e vendas.",
     preview: <MiniCashPreview />,
   },
   {
@@ -278,6 +304,8 @@ const modules: ModuleItem[] = [
     title: "Estoque e XML",
     highlight: "Entrada por XML com conferência.",
     description: "Salve XMLs de compra, revise os itens, dê entrada no estoque e registre perdas quando precisar.",
+    tooltip:
+      "Você pode apenas guardar o XML para consulta ou transformar a compra em entrada de estoque. O histórico fica anexado para baixar e conferir depois.",
     preview: <MiniXmlPreview />,
   },
   {
@@ -286,6 +314,8 @@ const modules: ModuleItem[] = [
     highlight: "API fiscal integrada no sistema.",
     description:
       "Configure tokens, CNPJ, homologação e produção direto no PDV, sem depender de variável por cliente.",
+    tooltip:
+      "Cada cliente informa seus próprios dados da Focus NFe no painel. Dá para usar homologação para testes e produção quando a emissão fiscal estiver pronta.",
     preview: <MiniFiscalPreview />,
   },
   {
@@ -294,13 +324,27 @@ const modules: ModuleItem[] = [
     highlight: "Cobrança por tempo para qualquer videogame.",
     description:
       "Controle PS5, simulador, sinuca ou serviço por minuto, com tempo livre, pausa, cancelamento e cobrança.",
+    tooltip:
+      "Funciona em TVs com Google TV/Android TV compatíveis. O app controla bloqueio, tempo liberado, atualização obrigatória e cobrança por minuto conforme o serviço cadastrado.",
     preview: <MiniTvPreview />,
+  },
+  {
+    icon: Link2,
+    title: "Link personalizado do seu PDV",
+    highlight: "Seu painel com endereço próprio.",
+    description:
+      "Defina um link exclusivo para acessar o PDV, conferir disponibilidade e deixar o ambiente com cara da sua operação.",
+    tooltip:
+      "O cliente escolhe um endereço único para acessar o painel. O sistema verifica se o link está disponível e aplica no ambiente, sem misturar com outros PDVs.",
+    preview: <MiniLinkPreview />,
   },
   {
     icon: BarChart3,
     title: "Relatórios claros",
     highlight: "Resumo de vendas, caixa e pagamentos.",
     description: "Veja dinheiro, Pix, crédito, débito, lucro, itens vendidos e envie o resumo pelo WhatsApp.",
+    tooltip:
+      "Os relatórios mostram vendas por período, formas de pagamento, saldo do caixa, itens mais vendidos, lucro estimado e resumo pronto para impressão ou WhatsApp.",
     preview: <MiniReportPreview />,
   },
 ];
@@ -373,7 +417,11 @@ function ModuleCard({ item }: { item: ModuleItem }) {
   const Icon = item.icon;
 
   return (
-    <div className="grid min-h-full gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition-colors hover:border-primary/28 hover:bg-white/[0.05]">
+    <article
+      tabIndex={0}
+      title={item.tooltip}
+      className="group/module relative grid min-h-full gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 outline-none transition-all hover:z-20 hover:border-primary/28 hover:bg-white/[0.05] focus-visible:z-20 focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-primary/25"
+    >
       <div>
         <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
@@ -383,7 +431,11 @@ function ModuleCard({ item }: { item: ModuleItem }) {
         <p className="mt-3 text-sm leading-6 text-white/58">{item.description}</p>
       </div>
       {item.preview}
-    </div>
+      <div className="pointer-events-none absolute left-4 right-4 top-4 z-30 translate-y-2 rounded-2xl border border-primary/25 bg-[#13090e]/95 p-4 text-sm leading-6 text-white/76 opacity-0 shadow-[0_28px_90px_-52px_rgba(0,0,0,0.95)] backdrop-blur-xl transition-all duration-200 group-hover/module:translate-y-0 group-hover/module:opacity-100 group-focus-visible/module:translate-y-0 group-focus-visible/module:opacity-100">
+        <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Como funciona</p>
+        <p className="mt-2">{item.tooltip}</p>
+      </div>
+    </article>
   );
 }
 
@@ -516,7 +568,7 @@ export default async function LoginPage() {
           <div className="max-w-2xl">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Módulos do PDV</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Uma operação real, mostrada em cards reais.
+              Confira agora alguns de nossos módulos disponíveis
             </h2>
             <p className="mt-4 text-base leading-7 text-white/60">
               Cada módulo resolve uma parte do caixa: venda, estoque, fiscal, controle de tempo, relatório e conferência.
