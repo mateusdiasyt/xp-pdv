@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 async function main() {
   const defaultTenantSlug = process.env.DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
   const defaultTenantName = process.env.DEFAULT_WORKSPACE_NAME ?? "XP Arcade & Bar";
-  const defaultAdminEmail = (process.env.DEFAULT_ADMIN_EMAIL ?? "admin@guildamaia.com").toLowerCase();
+  const defaultAdminEmail = (process.env.DEFAULT_ADMIN_EMAIL ?? "admin@mendozapdv.com.br").toLowerCase();
 
   const defaultTenant = await prisma.platformTenant.upsert({
     where: { slug: defaultTenantSlug },

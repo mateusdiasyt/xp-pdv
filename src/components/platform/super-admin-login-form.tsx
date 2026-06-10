@@ -56,7 +56,7 @@ export function SuperAdminLoginForm() {
           id="super-admin-email"
           type="email"
           autoComplete="email"
-          placeholder="admin@mendozapdv.com"
+          placeholder="admin@mendozapdv.com.br"
           {...form.register("email")}
         />
         {form.formState.errors.email ? (
