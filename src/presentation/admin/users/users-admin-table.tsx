@@ -29,6 +29,7 @@ type UserListItem = {
 type RoleOption = {
   id: string;
   name: string;
+  slug: string;
   permissionIds: string[];
 };
 
@@ -93,7 +94,7 @@ export function UsersAdminTable({
         <CardHeader className="space-y-3 border-b border-border/70 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>Lista de administradores</CardTitle>
+              <CardTitle>Lista de usuarios</CardTitle>
               <CardDescription>{users.length} registro(s) encontrado(s).</CardDescription>
             </div>
 
@@ -107,7 +108,9 @@ export function UsersAdminTable({
                   className="h-8 w-[260px] pl-9"
                 />
               </form>
-              {canManageUsers ? <CreateUserDialog roles={roles.map((role) => ({ id: role.id, name: role.name }))} /> : null}
+              {canManageUsers ? (
+                <CreateUserDialog roles={roles.map((role) => ({ id: role.id, name: role.name, slug: role.slug }))} />
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -117,7 +120,7 @@ export function UsersAdminTable({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
-                <TableHead>Administrador</TableHead>
+                <TableHead>Usuario</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead className="text-center">Total permissoes</TableHead>
                 <TableHead>Status</TableHead>

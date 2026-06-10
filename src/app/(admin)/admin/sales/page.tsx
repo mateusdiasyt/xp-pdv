@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
-  const session = await requirePermission(PERMISSIONS.PDV_VIEW);
+  const session = await requirePermission(PERMISSIONS.SALES_VIEW);
   const filters = await searchParams;
   const sales = await getSalesHistoryData({
     query: filters.q,

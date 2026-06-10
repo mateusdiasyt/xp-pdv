@@ -163,7 +163,7 @@ function getReleaseDurationLabel(release: Awaited<ReturnType<typeof getGameplayR
 }
 
 export default async function ServicesPage({ searchParams }: ServicesPageProps) {
-  await requirePermission(PERMISSIONS.PDV_VIEW);
+  await requirePermission(PERMISSIONS.SERVICES_VIEW);
   const params = await searchParams;
   const status = normalizeStatus(params.status);
   const query = params.query?.trim() || undefined;

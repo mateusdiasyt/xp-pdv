@@ -6,7 +6,7 @@ import {
   resolveSaleXmlUrlForDownload,
   sanitizeSaleNumberForFileName,
 } from "@/application/fiscal/focus-xml-download-service";
-import { PERMISSIONS, hasPermission } from "@/domain/auth/permissions";
+import { PERMISSIONS, hasAnyPermission } from "@/domain/auth/permissions";
 import {
   listFiscalSales,
   updateSaleFiscalData,
@@ -87,7 +87,11 @@ export async function GET(request: Request) {
     return new Response("Nao autorizado.", { status: 401 });
   }
 
-  if (!hasPermission(session.user.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
+  const canDownloadXml =
+    session.user.roleSlug === "administrador" ||
+    hasAnyPermission(session.user.permissions, [PERMISSIONS.FISCAL_VIEW, PERMISSIONS.SALES_VIEW]);
+
+  if (!canDownloadXml) {
     return new Response("Sem permissao para baixar XML fiscal.", { status: 403 });
   }
 

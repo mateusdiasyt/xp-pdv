@@ -78,7 +78,7 @@ function paymentCardClass(row: ReportPaymentRow) {
 }
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requirePermission(PERMISSIONS.REPORTS_VIEW);
   const { period, date, startDate, endDate, print } = await searchParams;
   const reports = await getReportsData({ period, date, startDate, endDate });
   const active = reports.active;

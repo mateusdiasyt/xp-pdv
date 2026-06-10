@@ -1,63 +1,11 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, RecordStatus } from "@prisma/client";
 
-const permissions = [
-  { key: "dashboard:view", description: "Visualizar painel administrativo" },
-  { key: "users:view", description: "Visualizar usuarios" },
-  { key: "users:manage", description: "Criar e editar usuarios" },
-  { key: "categories:view", description: "Visualizar categorias" },
-  { key: "categories:manage", description: "Criar e editar categorias" },
-  { key: "suppliers:view", description: "Visualizar fornecedores" },
-  { key: "suppliers:manage", description: "Criar e editar fornecedores" },
-  { key: "customers:view", description: "Visualizar clientes" },
-  { key: "customers:manage", description: "Criar e editar clientes" },
-  { key: "products:view", description: "Visualizar produtos" },
-  { key: "products:manage", description: "Criar e editar produtos" },
-  { key: "stock:view", description: "Visualizar movimentacoes de estoque" },
-  { key: "stock:manage", description: "Registrar movimentacoes de estoque" },
-  { key: "cash:view", description: "Visualizar sessoes de caixa" },
-  { key: "cash:manage", description: "Abrir e fechar caixa, registrar sangria e suprimento" },
-  { key: "pdv:view", description: "Visualizar vendas no PDV" },
-  { key: "pdv:manage", description: "Registrar vendas no PDV" },
-  { key: "pdv:cancel", description: "Cancelar vendas no PDV" },
-];
-
-const rolePermissions = {
-  administrador: permissions.map((permission) => permission.key),
-  gerente: [
-    "dashboard:view",
-    "users:view",
-    "categories:view",
-    "categories:manage",
-    "suppliers:view",
-    "suppliers:manage",
-    "customers:view",
-    "customers:manage",
-    "products:view",
-    "products:manage",
-    "stock:view",
-    "stock:manage",
-    "cash:view",
-    "cash:manage",
-    "pdv:view",
-    "pdv:manage",
-    "pdv:cancel",
-  ],
-  operador: [
-    "dashboard:view",
-    "categories:view",
-    "suppliers:view",
-    "customers:view",
-    "customers:manage",
-    "products:view",
-    "stock:view",
-    "stock:manage",
-    "cash:view",
-    "cash:manage",
-    "pdv:view",
-    "pdv:manage",
-  ],
-} as const;
+import {
+  ACCESS_PERMISSIONS,
+  ACCESS_ROLE_PERMISSION_KEYS,
+  ACCESS_ROLES,
+} from "@/domain/auth/access-control-presets";
 
 export async function seedTenantDatabase(
   prisma: PrismaClient,
@@ -81,7 +29,7 @@ export async function seedTenantDatabase(
     },
   });
 
-  for (const permission of permissions) {
+  for (const permission of ACCESS_PERMISSIONS) {
     await prisma.permission.upsert({
       where: { key: permission.key },
       update: { description: permission.description },
@@ -89,25 +37,7 @@ export async function seedTenantDatabase(
     });
   }
 
-  const roles = [
-    {
-      slug: "administrador",
-      name: "Administrador",
-      description: "Controle total da plataforma",
-    },
-    {
-      slug: "gerente",
-      name: "Gerente",
-      description: "Gestao operacional e acompanhamento de indicadores",
-    },
-    {
-      slug: "operador",
-      name: "Operador",
-      description: "Operacao diaria de cadastro e estoque",
-    },
-  ];
-
-  for (const role of roles) {
+  for (const role of ACCESS_ROLES) {
     const roleRecord = await prisma.role.upsert({
       where: { slug: role.slug },
       update: {
@@ -121,7 +51,7 @@ export async function seedTenantDatabase(
       },
     });
 
-    const allowedPermissionKeys = rolePermissions[role.slug as keyof typeof rolePermissions];
+    const allowedPermissionKeys = ACCESS_ROLE_PERMISSION_KEYS[role.slug];
     const permissionRecords = await prisma.permission.findMany({
       where: {
         key: { in: allowedPermissionKeys as string[] },

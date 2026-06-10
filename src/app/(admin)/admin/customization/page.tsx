@@ -8,7 +8,7 @@ import { UpdateBrandCustomizationForm } from "@/presentation/admin/customization
 import { UpdateFiscalEnvironmentForm } from "@/presentation/admin/customization/update-fiscal-environment-form";
 
 export default async function CustomizationPage() {
-  const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_VIEW);
   const { customization, setupPending } = await getBrandCustomizationSnapshot();
   const fiscal = await getFiscalSettingsSnapshot();
   const canManageFiscalEnvironment = hasPermission(session.user.permissions, PERMISSIONS.USERS_MANAGE);

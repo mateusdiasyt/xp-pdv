@@ -52,7 +52,7 @@ function getStatusBadge(isDeclared: boolean) {
 }
 
 export default async function ServiceFiscalPage({ searchParams }: ServiceFiscalPageProps) {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requirePermission(PERMISSIONS.SERVICE_FISCAL_VIEW);
   const filters = await searchParams;
   const data = await getServiceFiscalApurationData(filters);
 

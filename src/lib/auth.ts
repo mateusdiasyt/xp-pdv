@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { RecordStatus } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -11,6 +12,11 @@ import {
   getActiveTenantBySlug,
   normalizeTenantSlug,
 } from "@/application/platform/platform-service";
+import {
+  ACCESS_PERMISSIONS,
+  ACCESS_ROLE_PERMISSION_KEYS,
+  ACCESS_ROLES,
+} from "@/domain/auth/access-control-presets";
 import { getTenantPrismaClientBySlug } from "@/lib/prisma";
 
 const DEFAULT_WORKSPACE_SLUG = process.env.DEFAULT_WORKSPACE_SLUG ?? "xp-arcade";
@@ -20,6 +26,54 @@ const credentialsSchema = z.object({
   password: z.string().min(6, "Senha invalida"),
   workspace: z.string().optional(),
 });
+
+async function ensureTenantAccessControlPresets(prisma: PrismaClient) {
+  await prisma.$transaction(async (tx) => {
+    for (const permission of ACCESS_PERMISSIONS) {
+      await tx.permission.upsert({
+        where: { key: permission.key },
+        update: { description: permission.description },
+        create: permission,
+      });
+    }
+
+    for (const role of ACCESS_ROLES) {
+      const roleRecord = await tx.role.upsert({
+        where: { slug: role.slug },
+        update: {
+          name: role.name,
+          description: role.description,
+          isSystem: true,
+        },
+        create: {
+          ...role,
+          isSystem: true,
+        },
+      });
+
+      const allowedPermissionKeys = ACCESS_ROLE_PERMISSION_KEYS[role.slug];
+      const permissionRecords = await tx.permission.findMany({
+        where: {
+          key: { in: allowedPermissionKeys as string[] },
+        },
+      });
+
+      await tx.rolePermission.deleteMany({
+        where: { roleId: roleRecord.id },
+      });
+
+      if (permissionRecords.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissionRecords.map((permission) => ({
+            roleId: roleRecord.id,
+            permissionId: permission.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+  });
+}
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -70,6 +124,7 @@ export const authOptions: NextAuthOptions = {
 
         const tenantSlug = tenant?.slug ?? requestedWorkspace ?? DEFAULT_WORKSPACE_SLUG;
         const tenantPrisma = await getTenantPrismaClientBySlug(tenantSlug);
+        await ensureTenantAccessControlPresets(tenantPrisma);
 
         const user = await tenantPrisma.user.findUnique({
           where: { email },

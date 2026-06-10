@@ -1,22 +1,10 @@
-import { requirePermission } from "@/application/auth/guards";
+import { requireSession } from "@/application/auth/guards";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PERMISSIONS } from "@/domain/auth/permissions";
-
-function roleLabel(roleSlug: string) {
-  if (roleSlug === "administrador") {
-    return "Administrador";
-  }
-
-  if (roleSlug === "operador") {
-    return "Operador";
-  }
-
-  return roleSlug;
-}
+import { roleSlugToLabel } from "@/domain/auth/roles";
 
 export default async function ProfilePage() {
-  const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  const session = await requireSession();
 
   return (
     <div className="space-y-6">
@@ -42,7 +30,7 @@ export default async function ProfilePage() {
           </div>
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Perfil de acesso</p>
-            <p className="text-sm font-medium text-foreground">{roleLabel(session.user.roleSlug)}</p>
+            <p className="text-sm font-medium text-foreground">{roleSlugToLabel(session.user.roleSlug)}</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Permissoes concedidas</p>

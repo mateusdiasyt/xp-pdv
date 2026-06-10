@@ -1,6 +1,59 @@
 import { RecordStatus } from "@prisma/client";
 
+import {
+  ACCESS_PERMISSIONS,
+  ACCESS_ROLE_PERMISSION_KEYS,
+  ACCESS_ROLES,
+} from "@/domain/auth/access-control-presets";
 import { prisma } from "@/lib/prisma";
+
+export async function ensureAccessControlPresets() {
+  await prisma.$transaction(async (tx) => {
+    for (const permission of ACCESS_PERMISSIONS) {
+      await tx.permission.upsert({
+        where: { key: permission.key },
+        update: { description: permission.description },
+        create: permission,
+      });
+    }
+
+    for (const role of ACCESS_ROLES) {
+      const roleRecord = await tx.role.upsert({
+        where: { slug: role.slug },
+        update: {
+          name: role.name,
+          description: role.description,
+          isSystem: true,
+        },
+        create: {
+          ...role,
+          isSystem: true,
+        },
+      });
+
+      const allowedPermissionKeys = ACCESS_ROLE_PERMISSION_KEYS[role.slug];
+      const permissionRecords = await tx.permission.findMany({
+        where: {
+          key: { in: allowedPermissionKeys as string[] },
+        },
+      });
+
+      await tx.rolePermission.deleteMany({
+        where: { roleId: roleRecord.id },
+      });
+
+      if (permissionRecords.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissionRecords.map((permission) => ({
+            roleId: roleRecord.id,
+            permissionId: permission.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+  });
+}
 
 export async function listUsers(search?: string) {
   return prisma.user.findMany({

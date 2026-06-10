@@ -74,7 +74,7 @@ function parseStatusFilter(value?: string) {
 }
 
 export default async function SupportPage({ searchParams }: SupportPageProps) {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requirePermission(PERMISSIONS.SUPPORT_VIEW);
   const { q, status } = await searchParams;
   const search = q?.trim() || undefined;
   const statusFilter = parseStatusFilter(status);

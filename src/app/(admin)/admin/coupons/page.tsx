@@ -24,7 +24,7 @@ function formatDiscount(coupon: {
 }
 
 export default async function CouponsPage() {
-  await requirePermission(PERMISSIONS.PDV_VIEW);
+  await requirePermission(PERMISSIONS.COUPONS_VIEW);
   const { coupons, products, categories } = await getCouponsPageData();
 
   return (

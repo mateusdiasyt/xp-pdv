@@ -1,9 +1,8 @@
-import { requirePermission } from "@/application/auth/guards";
+import { requireSession } from "@/application/auth/guards";
 import { getSystemUpdates } from "@/application/updates/system-update-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PERMISSIONS } from "@/domain/auth/permissions";
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
@@ -11,7 +10,7 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 export default async function UpdatesPage() {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requireSession();
   const { updates, setupPending } = await getSystemUpdates();
 
   return (

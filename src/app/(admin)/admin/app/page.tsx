@@ -9,6 +9,7 @@ import {
   tvAppPageAccessCookieValue,
 } from "@/domain/tv-app/app-page-access";
 import { tvAppUpdateManifest } from "@/domain/tv-app/update-manifest";
+import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { getServerAuthSession } from "@/lib/auth";
 
 import { unlockTvAppPageAction } from "./actions";
@@ -22,7 +23,10 @@ type TvAppPageProps = {
 export default async function TvAppPage({ searchParams }: TvAppPageProps) {
   const [session, cookieStore, params] = await Promise.all([getServerAuthSession(), cookies(), searchParams]);
   const hasPinAccess = cookieStore.get(tvAppPageAccessCookieName)?.value === tvAppPageAccessCookieValue;
-  const canViewPage = Boolean(session?.user) || hasPinAccess;
+  const canUseSessionAccess =
+    session?.user.roleSlug === "administrador" ||
+    hasPermission(session?.user.permissions, PERMISSIONS.TV_APP_VIEW);
+  const canViewPage = canUseSessionAccess || hasPinAccess;
 
   if (!canViewPage) {
     return <TvAppPinGate hasError={params.pin === "invalid"} />;

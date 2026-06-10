@@ -82,7 +82,7 @@ function getFiscalStatusBadge(status?: string | null) {
 }
 
 export default async function FiscalPage({ searchParams }: FiscalPageProps) {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requirePermission(PERMISSIONS.FISCAL_VIEW);
   const filters = await searchParams;
   const fiscal = await getFiscalExportsData(filters);
 

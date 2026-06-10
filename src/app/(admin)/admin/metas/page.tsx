@@ -69,7 +69,7 @@ function ProgressRow({
 }
 
 export default async function MetasPage() {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  await requirePermission(PERMISSIONS.GOALS_VIEW);
   const data = await getGoalsPageData();
   const todaySummary = data.todaySummary;
 

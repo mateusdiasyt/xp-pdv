@@ -17,7 +17,7 @@ export async function updateBrandCustomizationAction(
 ): Promise<ActionState> {
   void prevState;
   try {
-    const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+    const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_MANAGE);
     const actorName = session.user.name ?? session.user.email ?? "Usuario do painel";
     await updateBrandCustomizationRecord(formData, {
       id: session.user.id,

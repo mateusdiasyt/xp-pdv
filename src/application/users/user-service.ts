@@ -5,6 +5,7 @@ import { createUserSchema, updateUserAccessSchema, updateUserStatusSchema } from
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
 import {
   createUser,
+  ensureAccessControlPresets,
   listActiveOperators,
   listPermissions,
   listRoles,
@@ -27,6 +28,10 @@ export async function getRoles() {
 
 export async function getPermissions() {
   return listPermissions();
+}
+
+export async function ensureUserAccessControlPresets() {
+  await ensureAccessControlPresets();
 }
 
 export async function createUserRecord(input: FormData, actorId?: string, tenantSlug?: string) {

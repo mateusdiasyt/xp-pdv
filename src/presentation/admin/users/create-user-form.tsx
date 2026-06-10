@@ -13,6 +13,7 @@ import { createUserAction } from "@/presentation/admin/users/actions";
 type RoleOption = {
   id: string;
   name: string;
+  slug: string;
 };
 
 type CreateUserFormProps = {
@@ -21,6 +22,7 @@ type CreateUserFormProps = {
 
 export function CreateUserForm({ roles }: CreateUserFormProps) {
   const [state, formAction] = useActionState(createUserAction, initialActionState);
+  const defaultRoleId = roles.find((role) => role.slug === "caixa")?.id ?? roles[0]?.id;
 
   return (
     <form action={formAction} className="grid gap-4 md:grid-cols-2">
@@ -45,7 +47,7 @@ export function CreateUserForm({ roles }: CreateUserFormProps) {
           id="roleId"
           name="roleId"
           className="admin-native-select"
-          defaultValue={roles[0]?.id}
+          defaultValue={defaultRoleId}
           required
         >
           {roles.map((role) => (

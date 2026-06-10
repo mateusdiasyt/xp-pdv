@@ -13,7 +13,7 @@ export async function upsertDailyGoalAction(
 ): Promise<ActionState> {
   void prevState;
   try {
-    const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+    const session = await requirePermission(PERMISSIONS.GOALS_MANAGE);
     await upsertDailyGoalRecord(formData, session.user.id);
     revalidatePath("/admin");
     return { status: "success", message: "Meta diaria salva com sucesso." };
@@ -28,7 +28,7 @@ export async function upsertMonthlyGoalPlanAction(
 ): Promise<ActionState> {
   void prevState;
   try {
-    const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+    const session = await requirePermission(PERMISSIONS.GOALS_MANAGE);
     await upsertMonthlyGoalPlanRecord(formData, session.user.id);
     revalidatePath("/admin");
     return { status: "success", message: "Planejamento mensal salvo com sucesso." };

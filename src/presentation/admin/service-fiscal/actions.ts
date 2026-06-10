@@ -7,7 +7,7 @@ import { createServiceFiscalDeclarationRecord } from "@/application/service-fisc
 import { PERMISSIONS } from "@/domain/auth/permissions";
 
 export async function declareServiceNfseAction(formData: FormData): Promise<void> {
-  const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+  const session = await requirePermission(PERMISSIONS.SERVICE_FISCAL_MANAGE);
 
   await createServiceFiscalDeclarationRecord(formData, session.user.id);
 

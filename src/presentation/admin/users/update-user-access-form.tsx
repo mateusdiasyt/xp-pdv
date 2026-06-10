@@ -45,7 +45,23 @@ type PermissionDisplay = {
   description: string;
 };
 
-const moduleOrder = ["Painel", "Usuarios", "Categorias", "Fornecedores", "Clientes", "Produtos", "Estoque", "Caixa", "PDV"];
+const moduleOrder = [
+  "Painel",
+  "PDV",
+  "Vendas",
+  "Cupons",
+  "Servicos",
+  "Financeiro",
+  "Fiscal",
+  "Usuarios",
+  "Categorias",
+  "Fornecedores",
+  "Clientes",
+  "Produtos",
+  "Estoque",
+  "Caixa",
+  "Sistema",
+];
 
 const permissionDictionary: Record<string, { module: string; title: string; description: string }> = {
   "dashboard:view": {
@@ -62,6 +78,61 @@ const permissionDictionary: Record<string, { module: string; title: string; desc
     module: "Usuarios",
     title: "Gerenciar usuarios",
     description: "Permite criar contas, alterar perfil e atualizar status.",
+  },
+  "sales:view": {
+    module: "Vendas",
+    title: "Visualizar vendas",
+    description: "Permite consultar historico completo, comprovantes, DANFE e XML.",
+  },
+  "coupons:view": {
+    module: "Cupons",
+    title: "Visualizar cupons",
+    description: "Permite consultar cupons cadastrados e regras de desconto.",
+  },
+  "coupons:manage": {
+    module: "Cupons",
+    title: "Gerenciar cupons",
+    description: "Permite criar, editar e ativar/desativar cupons.",
+  },
+  "services:view": {
+    module: "Servicos",
+    title: "Visualizar servicos",
+    description: "Permite abrir a tela de servicos por tempo e acompanhar estacoes.",
+  },
+  "payments:view": {
+    module: "Financeiro",
+    title: "Visualizar pagamentos",
+    description: "Permite consultar auditoria de Pix, dinheiro, credito e debito.",
+  },
+  "accounts:view": {
+    module: "Financeiro",
+    title: "Visualizar contas",
+    description: "Permite consultar contas, vencimentos e comprovantes.",
+  },
+  "accounts:manage": {
+    module: "Financeiro",
+    title: "Gerenciar contas",
+    description: "Permite cadastrar contas, alterar status e anexar comprovantes.",
+  },
+  "reports:view": {
+    module: "Financeiro",
+    title: "Visualizar relatorios",
+    description: "Permite consultar relatorios de venda, caixa, lucro e formas de pagamento.",
+  },
+  "fiscal:view": {
+    module: "Fiscal",
+    title: "Visualizar fiscal",
+    description: "Permite consultar NFC-e, DANFE, XML e exportacoes fiscais.",
+  },
+  "service-fiscal:view": {
+    module: "Fiscal",
+    title: "Visualizar NFS-e servicos",
+    description: "Permite consultar apuracao fiscal de servicos por periodo.",
+  },
+  "service-fiscal:manage": {
+    module: "Fiscal",
+    title: "Gerenciar NFS-e servicos",
+    description: "Permite registrar declaracoes e numeros de NFS-e de servicos.",
   },
   "categories:view": {
     module: "Categorias",
@@ -137,6 +208,41 @@ const permissionDictionary: Record<string, { module: string; title: string; desc
     module: "PDV",
     title: "Cancelar vendas",
     description: "Permite cancelar vendas e retornar estoque automaticamente.",
+  },
+  "support:view": {
+    module: "Sistema",
+    title: "Visualizar suporte",
+    description: "Permite consultar tickets de suporte.",
+  },
+  "support:manage": {
+    module: "Sistema",
+    title: "Gerenciar suporte",
+    description: "Permite criar tickets e atualizar status de suporte.",
+  },
+  "goals:view": {
+    module: "Sistema",
+    title: "Visualizar metas",
+    description: "Permite consultar metas diarias e mensais.",
+  },
+  "goals:manage": {
+    module: "Sistema",
+    title: "Gerenciar metas",
+    description: "Permite cadastrar e editar metas comerciais.",
+  },
+  "customization:view": {
+    module: "Sistema",
+    title: "Visualizar configuracoes",
+    description: "Permite acessar a tela de configuracoes e personalizacao.",
+  },
+  "customization:manage": {
+    module: "Sistema",
+    title: "Gerenciar configuracoes",
+    description: "Permite alterar identidade visual e configuracoes do sistema.",
+  },
+  "tv-app:view": {
+    module: "Sistema",
+    title: "Visualizar app da TV",
+    description: "Permite acessar a pagina do APK e manifesto de atualizacao.",
   },
 };
 

@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AlertTriangle, ArrowRight, Goal, Wallet } from "lucide-react";
 
-import { requirePermission } from "@/application/auth/guards";
+import { requireSession } from "@/application/auth/guards";
 import { getDashboardSummary } from "@/application/dashboard/dashboard-service";
+import { buildTenantAdminPath } from "@/application/platform/platform-service";
 import { MetricCard } from "@/components/admin/metric-card";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PERMISSIONS } from "@/domain/auth/permissions";
+import { hasPermission, PERMISSIONS, type PermissionKey } from "@/domain/auth/permissions";
 import { formatCurrency } from "@/lib/format";
 import { RevenueTrendChart } from "@/presentation/admin/dashboard/revenue-trend-chart";
 
@@ -38,8 +40,31 @@ function percentOfTarget(actual: number, target: number) {
   return Math.min(Math.round((actual / target) * 100), 100);
 }
 
+const fallbackRoutes: Array<{ permission: PermissionKey; path: string }> = [
+  { permission: PERMISSIONS.PDV_VIEW, path: "/admin/pdv" },
+  { permission: PERMISSIONS.PAYMENTS_VIEW, path: "/admin/payments" },
+  { permission: PERMISSIONS.ACCOUNTS_VIEW, path: "/admin/accounts" },
+  { permission: PERMISSIONS.REPORTS_VIEW, path: "/admin/reports" },
+  { permission: PERMISSIONS.FISCAL_VIEW, path: "/admin/fiscal" },
+  { permission: PERMISSIONS.SALES_VIEW, path: "/admin/sales" },
+  { permission: PERMISSIONS.SERVICES_VIEW, path: "/admin/services" },
+  { permission: PERMISSIONS.PRODUCTS_VIEW, path: "/admin/products" },
+  { permission: PERMISSIONS.STOCK_VIEW, path: "/admin/stock" },
+  { permission: PERMISSIONS.USERS_VIEW, path: "/admin/users" },
+];
+
 export default async function AdminDashboardPage() {
-  await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  const session = await requireSession();
+
+  if (session.user.roleSlug !== "administrador" && !hasPermission(session.user.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
+    const fallback = fallbackRoutes.find((item) => hasPermission(session.user.permissions, item.permission));
+    if (fallback) {
+      redirect(buildTenantAdminPath(session.user.tenantSlug, fallback.path));
+    }
+
+    redirect("/forbidden");
+  }
+
   const summary = await getDashboardSummary();
   const averageTicket = summary.todaySalesCount > 0 ? summary.todayRevenue / summary.todaySalesCount : 0;
 

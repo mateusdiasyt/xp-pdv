@@ -1,6 +1,7 @@
 import { AccountNotificationBell } from "@/components/admin/account-notification-bell";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav";
+import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 
 type AdminHeaderProps = {
   userName?: string | null;
@@ -27,6 +28,8 @@ export function AdminHeader({
   permissions,
   accountNotifications,
 }: AdminHeaderProps) {
+  const canViewAccounts = roleSlug === "administrador" || hasPermission(permissions, PERMISSIONS.ACCOUNTS_VIEW);
+
   return (
     <header className="sticky top-0 z-30 bg-background/64 px-4 py-3 backdrop-blur-2xl md:px-6 xl:px-8">
       <div className="mx-auto flex h-11 w-full max-w-[1600px] items-center justify-between">
@@ -42,7 +45,7 @@ export function AdminHeader({
 
         <div className="flex items-center gap-2">
           <AdminUserMenu userName={userName} userEmail={userEmail} />
-          <AccountNotificationBell {...accountNotifications} />
+          {canViewAccounts ? <AccountNotificationBell {...accountNotifications} /> : null}
         </div>
       </div>
     </header>

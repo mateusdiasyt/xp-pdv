@@ -32,7 +32,7 @@ function serializeDateOnly(value: Date) {
 }
 
 export default async function AccountsPage({ searchParams }: AccountsPageProps) {
-  await requirePermission(PERMISSIONS.CASH_VIEW);
+  await requirePermission(PERMISSIONS.ACCOUNTS_VIEW);
 
   const params = await searchParams;
   const status = parseStatus(params.status);

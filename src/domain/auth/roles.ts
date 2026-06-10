@@ -7,6 +7,14 @@ export function roleSlugToLabel(roleSlug: string) {
     return "Gerente";
   }
 
+  if (roleSlug === "financeiro") {
+    return "Financeiro";
+  }
+
+  if (roleSlug === "caixa") {
+    return "Caixa";
+  }
+
   if (roleSlug === "operador") {
     return "Operador";
   }

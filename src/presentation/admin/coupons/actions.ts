@@ -17,7 +17,7 @@ export async function saveCouponAction(
 
 export async function saveCouponRequest(formData: FormData): Promise<ActionState> {
   try {
-    const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+    const session = await requirePermission(PERMISSIONS.COUPONS_MANAGE);
     await saveCouponRecord(formData, session.user.id);
     revalidatePath("/admin/coupons");
     revalidatePath("/admin/pdv");
@@ -28,7 +28,7 @@ export async function saveCouponRequest(formData: FormData): Promise<ActionState
 }
 
 export async function toggleCouponStatusAction(formData: FormData) {
-  const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
+  const session = await requirePermission(PERMISSIONS.COUPONS_MANAGE);
   await updateCouponStatusRecord(formData, session.user.id);
   revalidatePath("/admin/coupons");
   revalidatePath("/admin/pdv");

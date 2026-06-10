@@ -14,7 +14,7 @@ export async function createSupportTicketAction(
 ): Promise<ActionState> {
   void prevState;
   try {
-    const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+    const session = await requirePermission(PERMISSIONS.SUPPORT_MANAGE);
     const actorName = session.user.name ?? session.user.email ?? "Usuario do painel";
     await createSupportTicketRecord(formData, {
       id: session.user.id,
@@ -32,7 +32,7 @@ export async function updateSupportTicketStatusAction(
 ): Promise<ActionState> {
   void prevState;
   try {
-    const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+    const session = await requirePermission(PERMISSIONS.SUPPORT_MANAGE);
     const actorName = session.user.name ?? session.user.email ?? "Usuario do painel";
     await updateSupportTicketStatusRecord(formData, {
       id: session.user.id,

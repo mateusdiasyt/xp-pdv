@@ -77,7 +77,7 @@ function isTraceableMethod(method: PaymentMethod) {
 }
 
 export default async function PaymentsPage({ searchParams }: PaymentsPageProps) {
-  await requirePermission(PERMISSIONS.PDV_VIEW);
+  await requirePermission(PERMISSIONS.PAYMENTS_VIEW);
   const filters = await searchParams;
   const audit = await getPaymentAuditData(filters);
 

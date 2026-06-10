@@ -1,5 +1,10 @@
 import { requirePermission } from "@/application/auth/guards";
-import { getPermissions, getRoles, getUsers } from "@/application/users/user-service";
+import {
+  ensureUserAccessControlPresets,
+  getPermissions,
+  getRoles,
+  getUsers,
+} from "@/application/users/user-service";
 import { PageHeader } from "@/components/admin/page-header";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { UsersAdminTable } from "@/presentation/admin/users/users-admin-table";
@@ -15,6 +20,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const { q } = await searchParams;
   const search = q?.trim() || undefined;
 
+  await ensureUserAccessControlPresets();
   const [users, roles, permissions] = await Promise.all([getUsers(search), getRoles(), getPermissions()]);
   const canManageUsers = hasPermission(session.user.permissions, PERMISSIONS.USERS_MANAGE);
 
@@ -22,8 +28,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Modulo ERP"
-        title="Administradores"
-        description="Gestao de contas administrativas com perfil base e permissao adicional por usuario."
+        title="Usuarios"
+        description="Cadastre contas e defina perfis como Administrador, Financeiro ou Caixa."
       />
 
       <UsersAdminTable
@@ -40,6 +46,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         roles={roles.map((role) => ({
           id: role.id,
           name: role.name,
+          slug: role.slug,
           permissionIds: role.permissions.map((item) => item.permissionId),
         }))}
         permissions={permissions.map((permission) => ({
