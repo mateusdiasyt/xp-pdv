@@ -14,7 +14,20 @@ function normalizeTenantSlug(value: unknown) {
 }
 
 function parseTenantAdminPath(pathname: string) {
-  const match = pathname.match(/^\/app\/([^/]+)\/admin(?:\/(.*))?$/);
+  const legacyMatch = pathname.match(/^\/app\/([^/]+)\/admin(?:\/(.*))?$/);
+
+  if (legacyMatch) {
+    const slug = normalizeTenantSlug(legacyMatch[1]);
+    const rest = legacyMatch[2] ? `/${legacyMatch[2]}` : "";
+
+    return {
+      slug,
+      adminPath: `/admin${rest}`,
+      isLegacy: true,
+    };
+  }
+
+  const match = pathname.match(/^\/app\/([^/.]+)(?:\/(.*))?$/);
 
   if (!match) {
     return null;
@@ -26,6 +39,7 @@ function parseTenantAdminPath(pathname: string) {
   return {
     slug,
     adminPath: `/admin${rest}`,
+    isLegacy: false,
   };
 }
 
@@ -58,6 +72,12 @@ function rewriteTenantAdminRoute(request: NextRequest, slug: string, adminPath: 
   return response;
 }
 
+function buildTenantPublicPath(slug: string, adminPath: string) {
+  const publicPath = adminPath === "/admin" ? "" : adminPath.replace(/^\/admin/, "");
+
+  return `/app/${slug}${publicPath}`;
+}
+
 function nextWithHeaders(request: NextRequest, isPublicAdminApp = false) {
   const requestHeaders = new Headers(request.headers);
 
@@ -82,7 +102,13 @@ const authenticatedProxy = withAuth(
 
       if (tokenTenantSlug !== tenantRoute.slug) {
         const url = request.nextUrl.clone();
-        url.pathname = `/app/${tokenTenantSlug}${tenantRoute.adminPath}`;
+        url.pathname = buildTenantPublicPath(tokenTenantSlug, tenantRoute.adminPath);
+        return NextResponse.redirect(url);
+      }
+
+      if (tenantRoute.isLegacy) {
+        const url = request.nextUrl.clone();
+        url.pathname = buildTenantPublicPath(tenantRoute.slug, tenantRoute.adminPath);
         return NextResponse.redirect(url);
       }
 
@@ -92,7 +118,7 @@ const authenticatedProxy = withAuth(
     if (pathname === "/admin" || pathname.startsWith("/admin/")) {
       const tenantSlug = normalizeTenantSlug(request.nextauth.token?.tenantSlug);
       const url = request.nextUrl.clone();
-      url.pathname = `/app/${tenantSlug}${pathname}`;
+      url.pathname = buildTenantPublicPath(tenantSlug, pathname);
       return NextResponse.redirect(url);
     }
 
@@ -112,9 +138,20 @@ const authenticatedProxy = withAuth(
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
+
+  if (pathname === "/app/xp-tv.apk") {
+    return NextResponse.next();
+  }
+
   const tenantRoute = parseTenantAdminPath(pathname);
 
   if (tenantRoute && isPublicTvAppRoute(tenantRoute.adminPath)) {
+    if (tenantRoute.isLegacy) {
+      const url = request.nextUrl.clone();
+      url.pathname = buildTenantPublicPath(tenantRoute.slug, tenantRoute.adminPath);
+      return NextResponse.redirect(url);
+    }
+
     return rewriteTenantAdminRoute(request, tenantRoute.slug, tenantRoute.adminPath, true);
   }
 
@@ -126,5 +163,5 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/app/:workspace/admin/:path*", "/super-admin/:path*"],
+  matcher: ["/admin/:path*", "/app/:workspace", "/app/:workspace/:path*", "/super-admin/:path*"],
 };

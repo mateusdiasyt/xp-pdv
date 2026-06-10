@@ -98,8 +98,9 @@ async function buildUniqueTenantSlug(base: string) {
 export function buildTenantAdminPath(slug: string, adminPath = "/admin") {
   const normalizedSlug = normalizeTenantSlug(slug);
   const normalizedPath = adminPath.startsWith("/admin") ? adminPath : `/admin${adminPath.startsWith("/") ? adminPath : `/${adminPath}`}`;
+  const publicPath = normalizedPath === "/admin" ? "" : normalizedPath.replace(/^\/admin/, "");
 
-  return `/app/${normalizedSlug}${normalizedPath}`;
+  return `/app/${normalizedSlug}${publicPath}`;
 }
 
 export async function listPlatformTenants() {

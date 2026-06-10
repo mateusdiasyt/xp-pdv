@@ -30,10 +30,10 @@ function extractWorkspaceFromCallbackUrl(callbackUrl: string | null) {
 
   try {
     const url = callbackUrl.startsWith("/") ? new URL(callbackUrl, "https://xp.local") : new URL(callbackUrl);
-    const match = url.pathname.match(/^\/app\/([^/]+)\/admin(?:\/|$)/);
+    const match = url.pathname.match(/^\/app\/([^/.]+)(?:\/|$)/);
     return match?.[1] ?? "";
   } catch {
-    const match = callbackUrl.match(/^\/app\/([^/]+)\/admin(?:\/|$)/);
+    const match = callbackUrl.match(/^\/app\/([^/.]+)(?:\/|$)/);
     return match?.[1] ?? "";
   }
 }
@@ -42,7 +42,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const rawCallbackUrl = searchParams.get("callbackUrl");
   const workspace = searchParams.get("workspace")?.trim() || extractWorkspaceFromCallbackUrl(rawCallbackUrl);
-  const callbackUrl = rawCallbackUrl ?? (workspace ? `/app/${workspace}/admin` : "/admin");
+  const callbackUrl = rawCallbackUrl ?? (workspace ? `/app/${workspace}` : "/admin");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tenantChoices, setTenantChoices] = useState<LoginTenantChoice[]>([]);
   const [loginValues, setLoginValues] = useState<LoginSchema | null>(null);
@@ -61,7 +61,7 @@ export function LoginForm() {
       return callbackUrl;
     }
 
-    return `/app/${tenantSlug}/admin`;
+    return `/app/${tenantSlug}`;
   }
 
   async function signInToTenant(values: LoginSchema, tenantSlug: string) {

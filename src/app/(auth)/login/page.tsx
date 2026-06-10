@@ -266,7 +266,7 @@ function MiniLinkPreview() {
         <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Link do PDV</p>
         <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-xs font-black text-white">
           <Link2 className="h-4 w-4 shrink-0 text-primary" />
-          <span className="truncate">/app/seu-bar/admin</span>
+          <span className="truncate">/app/seu-bar</span>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between text-xs">
