@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  type FocusEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Banknote, LockKeyhole, MinusCircle, PlusCircle, Printer, WalletCards } from "lucide-react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
@@ -130,6 +139,34 @@ function formatDateTime(value?: string | null) {
   return dateFormatter.format(new Date(value));
 }
 
+function normalizeBrazilianMoneyInput(value: string) {
+  const withoutDots = value.replace(/\./g, "");
+  const onlyMoneyChars = withoutDots.replace(/[^\d,]/g, "");
+  const [integer = "", ...decimalParts] = onlyMoneyChars.split(",");
+  const decimal = decimalParts.join("").slice(0, 2);
+
+  return decimalParts.length > 0 ? `${integer},${decimal}` : integer;
+}
+
+function handleBrazilianMoneyFocus(event: FocusEvent<HTMLInputElement>) {
+  if (["0.00", "0,00", "0"].includes(event.currentTarget.value.trim())) {
+    event.currentTarget.value = "";
+  }
+}
+
+function handleBrazilianMoneyKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.key === ".") {
+    event.preventDefault();
+  }
+}
+
+function handleBrazilianMoneyChange(event: ChangeEvent<HTMLInputElement>) {
+  const normalized = normalizeBrazilianMoneyInput(event.currentTarget.value);
+
+  if (event.currentTarget.value !== normalized) {
+    event.currentTarget.value = normalized;
+  }
+}
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -333,7 +370,17 @@ function OpenCashForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="pdv-opening-amount">Inicial</Label>
-        <Input id="pdv-opening-amount" name="openingAmount" defaultValue="0.00" inputMode="decimal" required />
+        <Input
+          id="pdv-opening-amount"
+          name="openingAmount"
+          defaultValue="0,00"
+          inputMode="decimal"
+          placeholder="0,00"
+          onFocus={handleBrazilianMoneyFocus}
+          onKeyDown={handleBrazilianMoneyKeyDown}
+          onChange={handleBrazilianMoneyChange}
+          required
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -389,7 +436,16 @@ function CashMovementForm({
       <input type="hidden" name="type" value={type} />
       <div className="space-y-1.5">
         <Label htmlFor={`cash-movement-${type}`}>Valor</Label>
-        <Input id={`cash-movement-${type}`} name="amount" placeholder="0.00" inputMode="decimal" required />
+        <Input
+          id={`cash-movement-${type}`}
+          name="amount"
+          placeholder="0,00"
+          inputMode="decimal"
+          onFocus={handleBrazilianMoneyFocus}
+          onKeyDown={handleBrazilianMoneyKeyDown}
+          onChange={handleBrazilianMoneyChange}
+          required
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`cash-movement-reason-${type}`}>Motivo</Label>
