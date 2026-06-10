@@ -71,7 +71,7 @@ export function LandingLoginModal({ label = "Login", className, children }: Land
                       Entrar no painel
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-white/58">
-                      Acesse seu ambiente com email, senha e cliente.
+                      Acesse seu ambiente com email e senha.
                     </p>
                   </div>
                   <button

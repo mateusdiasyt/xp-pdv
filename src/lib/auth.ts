@@ -95,7 +95,7 @@ export const authOptions: NextAuthOptions = {
           type: "password",
         },
         workspace: {
-          label: "Cliente",
+          label: "PDV",
           type: "text",
         },
       },

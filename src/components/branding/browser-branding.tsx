@@ -19,7 +19,7 @@ function upsertIconLink(rel: string, href: string) {
   link.href = href;
 
   if (rel.includes("icon")) {
-    link.type = "image/png";
+    link.type = href.includes(".svg") ? "image/svg+xml" : "image/png";
   }
 
   document.head.appendChild(link);

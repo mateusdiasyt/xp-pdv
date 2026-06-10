@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, ImageIcon, Palette, X } from "lucide-react";
+import { Clock, Palette, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useActionState, useState } from "react";
 
@@ -27,7 +27,6 @@ type UpdateBrandCustomizationFormProps = {
     backgroundColor: string;
     foregroundColor: string;
     logoDataUrl?: string;
-    faviconDataUrl?: string;
     businessTimezone: string;
     businessDayStartsAt: string;
     businessDayEndsAt: string;
@@ -80,10 +79,9 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
   const [businessDayEndsAt, setBusinessDayEndsAt] = useState(initialValues.businessDayEndsAt);
 
   const [logoDataUrl, setLogoDataUrl] = useState(initialValues.logoDataUrl ?? "");
-  const [faviconDataUrl, setFaviconDataUrl] = useState(initialValues.faviconDataUrl ?? "");
   const [processingError, setProcessingError] = useState<string | null>(null);
 
-  async function handleAssetChange(event: ChangeEvent<HTMLInputElement>, type: "logo" | "favicon") {
+  async function handleAssetChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) {
       return;
@@ -96,20 +94,13 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
 
     try {
       setProcessingError(null);
-      const nextDataUrl = await buildImagePreviewDataUrl(
-        selectedFile,
-        type === "favicon" ? "image/png" : "image/webp",
-      );
+      const nextDataUrl = await buildImagePreviewDataUrl(selectedFile, "image/webp");
 
       if (nextDataUrl.length > 1_800_000) {
         throw new Error("Arquivo muito grande. Use uma imagem menor para continuar.");
       }
 
-      if (type === "logo") {
-        setLogoDataUrl(nextDataUrl);
-      } else {
-        setFaviconDataUrl(nextDataUrl);
-      }
+      setLogoDataUrl(nextDataUrl);
     } catch (error) {
       setProcessingError(error instanceof Error ? error.message : "Nao foi possivel processar a imagem.");
     }
@@ -125,14 +116,12 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
     setBusinessDayStartsAt("19:00");
     setBusinessDayEndsAt("01:00");
     setLogoDataUrl("");
-    setFaviconDataUrl("");
     setProcessingError(null);
   }
 
   return (
     <form action={formAction} className="grid gap-5">
       <input type="hidden" name="logoDataUrl" value={logoDataUrl} />
-      <input type="hidden" name="faviconDataUrl" value={faviconDataUrl} />
 
       <section className="grid gap-2">
         <Label htmlFor="browserTitle">Nome da aba do navegador</Label>
@@ -221,17 +210,17 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4">
         <div className="rounded-2xl border border-border/75 bg-background/35 p-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">Logo do sistema</p>
-            <p className="text-xs text-muted-foreground">PNG, JPG ou WebP. Recomendado: horizontal, fundo transparente.</p>
+            <p className="text-sm font-medium text-foreground">Logo do painel</p>
+            <p className="text-xs text-muted-foreground">Usada apenas dentro do ambiente do cliente.</p>
           </div>
           <Input
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
             className="mt-3"
-            onChange={(event) => void handleAssetChange(event, "logo")}
+            onChange={(event) => void handleAssetChange(event)}
           />
           <div className="mt-3 overflow-hidden rounded-xl border border-border/70 bg-background/45 p-3">
             {logoDataUrl ? (
@@ -245,38 +234,6 @@ export function UpdateBrandCustomizationForm({ initialValues }: UpdateBrandCusto
             <Button type="button" variant="outline" size="sm" onClick={() => setLogoDataUrl("")}>
               <X className="h-4 w-4" />
               Remover logo
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/75 bg-background/35 p-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">Favicon</p>
-            <p className="text-xs text-muted-foreground">PNG recomendado. Tamanho ideal: 512x512.</p>
-          </div>
-          <Input
-            type="file"
-            accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/jpeg,image/jpg,image/webp"
-            className="mt-3"
-            onChange={(event) => void handleAssetChange(event, "favicon")}
-          />
-          <div className="mt-3 overflow-hidden rounded-xl border border-border/70 bg-background/45 p-3">
-            <div className="flex h-16 items-center justify-center">
-              {faviconDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={faviconDataUrl} alt="Preview do favicon" className="h-12 w-12 rounded-lg object-cover" />
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ImageIcon className="h-4 w-4" />
-                  Usando favicon padrao
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setFaviconDataUrl("")}>
-              <X className="h-4 w-4" />
-              Remover favicon
             </Button>
           </div>
         </div>

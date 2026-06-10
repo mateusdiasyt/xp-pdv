@@ -149,6 +149,24 @@ export async function findLoginTenantAccessByEmail(email: string) {
   return access ?? null;
 }
 
+export async function findLoginTenantAccessesByEmail(email: string) {
+  await ensurePlatformTenantProfileColumns();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  return getPlatformPrisma().platformTenantUser.findMany({
+    where: {
+      email: normalizedEmail,
+      tenant: {
+        status: PlatformTenantStatus.ACTIVE,
+      },
+    },
+    include: {
+      tenant: true,
+    },
+    orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }],
+  });
+}
+
 export async function findLoginTenantAccessBySlug(slug: string, email: string) {
   await ensurePlatformTenantProfileColumns();
   return getPlatformPrisma().platformTenantUser.findFirst({

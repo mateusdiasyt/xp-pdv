@@ -23,8 +23,17 @@ function parseDataUrlImage(dataUrl: string) {
 }
 
 export async function buildBrandAssetResponse(asset: BrandAsset, request: Request) {
+  if (asset === "favicon") {
+    return NextResponse.redirect(new URL("/mendoza-favicon.svg", request.url), {
+      status: 307,
+      headers: {
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
+      },
+    });
+  }
+
   const { customization } = await getBrandCustomizationSnapshot();
-  const targetAssetDataUrl = asset === "logo" ? customization.logoDataUrl : customization.faviconDataUrl;
+  const targetAssetDataUrl = customization.logoDataUrl;
   const parsedDataUrl = targetAssetDataUrl ? parseDataUrlImage(targetAssetDataUrl) : null;
 
   if (parsedDataUrl) {
@@ -36,8 +45,7 @@ export async function buildBrandAssetResponse(asset: BrandAsset, request: Reques
     });
   }
 
-  const fallbackPath = asset === "logo" ? "/logo-maia.png" : "/favicon-maia-square.png";
-  return NextResponse.redirect(new URL(fallbackPath, request.url), {
+  return NextResponse.redirect(new URL("/mendoza-logo.svg", request.url), {
     status: 307,
     headers: {
       "Cache-Control": "no-store, max-age=0, must-revalidate",
