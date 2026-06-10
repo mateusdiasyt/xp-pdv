@@ -56,7 +56,7 @@ export function LandingRegisterModal({
 
       {typeof document !== "undefined" && open
         ? createPortal(
-            <div className="fixed inset-0 z-[200] grid place-items-center overflow-y-auto bg-black/72 px-4 py-8 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[1000] grid place-items-center overflow-y-auto bg-black/72 px-4 py-8 backdrop-blur-sm">
               <button
                 type="button"
                 className="absolute inset-0 cursor-default"
