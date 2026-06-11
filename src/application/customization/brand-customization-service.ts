@@ -84,6 +84,13 @@ function ensureBrandCustomizationStorageAvailable(error: unknown): never {
   throw error instanceof Error ? error : new Error("Nao foi possivel carregar as configuracoes de personalizacao.");
 }
 
+function isTenantCustomizationUnavailableError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("cliente inativo ou banco de dados ainda nao provisionado")
+  );
+}
+
 function normalizeDataUrlImage(value: unknown, type: "logo" | "favicon") {
   if (value === null || value === undefined) {
     return null;
@@ -139,6 +146,13 @@ export async function getBrandCustomizationSnapshot() {
       setupPending: false,
     };
   } catch (error) {
+    if (isTenantCustomizationUnavailableError(error)) {
+      return {
+        customization: defaultBrandCustomization,
+        setupPending: false,
+      };
+    }
+
     if (isMissingBrandCustomizationTableError(error)) {
       console.warn("[CUSTOMIZATION] Tabela BrandCustomization ausente. Tentando auto-bootstrap.");
 
