@@ -1,13 +1,14 @@
 "use client";
 
 import { RecordStatus } from "@prisma/client";
-import { useActionState } from "react";
+import { Loader2 } from "lucide-react";
+import { type FormEvent, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import { createUserAction } from "@/presentation/admin/users/actions";
 
 type RoleOption = {
@@ -21,11 +22,40 @@ type CreateUserFormProps = {
 };
 
 export function CreateUserForm({ roles }: CreateUserFormProps) {
-  const [state, formAction] = useActionState(createUserAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const defaultRoleId = roles.find((role) => role.slug === "caixa")?.id ?? roles[0]?.id;
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setState(initialActionState);
+
+    try {
+      const result = await createUserAction(initialActionState, new FormData(event.currentTarget));
+      setState(result);
+
+      if (result.status === "success") {
+        window.location.reload();
+        return;
+      }
+    } catch {
+      setState({
+        status: "error",
+        message: "Nao foi possivel criar o usuario. Se o problema persistir, contate o Mateus.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="grid gap-4 md:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="name">Nome</Label>
         <Input id="name" name="name" placeholder="Nome completo" required />
@@ -73,7 +103,10 @@ export function CreateUserForm({ roles }: CreateUserFormProps) {
       </div>
 
       <div className="md:col-span-2">
-        <FormSubmitButton>Criar usuario</FormSubmitButton>
+        <Button type="submit" disabled={isSubmitting} className="gap-2">
+          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isSubmitting ? "Salvando..." : "Criar usuario"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>

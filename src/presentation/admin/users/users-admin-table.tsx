@@ -1,13 +1,14 @@
 "use client";
 
 import { RecordStatus } from "@prisma/client";
-import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toggleUserStatusAction } from "@/presentation/admin/users/actions";
@@ -77,6 +78,8 @@ export function UsersAdminTable({
 }: UsersAdminTableProps) {
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(users[0]?.id ?? "");
+  const [pendingToggleUserId, setPendingToggleUserId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === selectedUserId) ?? users[0],
@@ -87,6 +90,44 @@ export function UsersAdminTable({
     setSelectedUserId(userId);
     setIsPermissionsDialogOpen(true);
   }
+
+  async function handleToggleStatus(userId: string, status: RecordStatus) {
+    if (pendingToggleUserId) {
+      return;
+    }
+
+    setPendingToggleUserId(userId);
+    setToggleError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("userId", userId);
+      formData.set("status", status);
+      await toggleUserStatusAction(formData);
+      window.location.reload();
+    } catch {
+      setToggleError("Nao foi possivel atualizar o status do usuario. Tente novamente.");
+      setPendingToggleUserId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!isPermissionsDialogOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsPermissionsDialogOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPermissionsDialogOpen]);
 
   return (
     <>
@@ -116,6 +157,12 @@ export function UsersAdminTable({
         </CardHeader>
 
         <CardContent className="pt-4">
+          {toggleError ? (
+            <div className="mb-3 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              {toggleError}
+            </div>
+          ) : null}
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -139,7 +186,6 @@ export function UsersAdminTable({
               {users.map((user, index) => {
                 const nextStatus = user.status === RecordStatus.ACTIVE ? RecordStatus.INACTIVE : RecordStatus.ACTIVE;
                 const totalPermissions = getTotalPermissions(user);
-                const toggleFormId = `toggle-user-status-${user.id}`;
 
                 return (
                   <TableRow key={user.id}>
@@ -169,16 +215,13 @@ export function UsersAdminTable({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <form id={toggleFormId} action={toggleUserStatusAction} className="hidden">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input type="hidden" name="status" value={nextStatus} />
-                      </form>
                       {canManageUsers ? (
                         <UserRowActions
                           onAssignPermissions={() => openPermissionsForUser(user.id)}
-                          toggleFormId={toggleFormId}
+                          onToggleStatus={() => handleToggleStatus(user.id, nextStatus)}
                           toggleLabel={nextStatus === RecordStatus.ACTIVE ? "Reativar usuario" : "Desativar usuario"}
                           destructiveToggle={nextStatus === RecordStatus.INACTIVE}
+                          isToggling={pendingToggleUserId === user.id}
                         />
                       ) : (
                         <span className="text-xs text-muted-foreground">Sem permissao</span>
@@ -196,37 +239,61 @@ export function UsersAdminTable({
         </CardContent>
       </Card>
 
-      <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
-        <DialogContent className="max-w-[min(1200px,96vw)] gap-0 border-border/80 bg-card p-0 sm:max-w-[min(1200px,96vw)]">
-          <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
-            <DialogTitle>Atribuir permissoes</DialogTitle>
-            <DialogDescription>
-              {selectedUser
-                ? `Ajuste as permissoes de ${selectedUser.name} com base no perfil e nas excecoes necessarias.`
-                : "Selecione um usuario para editar as permissoes."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[80vh] overflow-y-auto p-5">
-            {selectedUser ? (
-              <UpdateUserAccessForm
-                users={[
-                  {
-                    id: selectedUser.id,
-                    name: selectedUser.name,
-                    email: selectedUser.email,
-                    roleId: selectedUser.roleId,
-                    directPermissionIds: selectedUser.directPermissionIds,
-                  },
-                ]}
-                roles={roles}
-                permissions={permissions}
-                initialUserId={selectedUser.id}
-                lockUser
+      {isPermissionsDialogOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+                aria-label="Fechar modal"
+                onClick={() => setIsPermissionsDialogOpen(false)}
               />
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="user-permissions-title"
+                className="relative z-10 grid w-full max-w-[min(1200px,96vw)] overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl"
+              >
+                <header className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4">
+                  <div>
+                    <h2 id="user-permissions-title" className="text-base font-black text-foreground">
+                      Atribuir permissoes
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selectedUser
+                        ? `Ajuste as permissoes de ${selectedUser.name} com base no perfil e nas excecoes necessarias.`
+                        : "Selecione um usuario para editar as permissoes."}
+                    </p>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => setIsPermissionsDialogOpen(false)}>
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Fechar</span>
+                  </Button>
+                </header>
+                <div className="max-h-[80vh] overflow-y-auto p-5">
+                  {selectedUser ? (
+                    <UpdateUserAccessForm
+                      users={[
+                        {
+                          id: selectedUser.id,
+                          name: selectedUser.name,
+                          email: selectedUser.email,
+                          roleId: selectedUser.roleId,
+                          directPermissionIds: selectedUser.directPermissionIds,
+                        },
+                      ]}
+                      roles={roles}
+                      permissions={permissions}
+                      initialUserId={selectedUser.id}
+                      lockUser
+                    />
+                  ) : null}
+                </div>
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

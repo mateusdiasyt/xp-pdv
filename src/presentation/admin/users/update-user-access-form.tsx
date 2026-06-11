@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { type FormEvent, useMemo, useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { initialActionState } from "@/presentation/admin/common/action-state";
+import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import { updateUserAccessAction } from "@/presentation/admin/users/actions";
 
 type AccessUser = {
@@ -280,7 +281,8 @@ export function UpdateUserAccessForm({
   lockUser = false,
 }: UpdateUserAccessFormProps) {
   const initialUser = users.find((user) => user.id === initialUserId) ?? users[0];
-  const [state, formAction] = useActionState(updateUserAccessAction, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(initialUser?.id ?? "");
   const [selectedRoleId, setSelectedRoleId] = useState(initialUser?.roleId ?? roles[0]?.id ?? "");
   const [searchPermission, setSearchPermission] = useState("");
@@ -365,6 +367,34 @@ export function UpdateUserAccessForm({
     setSelectedPermissionIds(user.directPermissionIds);
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setState(initialActionState);
+
+    try {
+      const result = await updateUserAccessAction(initialActionState, new FormData(event.currentTarget));
+      setState(result);
+
+      if (result.status === "success") {
+        window.location.reload();
+        return;
+      }
+    } catch {
+      setState({
+        status: "error",
+        message: "Nao foi possivel salvar o acesso. Se o problema persistir, contate o Mateus.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (!selectedUser || !selectedRole) {
     return (
       <div className="rounded-xl border border-border/80 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
@@ -374,7 +404,7 @@ export function UpdateUserAccessForm({
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-xl border border-border/80 bg-background/70 p-3">
         <p className="text-sm font-semibold text-foreground">Como funciona o controle de acesso</p>
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -515,7 +545,10 @@ export function UpdateUserAccessForm({
       </div>
 
       <div>
-        <FormSubmitButton>Salvar acesso</FormSubmitButton>
+        <Button type="submit" disabled={isSubmitting} className="gap-2">
+          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isSubmitting ? "Salvando..." : "Salvar acesso"}
+        </Button>
         <ActionFeedback state={state} />
       </div>
     </form>
