@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { PlatformTenantStatus } from "@prisma/client";
-import { ArrowUpRight, CheckCircle2, Database, PauseCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Database, PowerOff, RotateCcw } from "lucide-react";
 
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { approveTenantAction, suspendTenantAction } from "@/app/super-admin/actions";
+import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
+import { approveTenantAction, reactivateTenantAction, suspendTenantAction } from "@/app/super-admin/actions";
 
 function statusLabel(status: PlatformTenantStatus) {
   const labels: Record<PlatformTenantStatus, string> = {
@@ -52,9 +53,12 @@ export default async function SuperAdminPage() {
                 Aprove clientes, controle status do plano e acesse o PDV isolado de cada ambiente.
               </p>
             </div>
-            <Button render={<Link href="/" />} variant="outline">
-              Voltar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button render={<Link href="/" />} variant="outline">
+                Voltar
+              </Button>
+              <SuperAdminSignOutButton />
+            </div>
           </div>
         </section>
 
@@ -159,12 +163,29 @@ export default async function SuperAdminPage() {
                       </form>
                     ) : null}
 
+                    {tenant.status === PlatformTenantStatus.ACTIVE && tenant.isDefault ? (
+                      <Button type="button" size="sm" variant="outline" className="gap-2 opacity-60" disabled>
+                        <PowerOff className="h-4 w-4" />
+                        Protegido
+                      </Button>
+                    ) : null}
+
                     {tenant.status === PlatformTenantStatus.ACTIVE && !tenant.isDefault ? (
                       <form action={suspendTenantAction}>
                         <input type="hidden" name="tenantId" value={tenant.id} />
                         <Button type="submit" size="sm" variant="outline" className="gap-2">
-                          <PauseCircle className="h-4 w-4" />
-                          Suspender
+                          <PowerOff className="h-4 w-4" />
+                          Desligar painel
+                        </Button>
+                      </form>
+                    ) : null}
+
+                    {tenant.status === PlatformTenantStatus.SUSPENDED && !tenant.isDefault ? (
+                      <form action={reactivateTenantAction}>
+                        <input type="hidden" name="tenantId" value={tenant.id} />
+                        <Button type="submit" size="sm" className="gap-2">
+                          <RotateCcw className="h-4 w-4" />
+                          Reativar
                         </Button>
                       </form>
                     ) : null}

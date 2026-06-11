@@ -350,6 +350,19 @@ export async function suspendPlatformTenant(tenantId: string) {
   });
 }
 
+export async function reactivatePlatformTenant(tenantId: string) {
+  await ensurePlatformTenantProfileColumns();
+  return getPlatformPrisma().platformTenant.update({
+    where: { id: tenantId },
+    data: {
+      status: PlatformTenantStatus.ACTIVE,
+      planStatus: "active",
+      suspendedAt: null,
+      lastProvisioningError: null,
+    },
+  });
+}
+
 export async function getTenantCompanyOnboardingState(slug: string) {
   await ensurePlatformTenantProfileColumns();
   const tenant = await getPlatformPrisma().platformTenant.findFirst({
