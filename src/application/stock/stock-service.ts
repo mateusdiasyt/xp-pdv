@@ -169,6 +169,74 @@ function inferSellableUnitMultiplier(description: string) {
   return Number.isInteger(multiplier) && multiplier > 1 ? multiplier : 1;
 }
 
+function normalizeXmlUnit(rawValue?: string) {
+  return (
+    rawValue
+      ?.trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") ?? ""
+  );
+}
+
+function isFractionalMeasureUnit(unit?: string) {
+  return new Set(["KG", "KGS", "KILO", "QUILO", "QUILOS", "G", "GR", "GRAMAS", "L", "LT", "LTS", "LITRO", "LITROS", "ML"]).has(
+    normalizeXmlUnit(unit),
+  );
+}
+
+function isDiscreteSellableUnit(unit?: string) {
+  return new Set([
+    "UN",
+    "UND",
+    "UNID",
+    "UNIDADE",
+    "UNIDADES",
+    "PC",
+    "PCT",
+    "POTE",
+    "CX",
+    "CAIXA",
+    "FD",
+    "FARDO",
+    "BD",
+    "BALDE",
+    "GF",
+    "GARRAFA",
+    "LATA",
+    "SACHE",
+    "PACOTE",
+  ]).has(normalizeXmlUnit(unit));
+}
+
+function shouldUseTaxableQuantity(input: {
+  commercialQuantity?: number;
+  taxableQuantity?: number;
+  commercialUnit?: string;
+  taxableUnit?: string;
+}) {
+  if (!input.taxableQuantity || input.taxableQuantity <= 0) {
+    return false;
+  }
+
+  if (!input.commercialQuantity || input.commercialQuantity <= 0) {
+    return true;
+  }
+
+  const commercialUnit = normalizeXmlUnit(input.commercialUnit);
+  const taxableUnit = normalizeXmlUnit(input.taxableUnit);
+
+  if (commercialUnit && taxableUnit && commercialUnit === taxableUnit) {
+    return true;
+  }
+
+  if (isDiscreteSellableUnit(input.commercialUnit) && isFractionalMeasureUnit(input.taxableUnit)) {
+    return false;
+  }
+
+  return Number.isInteger(input.taxableQuantity) && !Number.isInteger(input.commercialQuantity);
+}
+
 function buildFractionalSaleProductName(description: string) {
   const normalizedDescription = description.toUpperCase();
 
@@ -222,12 +290,17 @@ function parseStockInvoiceItems(rawXml: string) {
     const taxableQuantity = parseXmlNumber(extractTagValue(productBlock, "qTrib"));
     const commercialUnit = normalizeXmlText(extractTagValue(productBlock, "uCom"));
     const taxableUnit = normalizeXmlText(extractTagValue(productBlock, "uTrib"));
-    const preferredRawQuantity = taxableQuantity && taxableQuantity > 0 ? taxableQuantity : commercialQuantity;
+    const quantityUsesTaxableUnit = shouldUseTaxableQuantity({
+      commercialQuantity,
+      taxableQuantity,
+      commercialUnit,
+      taxableUnit,
+    });
+    const preferredRawQuantity = quantityUsesTaxableUnit ? taxableQuantity : commercialQuantity;
     if (!preferredRawQuantity || preferredRawQuantity <= 0) {
       continue;
     }
 
-    const quantityUsesTaxableUnit = Boolean(taxableQuantity && taxableQuantity > 0);
     const sellableUnitMultiplier = quantityUsesTaxableUnit ? 1 : inferSellableUnitMultiplier(description);
     const quantity = preferredRawQuantity * sellableUnitMultiplier;
 

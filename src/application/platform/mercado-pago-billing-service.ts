@@ -292,7 +292,11 @@ async function activateTenantPlan(subscriptionId: string, sourceStatus: string, 
 
   const planName = normalizePlatformPlanName(subscription.planName);
   const cycle = normalizePlatformBillingCycle(subscription.billingCycleMonths);
-  const planExpiresAt = subscription.nextPaymentAt ?? buildPlanExpirationFromCycle(cycle, baseDate);
+  const cycleExpiration = buildPlanExpirationFromCycle(cycle, subscription.activatedAt ?? baseDate);
+  const planExpiresAt =
+    subscription.nextPaymentAt && subscription.nextPaymentAt.getTime() > cycleExpiration.getTime()
+      ? subscription.nextPaymentAt
+      : cycleExpiration;
 
   if (
     subscription.tenant.status === PlatformTenantStatus.PENDING ||
