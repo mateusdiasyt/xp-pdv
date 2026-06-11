@@ -631,6 +631,7 @@ CREATE TABLE "PlatformTenant" (
     "status" "PlatformTenantStatus" NOT NULL DEFAULT 'PENDING',
     "planName" TEXT,
     "planStatus" TEXT NOT NULL DEFAULT 'pending',
+    "planExpiresAt" TIMESTAMP(3),
     "ownerName" TEXT NOT NULL,
     "ownerEmail" TEXT NOT NULL,
     "ownerDocument" TEXT,

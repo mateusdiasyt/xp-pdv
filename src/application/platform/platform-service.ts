@@ -30,6 +30,13 @@ const tenantRegistrationSchema = z.object({
   message: "As senhas precisam ser iguais",
 });
 
+const platformTenantPlanSchema = z.object({
+  tenantId: z.string().trim().min(1, "Cliente invalido."),
+  planName: z.enum(["Ouro", "Platina"]),
+  durationMonths: z.enum(["1", "3", "6", "12", "custom"]),
+  planExpiresAt: z.string().trim().optional(),
+});
+
 let platformTenantProfileColumnsPromise: Promise<void> | null = null;
 
 function onlyDigits(value: string) {
@@ -54,7 +61,8 @@ async function ensurePlatformTenantProfileColumns() {
           ADD COLUMN IF NOT EXISTS "ownerDocument" TEXT,
           ADD COLUMN IF NOT EXISTS "ownerWhatsapp" TEXT,
           ADD COLUMN IF NOT EXISTS "companyNameConfirmedAt" TIMESTAMP(3),
-          ADD COLUMN IF NOT EXISTS "customSlugUpdatedAt" TIMESTAMP(3);
+          ADD COLUMN IF NOT EXISTS "customSlugUpdatedAt" TIMESTAMP(3),
+          ADD COLUMN IF NOT EXISTS "planExpiresAt" TIMESTAMP(3);
       `)
       .then(() => undefined)
       .catch((error) => {
@@ -73,6 +81,29 @@ function buildTenantSlugBase(fullName: string, ownerEmail: string, document: str
   const base = nameBase || emailBase || "cliente";
 
   return `${base}${documentSuffix ? `-${documentSuffix}` : ""}`.slice(0, 48).replace(/-+$/g, "");
+}
+
+function buildPlanExpirationDate(durationMonths: string, customDate?: string | null) {
+  if (durationMonths === "custom") {
+    if (!customDate) {
+      throw new Error("Informe a data de encerramento do plano.");
+    }
+
+    const parsed = new Date(`${customDate}T23:59:59.000-03:00`);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Informe uma data de encerramento valida.");
+    }
+
+    return parsed;
+  }
+
+  const months = Number(durationMonths);
+  const expiration = new Date();
+  expiration.setMonth(expiration.getMonth() + months);
+  expiration.setHours(23, 59, 59, 999);
+
+  return expiration;
 }
 
 async function buildUniqueTenantSlug(base: string) {
@@ -359,6 +390,26 @@ export async function reactivatePlatformTenant(tenantId: string) {
       planStatus: "active",
       suspendedAt: null,
       lastProvisioningError: null,
+    },
+  });
+}
+
+export async function updatePlatformTenantPlan(input: FormData) {
+  await ensurePlatformTenantProfileColumns();
+  const parsed = platformTenantPlanSchema.parse({
+    tenantId: input.get("tenantId"),
+    planName: input.get("planName"),
+    durationMonths: input.get("durationMonths"),
+    planExpiresAt: input.get("planExpiresAt"),
+  });
+  const planExpiresAt = buildPlanExpirationDate(parsed.durationMonths, parsed.planExpiresAt);
+
+  return getPlatformPrisma().platformTenant.update({
+    where: { id: parsed.tenantId },
+    data: {
+      planName: parsed.planName,
+      planStatus: "active",
+      planExpiresAt,
     },
   });
 }

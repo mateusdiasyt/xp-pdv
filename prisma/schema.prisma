@@ -847,6 +847,7 @@ model PlatformTenant {
   status                 PlatformTenantStatus @default(PENDING)
   planName               String?
   planStatus             String               @default("pending")
+  planExpiresAt          DateTime?
   ownerName              String
   ownerEmail             String
   ownerDocument          String?

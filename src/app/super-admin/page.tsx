@@ -1,14 +1,51 @@
 import Link from "next/link";
-import { PlatformTenantStatus } from "@prisma/client";
-import { ArrowUpRight, CheckCircle2, Database, PowerOff, RotateCcw } from "lucide-react";
+import { PlatformTenantStatus, type PlatformTenant } from "@prisma/client";
+import {
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  PowerOff,
+  RotateCcw,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
+import { approveTenantAction, reactivateTenantAction, suspendTenantAction, updateTenantPlanAction } from "@/app/super-admin/actions";
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
+import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
-import { approveTenantAction, reactivateTenantAction, suspendTenantAction } from "@/app/super-admin/actions";
+import { cn } from "@/lib/utils";
+
+type PlatformTenantRow = PlatformTenant & {
+  users: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    isOwner: boolean;
+    isPlatformAdmin: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    tenantId: string;
+  }>;
+};
+
+const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+const planStatusLabels: Record<string, string> = {
+  active: "Ativo",
+  pending: "Pendente",
+  suspended: "Suspenso",
+  expired: "Vencido",
+};
 
 function statusLabel(status: PlatformTenantStatus) {
   const labels: Record<PlatformTenantStatus, string> = {
@@ -34,23 +71,90 @@ function statusClassName(status: PlatformTenantStatus) {
     return "border-rose-400/35 bg-rose-400/12 text-rose-100";
   }
 
-  return "border-border/70 bg-muted/40 text-muted-foreground";
+  return "border-white/10 bg-white/5 text-white/48";
+}
+
+function formatDate(date?: Date | string | null) {
+  if (!date) {
+    return "Sem vencimento";
+  }
+
+  return dateFormatter.format(new Date(date));
+}
+
+function formatDateInput(date?: Date | string | null) {
+  if (!date) {
+    return "";
+  }
+
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+function getPlanState(tenant: PlatformTenantRow) {
+  if (!tenant.planName) {
+    return {
+      label: "Plano não definido",
+      className: "border-white/10 bg-white/5 text-white/50",
+    };
+  }
+
+  if (tenant.planExpiresAt && new Date(tenant.planExpiresAt) < new Date()) {
+    return {
+      label: "Vencido",
+      className: "border-rose-400/35 bg-rose-400/12 text-rose-100",
+    };
+  }
+
+  return {
+    label: planStatusLabels[tenant.planStatus] ?? tenant.planStatus,
+    className: "border-primary/30 bg-primary/10 text-primary",
+  };
+}
+
+function getEnvironmentLabel(tenant: PlatformTenantRow) {
+  if (tenant.isDefault) {
+    return "Ambiente principal";
+  }
+
+  if (tenant.databaseName) {
+    return "Banco dedicado ativo";
+  }
+
+  if (tenant.status === PlatformTenantStatus.PENDING) {
+    return "Aguardando aprovação";
+  }
+
+  return "Ambiente não provisionado";
 }
 
 export default async function SuperAdminPage() {
   const session = await requirePlatformAdmin();
   const tenants = await listPlatformTenants();
+  const activeCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.ACTIVE).length;
+  const pendingCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.PENDING).length;
+  const expiringCount = tenants.filter((tenant) => {
+    if (!tenant.planExpiresAt) {
+      return false;
+    }
+
+    const today = new Date();
+    const limit = new Date();
+    limit.setDate(limit.getDate() + 7);
+    const expiration = new Date(tenant.planExpiresAt);
+
+    return expiration >= today && expiration <= limit;
+  }).length;
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground md:px-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <section className="rounded-2xl border border-border/80 bg-card/78 p-5 shadow-[0_28px_90px_-62px_rgba(0,0,0,0.9)]">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="rounded-3xl border border-border/80 bg-card/78 p-5 shadow-[0_28px_90px_-62px_rgba(0,0,0,0.9)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Plataforma</p>
-              <h1 className="mt-1 text-3xl font-bold tracking-tight">Super admin</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Mendoza PDV</p>
+              <h1 className="mt-1 text-3xl font-black tracking-tight">Super admin</h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Aprove clientes, controle status do plano e acesse o PDV isolado de cada ambiente.
+                Gerencie clientes, plano, validade e acesso aos ambientes da plataforma.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -62,139 +166,212 @@ export default async function SuperAdminPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <nav className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card/60 p-2">
+          <Button type="button" className="gap-2" size="sm">
+            <Users className="h-4 w-4" />
+            Usuários
+          </Button>
+        </nav>
+
+        <section className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Clientes</CardDescription>
+              <CardDescription>Usuários</CardDescription>
               <CardTitle className="text-3xl">{tenants.length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Pendentes</CardDescription>
-              <CardTitle className="text-3xl">
-                {tenants.filter((tenant) => tenant.status === PlatformTenantStatus.PENDING).length}
-              </CardTitle>
+              <CardDescription>Ativos</CardDescription>
+              <CardTitle className="text-3xl">{activeCount}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Ativos</CardDescription>
-              <CardTitle className="text-3xl">
-                {tenants.filter((tenant) => tenant.status === PlatformTenantStatus.ACTIVE).length}
-              </CardTitle>
+              <CardDescription>Pendentes</CardDescription>
+              <CardTitle className="text-3xl">{pendingCount}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Vencem em 7 dias</CardDescription>
+              <CardTitle className="text-3xl">{expiringCount}</CardTitle>
             </CardHeader>
           </Card>
         </section>
 
         <Card>
-          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <CardHeader className="flex flex-col gap-3 border-b border-border/70 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>Clientes da plataforma</CardTitle>
-              <CardDescription>Seu bar atual aparece como cliente padrao e nao tem banco duplicado.</CardDescription>
+              <CardTitle>Usuários da plataforma</CardTitle>
+              <CardDescription>Controle plano, validade e acesso sem mexer nos dados do cliente.</CardDescription>
             </div>
             <Button render={<Link href="/register" />}>
               Novo cadastro
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 p-3 sm:p-4">
             {tenants.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhum cliente cadastrado.
+                Nenhum usuário cadastrado.
               </div>
             ) : (
-              tenants.map((tenant) => (
-                <div
-                  key={tenant.id}
-                  className="grid gap-3 rounded-xl border border-border/70 bg-background/45 p-4 lg:grid-cols-[1.2fr,0.8fr,1fr,auto]"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-base font-semibold text-foreground">{tenant.name}</p>
-                      {tenant.isDefault ? <Badge variant="outline">Atual</Badge> : null}
-                      <Badge className={statusClassName(tenant.status)}>{statusLabel(tenant.status)}</Badge>
+              tenants.map((tenant) => {
+                const planState = getPlanState(tenant);
+                const canOpenTenant = tenant.status === PlatformTenantStatus.ACTIVE && tenant.slug === session.user.tenantSlug;
+
+                return (
+                  <article
+                    key={tenant.id}
+                    className="rounded-2xl border border-border/70 bg-background/45 p-4 transition-colors hover:border-border"
+                  >
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(480px,1.25fr)_auto] xl:items-start">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-lg font-black text-foreground">{tenant.name}</h2>
+                          {tenant.isDefault ? <Badge variant="outline">Principal</Badge> : null}
+                          <Badge className={statusClassName(tenant.status)}>{statusLabel(tenant.status)}</Badge>
+                          <Badge className={planState.className}>{planState.label}</Badge>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
+                          <p className="truncate font-mono text-xs text-muted-foreground/85">/app/{tenant.slug}</p>
+                          <p className="truncate">
+                            {tenant.ownerName} - {tenant.ownerEmail}
+                          </p>
+                          <p className="inline-flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            {getEnvironmentLabel(tenant)}
+                          </p>
+                        </div>
+                        {tenant.lastProvisioningError ? (
+                          <p className="mt-3 rounded-xl border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">
+                            {tenant.lastProvisioningError}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <form action={updateTenantPlanAction} className="rounded-2xl border border-border/60 bg-card/45 p-3">
+                        <input type="hidden" name="tenantId" value={tenant.id} />
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Plano</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Atual: <strong className="text-foreground">{tenant.planName ?? "Não definido"}</strong>
+                            </p>
+                          </div>
+                          <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                            <CalendarDays className="h-4 w-4" />
+                            {formatDate(tenant.planExpiresAt)}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+                          <label className="space-y-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">Plano</span>
+                            <select
+                              name="planName"
+                              defaultValue={tenant.planName === "Platina" ? "Platina" : "Ouro"}
+                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+                            >
+                              <option value="Ouro">Ouro</option>
+                              <option value="Platina">Platina</option>
+                            </select>
+                          </label>
+
+                          <label className="space-y-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">Duração</span>
+                            <select
+                              name="durationMonths"
+                              defaultValue={tenant.planExpiresAt ? "custom" : "1"}
+                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+                            >
+                              <option value="1">1 mês</option>
+                              <option value="3">3 meses</option>
+                              <option value="6">6 meses</option>
+                              <option value="12">1 ano</option>
+                              <option value="custom">Data manual</option>
+                            </select>
+                          </label>
+
+                          <label className="space-y-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">Encerramento</span>
+                            <input
+                              type="date"
+                              name="planExpiresAt"
+                              defaultValue={formatDateInput(tenant.planExpiresAt)}
+                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+                            />
+                          </label>
+
+                          <Button type="submit" size="sm" className="h-10 gap-2">
+                            <Clock3 className="h-4 w-4" />
+                            Salvar
+                          </Button>
+                        </div>
+                      </form>
+
+                      <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                        {canOpenTenant ? (
+                          <Button render={<Link href={buildTenantAdminPath(tenant.slug)} />} variant="outline" size="sm">
+                            Abrir
+                            <ArrowUpRight className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+
+                        {tenant.status === PlatformTenantStatus.ACTIVE && tenant.slug !== session.user.tenantSlug ? (
+                          <span className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+                            Acesso pelo cliente
+                          </span>
+                        ) : null}
+
+                        {tenant.status === PlatformTenantStatus.PENDING || tenant.status === PlatformTenantStatus.FAILED ? (
+                          <form action={approveTenantAction}>
+                            <input type="hidden" name="tenantId" value={tenant.id} />
+                            <Button type="submit" size="sm" className="gap-2">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Aprovar
+                            </Button>
+                          </form>
+                        ) : null}
+
+                        {tenant.status === PlatformTenantStatus.ACTIVE && tenant.isDefault ? (
+                          <Button type="button" size="sm" variant="outline" className="gap-2 opacity-60" disabled>
+                            <PowerOff className="h-4 w-4" />
+                            Protegido
+                          </Button>
+                        ) : null}
+
+                        {tenant.status === PlatformTenantStatus.ACTIVE && !tenant.isDefault ? (
+                          <form action={suspendTenantAction}>
+                            <input type="hidden" name="tenantId" value={tenant.id} />
+                            <Button type="submit" size="sm" variant="outline" className="gap-2">
+                              <PowerOff className="h-4 w-4" />
+                              Desligar
+                            </Button>
+                          </form>
+                        ) : null}
+
+                        {tenant.status === PlatformTenantStatus.SUSPENDED && !tenant.isDefault ? (
+                          <form action={reactivateTenantAction}>
+                            <input type="hidden" name="tenantId" value={tenant.id} />
+                            <Button type="submit" size="sm" className="gap-2">
+                              <RotateCcw className="h-4 w-4" />
+                              Reativar
+                            </Button>
+                          </form>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">/{tenant.slug}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Dono: {tenant.ownerName} · {tenant.ownerEmail}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-border/60 bg-card/45 p-3">
-                    <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Plano</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">{tenant.planName ?? "Padrao"}</p>
-                    <p className="text-xs text-muted-foreground">{tenant.planStatus}</p>
-                  </div>
-
-                  <div className="rounded-lg border border-border/60 bg-card/45 p-3">
-                    <p className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                      <Database className="h-3.5 w-3.5" />
-                      Banco
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">
-                      {tenant.isDefault ? "Banco atual" : tenant.databaseName ?? "Aguardando aprovacao"}
-                    </p>
-                    {tenant.lastProvisioningError ? (
-                      <p className="mt-1 line-clamp-2 text-xs text-rose-300">{tenant.lastProvisioningError}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-                    {tenant.status === PlatformTenantStatus.ACTIVE && tenant.slug === session.user.tenantSlug ? (
-                      <Button render={<Link href={buildTenantAdminPath(tenant.slug)} />} variant="outline" size="sm">
-                        Abrir
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-
-                    {tenant.status === PlatformTenantStatus.ACTIVE && tenant.slug !== session.user.tenantSlug ? (
-                      <span className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground">
-                        Acesso pelo cliente
-                      </span>
-                    ) : null}
-
-                    {tenant.status === PlatformTenantStatus.PENDING || tenant.status === PlatformTenantStatus.FAILED ? (
-                      <form action={approveTenantAction}>
-                        <input type="hidden" name="tenantId" value={tenant.id} />
-                        <Button type="submit" size="sm" className="gap-2">
-                          <CheckCircle2 className="h-4 w-4" />
-                          Aprovar
-                        </Button>
-                      </form>
-                    ) : null}
-
-                    {tenant.status === PlatformTenantStatus.ACTIVE && tenant.isDefault ? (
-                      <Button type="button" size="sm" variant="outline" className="gap-2 opacity-60" disabled>
-                        <PowerOff className="h-4 w-4" />
-                        Protegido
-                      </Button>
-                    ) : null}
-
-                    {tenant.status === PlatformTenantStatus.ACTIVE && !tenant.isDefault ? (
-                      <form action={suspendTenantAction}>
-                        <input type="hidden" name="tenantId" value={tenant.id} />
-                        <Button type="submit" size="sm" variant="outline" className="gap-2">
-                          <PowerOff className="h-4 w-4" />
-                          Desligar painel
-                        </Button>
-                      </form>
-                    ) : null}
-
-                    {tenant.status === PlatformTenantStatus.SUSPENDED && !tenant.isDefault ? (
-                      <form action={reactivateTenantAction}>
-                        <input type="hidden" name="tenantId" value={tenant.id} />
-                        <Button type="submit" size="sm" className="gap-2">
-                          <RotateCcw className="h-4 w-4" />
-                          Reativar
-                        </Button>
-                      </form>
-                    ) : null}
-                  </div>
-                </div>
-              ))
+                  </article>
+                );
+              })
             )}
           </CardContent>
         </Card>
+
+        <p className={cn("text-center text-xs text-muted-foreground")}>
+          Próximos menus serão adicionados nessa mesma navegação.
+        </p>
       </div>
     </main>
   );

@@ -7,6 +7,7 @@ import {
   approvePlatformTenant,
   reactivatePlatformTenant,
   suspendPlatformTenant,
+  updatePlatformTenantPlan,
 } from "@/application/platform/platform-service";
 
 export async function approveTenantAction(formData: FormData) {
@@ -45,5 +46,11 @@ export async function reactivateTenantAction(formData: FormData) {
   }
 
   await reactivatePlatformTenant(tenantId);
+  revalidatePath("/super-admin");
+}
+
+export async function updateTenantPlanAction(formData: FormData) {
+  await requirePlatformAdmin();
+  await updatePlatformTenantPlan(formData);
   revalidatePath("/super-admin");
 }
