@@ -24,6 +24,10 @@ const checkoutSchema = z.object({
   billingCycleMonths: z.string().or(z.number()).transform((value) => normalizePlatformBillingCycle(value)),
 });
 
+const authorizedCheckoutSchema = checkoutSchema.extend({
+  cardTokenId: z.string().trim().min(12, "Cartao invalido. Revise os dados e tente novamente."),
+});
+
 let platformBillingTablesPromise: Promise<void> | null = null;
 
 type MercadoPagoPreapprovalResponse = {
@@ -32,6 +36,8 @@ type MercadoPagoPreapprovalResponse = {
   status?: string;
   external_reference?: string;
   payer_email?: string;
+  payment_method_id?: string;
+  card_id?: string;
   reason?: string;
   next_payment_date?: string;
   date_created?: string;
@@ -530,6 +536,103 @@ export async function createPlatformSubscriptionCheckout(input: {
   };
 }
 
+export async function createPlatformSubscriptionAuthorization(input: {
+  tenantId: string;
+  planName: PlatformPlanName;
+  billingCycleMonths: PlatformBillingCycleMonths;
+  cardTokenId: string;
+}) {
+  await ensurePlatformBillingTables();
+  const prisma = getPlatformPrisma();
+  const credentials = await resolveMercadoPagoGatewayCredentials();
+
+  if (!credentials) {
+    throw new Error("Configure o gateway Mercado Pago no super admin antes de cobrar assinaturas.");
+  }
+
+  const tenant = await prisma.platformTenant.findUnique({
+    where: { id: input.tenantId },
+  });
+
+  if (!tenant) {
+    throw new Error("Cliente nao encontrado.");
+  }
+
+  if (tenant.status === PlatformTenantStatus.SUSPENDED) {
+    throw new Error("Cliente suspenso. Reative antes de gerar nova assinatura.");
+  }
+
+  const price = getPlatformPlanPrice(input.planName, input.billingCycleMonths);
+  const amount = Number((price.amountCents / 100).toFixed(2));
+  const externalReference = `mendoza:${tenant.id}:${randomUUID()}`;
+  const reason = `Mendoza PDV - Plano ${input.planName} (${price.label})`;
+  const payerEmail = resolveSubscriptionPayerEmail({
+    environment: credentials.environment,
+    testPayerEmail: credentials.testPayerEmail,
+    ownerEmail: tenant.ownerEmail,
+  });
+
+  const subscription = await prisma.platformSubscription.create({
+    data: {
+      tenantId: tenant.id,
+      planName: input.planName,
+      billingCycleMonths: input.billingCycleMonths,
+      amountCents: price.amountCents,
+      currency: "BRL",
+      status: "pending",
+      mercadoPagoExternalReference: externalReference,
+      payerEmail,
+      reason,
+    },
+  });
+
+  const preapproval = await mercadoPagoRequest<MercadoPagoPreapprovalResponse>("/preapproval", {
+    method: "POST",
+    body: JSON.stringify({
+      reason,
+      external_reference: externalReference,
+      payer_email: payerEmail,
+      card_token_id: input.cardTokenId,
+      auto_recurring: {
+        frequency: input.billingCycleMonths,
+        frequency_type: "months",
+        end_date: buildMercadoPagoSubscriptionEndDate(),
+        transaction_amount: amount,
+        currency_id: "BRL",
+      },
+      back_url: `${getSiteUrl()}/api/platform/mercado-pago/return?subscriptionId=${subscription.id}`,
+      status: "authorized",
+    }),
+  });
+
+  if (!preapproval.id) {
+    throw new Error("Mercado Pago nao retornou a assinatura autorizada.");
+  }
+
+  const status = normalizeMercadoPagoStatus(preapproval.status);
+  const updated = await prisma.platformSubscription.update({
+    where: { id: subscription.id },
+    data: {
+      mercadoPagoPreapprovalId: preapproval.id,
+      mercadoPagoInitPoint: preapproval.init_point ?? null,
+      status,
+      nextPaymentAt: parseDate(preapproval.next_payment_date),
+      rawSnapshot: toJsonInput(preapproval),
+    },
+  });
+
+  if (isActiveSubscriptionStatus(status)) {
+    await activateTenantPlan(updated.id, status, updated.nextPaymentAt ?? new Date());
+  }
+
+  return {
+    subscriptionId: updated.id,
+    status,
+    initPoint: preapproval.init_point ?? null,
+    amountLabel: formatCentsToBRL(price.amountCents),
+  };
+}
+
 export async function createPlatformSubscriptionCheckoutFromForm(input: FormData) {
   const parsed = checkoutSchema.parse({
     tenantId: input.get("tenantId"),
@@ -538,6 +641,17 @@ export async function createPlatformSubscriptionCheckoutFromForm(input: FormData
   });
 
   return createPlatformSubscriptionCheckout(parsed);
+}
+
+export async function createPlatformSubscriptionAuthorizationFromForm(input: FormData) {
+  const parsed = authorizedCheckoutSchema.parse({
+    tenantId: input.get("tenantId"),
+    planName: input.get("planName"),
+    billingCycleMonths: input.get("billingCycleMonths"),
+    cardTokenId: input.get("cardTokenId"),
+  });
+
+  return createPlatformSubscriptionAuthorization(parsed);
 }
 
 export async function listPlatformBillingSummaries(tenantIds: string[]): Promise<PlatformBillingSummary[]> {

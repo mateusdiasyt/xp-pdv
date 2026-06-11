@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { getPlatformGatewayConfigurationSnapshot } from "@/application/platform/gateway-service";
 import { getTenantPaymentPortalState } from "@/application/platform/mercado-pago-billing-service";
 import { buildTenantAdminPath } from "@/application/platform/platform-service";
 import { PendingTenantPaymentPanel } from "@/components/platform/pending-tenant-payment-panel";
@@ -32,10 +33,14 @@ export default async function PendingTenantPaymentPage() {
     redirect("/login");
   }
 
+  const gateway = await getPlatformGatewayConfigurationSnapshot();
+
   return (
     <PendingTenantPaymentPanel
       tenantName={portalState.tenantName}
       ownerEmail={portalState.ownerEmail}
+      mercadoPagoPublicKey={gateway.publicKey}
+      mercadoPagoEnvironment={gateway.environment}
       defaultPlanName={normalizePlanName(portalState.latestSubscription?.planName ?? portalState.planName)}
       defaultBillingCycleMonths={normalizeCycle(portalState.latestSubscription?.billingCycleMonths)}
       latestSubscription={portalState.latestSubscription}
