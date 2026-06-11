@@ -8,6 +8,7 @@ const MERCADO_PAGO_PROVIDER = "mercado-pago";
 const gatewayConfigurationSchema = z.object({
   environment: z.enum(["test", "production"]),
   publicKey: z.string().trim().min(16, "Informe a Public Key do Mercado Pago."),
+  testPayerEmail: z.string().trim().email("Informe um email de comprador teste valido.").optional().or(z.literal("")),
   accessToken: z.string().trim().optional(),
   webhookSecret: z.string().trim().optional(),
   runConnectionTest: z.boolean().default(true),
@@ -29,6 +30,7 @@ export type PlatformGatewayConfigurationSnapshot = {
   provider: string;
   environment: "test" | "production";
   publicKey: string;
+  testPayerEmail: string | null;
   hasAccessToken: boolean;
   hasWebhookSecret: boolean;
   status: string;
@@ -55,6 +57,7 @@ async function ensurePlatformGatewayConfigurationTable() {
           "provider" TEXT NOT NULL DEFAULT 'mercado-pago',
           "environment" TEXT NOT NULL DEFAULT 'test',
           "publicKey" TEXT,
+          "testPayerEmail" TEXT,
           "accessTokenEncrypted" TEXT,
           "webhookSecretEncrypted" TEXT,
           "status" TEXT NOT NULL DEFAULT 'inactive',
@@ -71,6 +74,10 @@ async function ensurePlatformGatewayConfigurationTable() {
       await prisma.$executeRawUnsafe(`
         ALTER TABLE "PlatformGatewayConfiguration"
           ADD COLUMN IF NOT EXISTS "webhookSecretEncrypted" TEXT
+      `);
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "PlatformGatewayConfiguration"
+          ADD COLUMN IF NOT EXISTS "testPayerEmail" TEXT
       `);
       await prisma.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "PlatformGatewayConfiguration_provider_key"
@@ -143,6 +150,7 @@ export async function getPlatformGatewayConfigurationSnapshot(): Promise<Platfor
       provider: MERCADO_PAGO_PROVIDER,
       environment: "test",
       publicKey: "",
+      testPayerEmail: "test@testuser.com",
       hasAccessToken: false,
       hasWebhookSecret: false,
       status: "inactive",
@@ -159,6 +167,7 @@ export async function getPlatformGatewayConfigurationSnapshot(): Promise<Platfor
     provider: configuration.provider,
     environment: normalizeGatewayEnvironment(configuration.environment),
     publicKey: configuration.publicKey ?? "",
+    testPayerEmail: configuration.testPayerEmail ?? "test@testuser.com",
     hasAccessToken: Boolean(configuration.accessTokenEncrypted),
     hasWebhookSecret: Boolean(configuration.webhookSecretEncrypted),
     status: configuration.status,
@@ -176,6 +185,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
   const parsed = gatewayConfigurationSchema.parse({
     environment: input.get("environment"),
     publicKey: input.get("publicKey"),
+    testPayerEmail: input.get("testPayerEmail"),
     accessToken: input.get("accessToken"),
     webhookSecret: input.get("webhookSecret"),
     runConnectionTest: input.get("runConnectionTest") === "1",
@@ -205,6 +215,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
     update: {
       environment: parsed.environment,
       publicKey: parsed.publicKey,
+      testPayerEmail: parsed.environment === "test" ? parsed.testPayerEmail || "test@testuser.com" : null,
       accessTokenEncrypted: nextAccessTokenEncrypted,
       webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
@@ -218,6 +229,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
       provider: MERCADO_PAGO_PROVIDER,
       environment: parsed.environment,
       publicKey: parsed.publicKey,
+      testPayerEmail: parsed.environment === "test" ? parsed.testPayerEmail || "test@testuser.com" : null,
       accessTokenEncrypted: nextAccessTokenEncrypted,
       webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
@@ -249,6 +261,7 @@ export async function resolveMercadoPagoGatewayCredentials() {
   return {
     environment: normalizeGatewayEnvironment(configuration.environment),
     publicKey: configuration.publicKey,
+    testPayerEmail: configuration.testPayerEmail ?? "test@testuser.com",
     accessToken,
     webhookSecret: decryptSecretValue(configuration.webhookSecretEncrypted),
   };

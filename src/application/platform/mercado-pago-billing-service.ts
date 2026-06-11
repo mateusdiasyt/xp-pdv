@@ -441,6 +441,7 @@ export async function createPlatformSubscriptionCheckout(input: {
   const amount = Number((price.amountCents / 100).toFixed(2));
   const externalReference = `mendoza:${tenant.id}:${randomUUID()}`;
   const reason = `Mendoza PDV - Plano ${input.planName} (${price.label})`;
+  const payerEmail = credentials.environment === "test" ? credentials.testPayerEmail : tenant.ownerEmail;
 
   const subscription = await prisma.platformSubscription.create({
     data: {
@@ -451,7 +452,7 @@ export async function createPlatformSubscriptionCheckout(input: {
       currency: "BRL",
       status: "pending",
       mercadoPagoExternalReference: externalReference,
-      payerEmail: tenant.ownerEmail,
+      payerEmail,
       reason,
     },
   });
@@ -461,7 +462,7 @@ export async function createPlatformSubscriptionCheckout(input: {
     body: JSON.stringify({
       reason,
       external_reference: externalReference,
-      payer_email: tenant.ownerEmail,
+      payer_email: payerEmail,
       auto_recurring: {
         frequency: input.billingCycleMonths,
         frequency_type: "months",

@@ -264,6 +264,12 @@ function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapsh
                 {gateway.hasWebhookSecret ? "Configurado" : "Opcional"}
               </p>
             </div>
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Comprador teste</p>
+              <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                {gateway.environment === "test" ? gateway.testPayerEmail ?? "test@testuser.com" : "Inativo"}
+              </p>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border/70 bg-background/45 p-3">

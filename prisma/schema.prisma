@@ -904,6 +904,7 @@ model PlatformGatewayConfiguration {
   provider               String    @unique @default("mercado-pago")
   environment            String    @default("test")
   publicKey              String?
+  testPayerEmail         String?
   accessTokenEncrypted   String?
   webhookSecretEncrypted String?
   status                 String    @default("inactive")

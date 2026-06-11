@@ -72,6 +72,20 @@ export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
       </div>
 
       <label className="block space-y-1.5">
+        <span className="text-xs font-semibold text-muted-foreground">Email comprador teste</span>
+        <input
+          name="testPayerEmail"
+          defaultValue={gateway.testPayerEmail ?? "test@testuser.com"}
+          placeholder="test@testuser.com"
+          className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
+          type="email"
+        />
+        <span className="block text-[11px] text-muted-foreground">
+          Usado apenas no ambiente de teste para evitar mistura entre cliente real e vendedor teste.
+        </span>
+      </label>
+
+      <label className="block space-y-1.5">
         <span className="text-xs font-semibold text-muted-foreground">Access Token</span>
         <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 transition-colors focus-within:border-primary">
           <KeyRound className="h-4 w-4 text-primary" />
