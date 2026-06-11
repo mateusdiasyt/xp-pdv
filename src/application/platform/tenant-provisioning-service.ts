@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 
@@ -46,7 +47,8 @@ function splitSqlStatements(sql: string) {
 }
 
 async function applyTenantSchema(databaseUrl: string) {
-  const schemaSql = await readFile(new URL("../../infrastructure/platform/tenant-schema.sql", import.meta.url), "utf8");
+  const schemaPath = fileURLToPath(new URL("../../infrastructure/platform/tenant-schema.sql", import.meta.url));
+  const schemaSql = await readFile(schemaPath, "utf8");
   const statements = splitSqlStatements(schemaSql);
   const tenantPrisma = new PrismaClient({
     datasources: {
@@ -65,6 +67,19 @@ async function applyTenantSchema(databaseUrl: string) {
   }
 }
 
+async function ensureTenantDatabase(databaseName: string) {
+  const platformPrisma = getPlatformPrisma();
+  const existing = await platformPrisma.$queryRaw<Array<{ datname: string }>>`
+    SELECT datname FROM pg_database WHERE datname = ${databaseName}
+  `;
+
+  if (existing.length > 0) {
+    return;
+  }
+
+  await platformPrisma.$executeRawUnsafe(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+}
+
 export async function provisionTenantDatabase(data: {
   tenantId: string;
   tenantName: string;
@@ -73,11 +88,10 @@ export async function provisionTenantDatabase(data: {
   ownerEmail: string;
   ownerPasswordHash: string;
 }) {
-  const platformPrisma = getPlatformPrisma();
   const databaseName = normalizeDatabaseName(data.tenantSlug);
   const databaseUrl = buildDatabaseUrl(databaseName);
 
-  await platformPrisma.$executeRawUnsafe(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
+  await ensureTenantDatabase(databaseName);
 
   await applyTenantSchema(databaseUrl);
 

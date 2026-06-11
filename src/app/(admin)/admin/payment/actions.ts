@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  activateLatestAuthorizedPlatformSubscription,
   createPlatformSubscriptionAuthorization,
   createPlatformSubscriptionCheckout,
   getTenantPaymentPortalState,
@@ -86,8 +87,37 @@ export async function authorizeCurrentTenantPaymentAction(
 
     return {
       status: "success",
-      message: "Pagamento confirmado. Liberando painel.",
-      redirectUrl: buildTenantAdminPath(session.user.tenantSlug),
+      message: "Pagamento confirmado. Entre novamente para abrir o painel.",
+      redirectUrl: `/login?activated=1&callbackUrl=${encodeURIComponent(buildTenantAdminPath(session.user.tenantSlug))}`,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function activateCurrentTenantPaidPlanAction(): Promise<ActionState & { redirectUrl?: string }> {
+  try {
+    const session = await getServerAuthSession();
+
+    if (!session?.user || session.user.accessScope === "platform") {
+      throw new Error("Acesse com a conta do cliente para continuar.");
+    }
+
+    const portalState = await getTenantPaymentPortalState(session.user.tenantSlug);
+
+    if (!portalState) {
+      throw new Error("Conta nao encontrada.");
+    }
+
+    await activateLatestAuthorizedPlatformSubscription(portalState.tenantId);
+
+    return {
+      status: "success",
+      message: "Painel liberado. Entre novamente para atualizar o acesso.",
+      redirectUrl: `/login?activated=1&callbackUrl=${encodeURIComponent(buildTenantAdminPath(session.user.tenantSlug))}`,
     };
   } catch (error) {
     return {

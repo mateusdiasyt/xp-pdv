@@ -2,8 +2,10 @@
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
+import { signOut } from "next-auth/react";
 
 import {
+  activateCurrentTenantPaidPlanAction,
   authorizeCurrentTenantPaymentAction,
   createCurrentTenantPaymentCheckoutAction,
 } from "@/app/(admin)/admin/payment/actions";
@@ -158,6 +160,7 @@ export function PendingTenantPaymentPanel({
 }: PendingTenantPaymentPanelProps) {
   const [state, setState] = useState<ActionState>(initialActionState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const [isLinkSubmitting, setIsLinkSubmitting] = useState(false);
   const [isCardFormReady, setIsCardFormReady] = useState(false);
   const [cardFormMessage, setCardFormMessage] = useState("Carregando pagamento seguro...");
@@ -169,6 +172,9 @@ export function PendingTenantPaymentPanel({
   const planNameRef = useRef(planName);
   const billingCycleMonthsRef = useRef(billingCycleMonths);
   const isTestEnvironment = mercadoPagoEnvironment === "test";
+  const hasAuthorizedSubscription = ["authorized", "active"].includes(
+    latestSubscription?.status.toLowerCase() ?? "",
+  );
   const cycleOptions = useMemo(
     () => PLATFORM_PLAN_PRICES.filter((price) => price.planName === planName),
     [planName],
@@ -196,6 +202,12 @@ export function PendingTenantPaymentPanel({
     let disposed = false;
 
     async function mountCardForm() {
+      if (hasAuthorizedSubscription) {
+        setIsCardFormReady(false);
+        setCardFormMessage("Pagamento confirmado. Libere o painel para continuar.");
+        return;
+      }
+
       if (!mercadoPagoPublicKey) {
         setCardFormMessage("Configure a Public Key do Mercado Pago no super admin.");
         setIsCardFormReady(false);
@@ -321,7 +333,7 @@ export function PendingTenantPaymentPanel({
                 setState(result);
 
                 if (result.status === "success" && result.redirectUrl) {
-                  window.location.assign(result.redirectUrl);
+                  await signOut({ callbackUrl: result.redirectUrl });
                 }
               } catch {
                 setState({
@@ -358,7 +370,34 @@ export function PendingTenantPaymentPanel({
       safelyUnmountCardForm(cardFormRef.current);
       cardFormRef.current = null;
     };
-  }, [amountCents, mercadoPagoPublicKey]);
+  }, [amountCents, hasAuthorizedSubscription, mercadoPagoPublicKey]);
+
+  async function handleActivatePaidPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isActivating) {
+      return;
+    }
+
+    setIsActivating(true);
+    setState(initialActionState);
+
+    try {
+      const result = await activateCurrentTenantPaidPlanAction();
+      setState(result);
+
+      if (result.status === "success" && result.redirectUrl) {
+        await signOut({ callbackUrl: result.redirectUrl });
+      }
+    } catch {
+      setState({
+        status: "error",
+        message: "Nao foi possivel liberar o painel agora.",
+      });
+    } finally {
+      setIsActivating(false);
+    }
+  }
 
   async function handleFallbackLinkSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -426,6 +465,37 @@ export function PendingTenantPaymentPanel({
         </div>
       </div>
 
+      {hasAuthorizedSubscription ? (
+        <form onSubmit={handleActivatePaidPlan} className="mt-5 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-emerald-100">Pagamento confirmado</p>
+              <p className="mt-1 text-sm text-emerald-100/70">
+                Falta apenas finalizar a liberacao do ambiente do cliente.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={isActivating}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-300/45 bg-emerald-300 px-5 text-sm font-black text-emerald-950 transition-colors hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isActivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              {isActivating ? "Liberando..." : "Liberar painel"}
+            </button>
+          </div>
+
+          {state.status === "error" && state.message ? (
+            <p className="mt-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {state.message}
+            </p>
+          ) : null}
+          {state.status === "success" && state.message ? (
+            <p className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
+              {state.message}
+            </p>
+          ) : null}
+        </form>
+      ) : (
       <form id="mendoza-card-form" className="mt-5 rounded-2xl border border-border/70 bg-background/45 p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1.5">
@@ -543,6 +613,7 @@ export function PendingTenantPaymentPanel({
           </p>
         ) : null}
       </form>
+      )}
 
       <form onSubmit={handleFallbackLinkSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
         {latestSubscription?.mercadoPagoInitPoint ? (

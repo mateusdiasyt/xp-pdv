@@ -323,6 +323,29 @@ async function activateTenantPlan(subscriptionId: string, sourceStatus: string, 
   });
 }
 
+export async function activateLatestAuthorizedPlatformSubscription(tenantId: string) {
+  await ensurePlatformBillingTables();
+  const subscription = await getPlatformPrisma().platformSubscription.findFirst({
+    where: {
+      tenantId,
+      status: {
+        in: ["authorized", "active"],
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (!subscription) {
+    throw new Error("Nenhum pagamento confirmado encontrado para liberar o painel.");
+  }
+
+  await activateTenantPlan(subscription.id, subscription.status, subscription.nextPaymentAt ?? new Date());
+
+  return subscription.id;
+}
+
 async function suspendTenantPlanFromSubscription(subscriptionId: string, sourceStatus: string) {
   await ensurePlatformBillingTables();
   const prisma = getPlatformPrisma();
