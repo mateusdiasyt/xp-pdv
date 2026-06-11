@@ -46,6 +46,24 @@ function normalizeGatewayEnvironment(value: string | null | undefined): "test" |
   return value === "production" ? "production" : "test";
 }
 
+function normalizeTestPayerEmail(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (!normalized) {
+    throw new Error("Informe o email da conta comprador teste do Mercado Pago.");
+  }
+
+  if (normalized === "test@testuser.com") {
+    throw new Error("Use o email real do comprador teste, no formato test_user_...@testuser.com.");
+  }
+
+  if (!normalized.endsWith("@testuser.com")) {
+    throw new Error("No ambiente de teste, use uma conta comprador teste terminada em @testuser.com.");
+  }
+
+  return normalized;
+}
+
 async function ensurePlatformGatewayConfigurationTable() {
   if (!platformGatewayConfigurationTablePromise) {
     const prisma = getPlatformPrisma();
@@ -150,7 +168,7 @@ export async function getPlatformGatewayConfigurationSnapshot(): Promise<Platfor
       provider: MERCADO_PAGO_PROVIDER,
       environment: "test",
       publicKey: "",
-      testPayerEmail: "test@testuser.com",
+      testPayerEmail: null,
       hasAccessToken: false,
       hasWebhookSecret: false,
       status: "inactive",
@@ -200,6 +218,8 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
   const nextWebhookSecretEncrypted = parsed.webhookSecret
     ? encryptSecretValue(parsed.webhookSecret)
     : existing?.webhookSecretEncrypted ?? null;
+  const nextTestPayerEmail =
+    parsed.environment === "test" ? normalizeTestPayerEmail(parsed.testPayerEmail || existing?.testPayerEmail) : null;
   const decryptedToken = parsed.accessToken || decryptSecretValue(nextAccessTokenEncrypted);
   const connectionTest = parsed.runConnectionTest && decryptedToken
     ? await testMercadoPagoAccessToken(decryptedToken)
@@ -215,7 +235,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
     update: {
       environment: parsed.environment,
       publicKey: parsed.publicKey,
-      testPayerEmail: parsed.environment === "test" ? parsed.testPayerEmail || "test@testuser.com" : null,
+      testPayerEmail: nextTestPayerEmail,
       accessTokenEncrypted: nextAccessTokenEncrypted,
       webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
@@ -229,7 +249,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
       provider: MERCADO_PAGO_PROVIDER,
       environment: parsed.environment,
       publicKey: parsed.publicKey,
-      testPayerEmail: parsed.environment === "test" ? parsed.testPayerEmail || "test@testuser.com" : null,
+      testPayerEmail: nextTestPayerEmail,
       accessTokenEncrypted: nextAccessTokenEncrypted,
       webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
@@ -261,7 +281,7 @@ export async function resolveMercadoPagoGatewayCredentials() {
   return {
     environment: normalizeGatewayEnvironment(configuration.environment),
     publicKey: configuration.publicKey,
-    testPayerEmail: configuration.testPayerEmail ?? "test@testuser.com",
+    testPayerEmail: configuration.testPayerEmail,
     accessToken,
     webhookSecret: decryptSecretValue(configuration.webhookSecretEncrypted),
   };

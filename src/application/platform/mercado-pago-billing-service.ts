@@ -112,6 +112,24 @@ function buildMercadoPagoSubscriptionEndDate() {
   return endDate.toISOString();
 }
 
+function resolveSubscriptionPayerEmail(input: {
+  environment: "test" | "production";
+  testPayerEmail: string | null;
+  ownerEmail: string;
+}) {
+  if (input.environment === "production") {
+    return input.ownerEmail;
+  }
+
+  const testPayerEmail = input.testPayerEmail?.trim().toLowerCase() ?? "";
+
+  if (!testPayerEmail || testPayerEmail === "test@testuser.com") {
+    throw new Error("Configure no Gateway o email real do comprador teste. Ex: test_user_8545504462109183292@testuser.com.");
+  }
+
+  return testPayerEmail;
+}
+
 export async function ensurePlatformBillingTables() {
   if (!platformBillingTablesPromise) {
     const prisma = getPlatformPrisma();
@@ -452,7 +470,11 @@ export async function createPlatformSubscriptionCheckout(input: {
   const amount = Number((price.amountCents / 100).toFixed(2));
   const externalReference = `mendoza:${tenant.id}:${randomUUID()}`;
   const reason = `Mendoza PDV - Plano ${input.planName} (${price.label})`;
-  const payerEmail = credentials.environment === "test" ? credentials.testPayerEmail : tenant.ownerEmail;
+  const payerEmail = resolveSubscriptionPayerEmail({
+    environment: credentials.environment,
+    testPayerEmail: credentials.testPayerEmail,
+    ownerEmail: tenant.ownerEmail,
+  });
 
   const subscription = await prisma.platformSubscription.create({
     data: {

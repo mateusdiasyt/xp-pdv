@@ -75,13 +75,13 @@ export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
         <span className="text-xs font-semibold text-muted-foreground">Email comprador teste</span>
         <input
           name="testPayerEmail"
-          defaultValue={gateway.testPayerEmail ?? "test@testuser.com"}
-          placeholder="test@testuser.com"
+          defaultValue={gateway.testPayerEmail ?? ""}
+          placeholder="test_user_8545504462109183292@testuser.com"
           className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
           type="email"
         />
         <span className="block text-[11px] text-muted-foreground">
-          Usado apenas no ambiente de teste para evitar mistura entre cliente real e vendedor teste.
+          Use o email tecnico do comprador teste, no formato test_user_...@testuser.com.
         </span>
       </label>
 
