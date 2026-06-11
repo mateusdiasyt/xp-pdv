@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import {
   buildBrandThemeVariables,
+  defaultBrandCustomization,
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
 import { getAccountNotificationData } from "@/application/accounts/account-payable-service";
@@ -24,10 +25,15 @@ export default async function AdminLayout({
 }>) {
   const session = await getServerAuthSession();
   const requestHeaders = await headers();
-  const { customization } = await getBrandCustomizationSnapshot();
-  const themeVariables = buildBrandThemeVariables(customization);
   const isPublicAdminApp = requestHeaders.get("x-public-admin-app") === "1";
   const user = session?.user;
+  const shouldLoadTenantCustomization = Boolean(
+    user && (!user.platformTenantStatus || user.platformTenantStatus === "ACTIVE"),
+  );
+  const { customization } = shouldLoadTenantCustomization
+    ? await getBrandCustomizationSnapshot()
+    : { customization: defaultBrandCustomization };
+  const themeVariables = buildBrandThemeVariables(customization);
 
   if (!user && !isPublicAdminApp) {
     return null;
