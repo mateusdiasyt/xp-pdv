@@ -873,7 +873,9 @@ model PlatformTenant {
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 
-  users PlatformTenantUser[]
+  users         PlatformTenantUser[]
+  subscriptions PlatformSubscription[]
+  paymentEvents PlatformPaymentEvent[]
 
   @@index([status])
   @@index([ownerEmail])
@@ -898,21 +900,77 @@ model PlatformTenantUser {
 }
 
 model PlatformGatewayConfiguration {
-  id                   String    @id @default(cuid())
-  provider             String    @unique @default("mercado-pago")
-  environment          String    @default("test")
-  publicKey            String?
-  accessTokenEncrypted String?
-  status               String    @default("inactive")
-  lastTestStatus       String?
-  lastTestMessage      String?
-  lastTestedAt         DateTime?
-  updatedById          String?
-  updatedByName        String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                     String    @id @default(cuid())
+  provider               String    @unique @default("mercado-pago")
+  environment            String    @default("test")
+  publicKey              String?
+  accessTokenEncrypted   String?
+  webhookSecretEncrypted String?
+  status                 String    @default("inactive")
+  lastTestStatus         String?
+  lastTestMessage        String?
+  lastTestedAt           DateTime?
+  updatedById            String?
+  updatedByName          String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   @@index([provider])
+  @@index([status])
+}
+
+model PlatformSubscription {
+  id                           String    @id @default(cuid())
+  tenantId                     String
+  planName                     String
+  billingCycleMonths           Int
+  amountCents                  Int
+  currency                     String    @default("BRL")
+  status                       String    @default("pending")
+  mercadoPagoPreapprovalId     String?   @unique
+  mercadoPagoInitPoint         String?
+  mercadoPagoExternalReference String    @unique
+  payerEmail                   String
+  reason                       String
+  nextPaymentAt                DateTime?
+  lastPaymentAt                DateTime?
+  activatedAt                  DateTime?
+  cancelledAt                  DateTime?
+  lastWebhookAt                DateTime?
+  rawSnapshot                  Json?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  tenant PlatformTenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events PlatformPaymentEvent[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([planName])
+}
+
+model PlatformPaymentEvent {
+  id             String    @id @default(cuid())
+  provider       String    @default("mercado-pago")
+  eventType      String
+  resourceId     String?
+  action         String?
+  subscriptionId String?
+  tenantId       String?
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+  status         String    @default("received")
+  message        String?
+  payload        Json?
+
+  subscription PlatformSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  tenant       PlatformTenant?       @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([provider])
+  @@index([eventType])
+  @@index([resourceId])
+  @@index([subscriptionId])
+  @@index([tenantId])
   @@index([status])
 }
 

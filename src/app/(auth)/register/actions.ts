@@ -1,24 +1,39 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
+import { createPlatformSubscriptionCheckout } from "@/application/platform/mercado-pago-billing-service";
 import { registerPlatformTenant } from "@/application/platform/platform-service";
+import {
+  normalizePlatformBillingCycle,
+  normalizePlatformPlanName,
+} from "@/domain/platform/billing-plans";
 
 export type RegisterTenantState = {
-  status: "idle" | "error";
+  status: "idle" | "success" | "error";
   message?: string;
+  redirectUrl?: string;
 };
 
 export async function registerTenantAction(
-  _previousState: RegisterTenantState,
-  formData: FormData,
+  previousStateOrFormData: RegisterTenantState | FormData,
+  maybeFormData?: FormData,
 ): Promise<RegisterTenantState> {
-  let registered = false;
+  const formData = maybeFormData ?? (previousStateOrFormData as FormData);
 
   try {
-    await registerPlatformTenant(formData);
-    registered = true;
+    const tenant = await registerPlatformTenant(formData);
+    const checkout = await createPlatformSubscriptionCheckout({
+      tenantId: tenant.id,
+      planName: normalizePlatformPlanName(formData.get("planName") ?? "Ouro"),
+      billingCycleMonths: normalizePlatformBillingCycle(formData.get("billingCycleMonths") ?? "1"),
+    });
+
+    return {
+      status: "success",
+      message: "Cadastro criado. Abrindo pagamento seguro do Mercado Pago.",
+      redirectUrl: checkout.initPoint,
+    };
   } catch (error) {
     return {
       status: "error",
@@ -30,12 +45,4 @@ export async function registerTenantAction(
             : "Nao foi possivel criar a conta.",
     };
   }
-
-  if (registered) {
-    redirect("/login?registered=1");
-  }
-
-  return {
-    status: "idle",
-  };
 }

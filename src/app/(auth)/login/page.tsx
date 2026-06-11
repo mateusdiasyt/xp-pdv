@@ -23,6 +23,7 @@ import { LandingLoginModal } from "@/components/platform/landing-login-modal";
 import { LandingModulesSection } from "@/components/platform/landing-modules-section";
 import { LandingRegisterModal } from "@/components/platform/landing-register-modal";
 import { MendozaLogo } from "@/components/platform/mendoza-logo";
+import type { PlatformPlanName } from "@/domain/platform/plan-entitlements";
 import { getServerAuthSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ type StepItem = {
 };
 
 type PricingPlan = {
+  planName: PlatformPlanName;
   title: string;
   idealFor: string;
   accent: "gold" | "platinum";
@@ -174,6 +176,7 @@ const faq = [
 
 const pricingPlans: PricingPlan[] = [
   {
+    planName: "Ouro",
     title: "Plano Ouro",
     idealFor: "Ideal para pequenos comércios, lanchonetes, conveniências e bares.",
     accent: "gold",
@@ -186,6 +189,7 @@ const pricingPlans: PricingPlan[] = [
     ],
   },
   {
+    planName: "Platina",
     title: "Plano Platina",
     idealFor:
       "Ideal para empresas que precisam de recursos avançados, múltiplos usuários, relatórios completos, integrações e suporte prioritário.",
@@ -582,6 +586,7 @@ export default async function LoginPage() {
 
                   <LandingRegisterModal
                     label="Começar com este plano"
+                    defaultPlanName={plan.planName}
                     className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-primary/30 bg-[linear-gradient(135deg,#ff496c,#ff0059)] px-5 text-base font-black text-black shadow-[0_22px_66px_-42px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-[0_28px_90px_-44px_hsl(var(--primary))]"
                   />
 

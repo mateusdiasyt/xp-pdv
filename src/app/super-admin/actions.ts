@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { updatePlatformGatewayConfiguration } from "@/application/platform/gateway-service";
+import { createPlatformSubscriptionCheckoutFromForm } from "@/application/platform/mercado-pago-billing-service";
 import {
   approvePlatformTenant,
   reactivatePlatformTenant,
@@ -55,6 +56,31 @@ export async function updateTenantPlanAction(formData: FormData) {
   await requirePlatformAdmin();
   await updatePlatformTenantPlan(formData);
   revalidatePath("/super-admin");
+}
+
+export async function createTenantSubscriptionCheckoutAction(
+  prevStateOrFormData: ActionState | FormData,
+  maybeFormData?: FormData,
+): Promise<ActionState & { redirectUrl?: string }> {
+  const formData = maybeFormData ?? (prevStateOrFormData as FormData);
+
+  try {
+    await requirePlatformAdmin();
+    const checkout = await createPlatformSubscriptionCheckoutFromForm(formData);
+
+    revalidatePath("/super-admin");
+
+    return {
+      status: "success",
+      message: "Link de assinatura criado.",
+      redirectUrl: checkout.initPoint,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
 }
 
 export async function updateGatewayConfigurationAction(

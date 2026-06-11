@@ -84,6 +84,21 @@ export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
         </div>
       </label>
 
+      <label className="block space-y-1.5">
+        <span className="text-xs font-semibold text-muted-foreground">Webhook Secret</span>
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 transition-colors focus-within:border-primary">
+          <KeyRound className="h-4 w-4 text-primary" />
+          <input
+            name="webhookSecret"
+            placeholder={
+              gateway.hasWebhookSecret ? "Secret ja configurado. Preencha apenas para trocar." : "Secret do webhook"
+            }
+            className="h-11 min-w-0 flex-1 bg-transparent font-mono text-sm text-foreground outline-none"
+            type="password"
+          />
+        </div>
+      </label>
+
       <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
         <input
           type="checkbox"

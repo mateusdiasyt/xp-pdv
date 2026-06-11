@@ -1,22 +1,101 @@
 "use client";
 
-import { useActionState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { Building2, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { registerTenantAction, type RegisterTenantState } from "@/app/(auth)/register/actions";
+import {
+  formatCentsToBRL,
+  PLATFORM_PLAN_PRICES,
+  type PlatformBillingCycleMonths,
+} from "@/domain/platform/billing-plans";
+import type { PlatformPlanName } from "@/domain/platform/plan-entitlements";
 
 const initialState: RegisterTenantState = {
   status: "idle",
 };
 
-export function RegisterTenantForm() {
-  const [state, action, isPending] = useActionState(registerTenantAction, initialState);
+type RegisterTenantFormProps = {
+  defaultPlanName?: PlatformPlanName;
+  defaultBillingCycleMonths?: PlatformBillingCycleMonths;
+};
+
+export function RegisterTenantForm({
+  defaultPlanName = "Ouro",
+  defaultBillingCycleMonths = 1,
+}: RegisterTenantFormProps) {
+  const [state, setState] = useState<RegisterTenantState>(initialState);
+  const [isPending, setIsPending] = useState(false);
+  const [planName, setPlanName] = useState<PlatformPlanName>(defaultPlanName);
+  const cycleOptions = useMemo(
+    () => PLATFORM_PLAN_PRICES.filter((price) => price.planName === planName),
+    [planName],
+  );
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isPending) {
+      return;
+    }
+
+    setIsPending(true);
+    setState(initialState);
+
+    try {
+      const result = await registerTenantAction(initialState, new FormData(event.currentTarget));
+      setState(result);
+
+      if (result.status === "success") {
+        window.location.href = result.redirectUrl ?? "/login?registered=1";
+      }
+    } catch {
+      setState({
+        status: "error",
+        message: "Nao foi possivel criar a conta agora.",
+      });
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   return (
-    <form action={action} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="planName">Plano</Label>
+          <select
+            id="planName"
+            name="planName"
+            value={planName}
+            onChange={(event) => setPlanName(event.currentTarget.value as PlatformPlanName)}
+            className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+          >
+            <option value="Ouro">Ouro</option>
+            <option value="Platina">Platina</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="billingCycleMonths">Pagamento</Label>
+          <select
+            id="billingCycleMonths"
+            name="billingCycleMonths"
+            defaultValue={String(defaultBillingCycleMonths)}
+            className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+          >
+            {cycleOptions.map((option) => (
+              <option key={`${option.planName}-${option.billingCycleMonths}`} value={option.billingCycleMonths}>
+                {option.label} - {formatCentsToBRL(option.amountCents)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="fullName">Nome completo</Label>
@@ -57,7 +136,7 @@ export function RegisterTenantForm() {
 
       <Button type="submit" className="w-full gap-2" disabled={isPending}>
         {isPending ? <CheckCircle2 className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
-        {isPending ? "Enviando..." : "Solicitar cadastro"}
+        {isPending ? "Gerando pagamento..." : "Criar conta e pagar"}
       </Button>
     </form>
   );

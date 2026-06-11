@@ -9,6 +9,7 @@ const gatewayConfigurationSchema = z.object({
   environment: z.enum(["test", "production"]),
   publicKey: z.string().trim().min(16, "Informe a Public Key do Mercado Pago."),
   accessToken: z.string().trim().optional(),
+  webhookSecret: z.string().trim().optional(),
   runConnectionTest: z.boolean().default(true),
 });
 
@@ -29,6 +30,7 @@ export type PlatformGatewayConfigurationSnapshot = {
   environment: "test" | "production";
   publicKey: string;
   hasAccessToken: boolean;
+  hasWebhookSecret: boolean;
   status: string;
   lastTestStatus: string | null;
   lastTestMessage: string | null;
@@ -54,6 +56,7 @@ async function ensurePlatformGatewayConfigurationTable() {
           "environment" TEXT NOT NULL DEFAULT 'test',
           "publicKey" TEXT,
           "accessTokenEncrypted" TEXT,
+          "webhookSecretEncrypted" TEXT,
           "status" TEXT NOT NULL DEFAULT 'inactive',
           "lastTestStatus" TEXT,
           "lastTestMessage" TEXT,
@@ -64,6 +67,10 @@ async function ensurePlatformGatewayConfigurationTable() {
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "PlatformGatewayConfiguration_pkey" PRIMARY KEY ("id")
         )
+      `);
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "PlatformGatewayConfiguration"
+          ADD COLUMN IF NOT EXISTS "webhookSecretEncrypted" TEXT
       `);
       await prisma.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "PlatformGatewayConfiguration_provider_key"
@@ -137,6 +144,7 @@ export async function getPlatformGatewayConfigurationSnapshot(): Promise<Platfor
       environment: "test",
       publicKey: "",
       hasAccessToken: false,
+      hasWebhookSecret: false,
       status: "inactive",
       lastTestStatus: null,
       lastTestMessage: null,
@@ -152,6 +160,7 @@ export async function getPlatformGatewayConfigurationSnapshot(): Promise<Platfor
     environment: normalizeGatewayEnvironment(configuration.environment),
     publicKey: configuration.publicKey ?? "",
     hasAccessToken: Boolean(configuration.accessTokenEncrypted),
+    hasWebhookSecret: Boolean(configuration.webhookSecretEncrypted),
     status: configuration.status,
     lastTestStatus: configuration.lastTestStatus,
     lastTestMessage: configuration.lastTestMessage,
@@ -168,6 +177,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
     environment: input.get("environment"),
     publicKey: input.get("publicKey"),
     accessToken: input.get("accessToken"),
+    webhookSecret: input.get("webhookSecret"),
     runConnectionTest: input.get("runConnectionTest") === "1",
   });
 
@@ -177,6 +187,9 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
   const nextAccessTokenEncrypted = parsed.accessToken
     ? encryptSecretValue(parsed.accessToken)
     : existing?.accessTokenEncrypted ?? null;
+  const nextWebhookSecretEncrypted = parsed.webhookSecret
+    ? encryptSecretValue(parsed.webhookSecret)
+    : existing?.webhookSecretEncrypted ?? null;
   const decryptedToken = parsed.accessToken || decryptSecretValue(nextAccessTokenEncrypted);
   const connectionTest = parsed.runConnectionTest && decryptedToken
     ? await testMercadoPagoAccessToken(decryptedToken)
@@ -193,6 +206,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
       environment: parsed.environment,
       publicKey: parsed.publicKey,
       accessTokenEncrypted: nextAccessTokenEncrypted,
+      webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
       lastTestStatus: connectionTest?.status ?? existing?.lastTestStatus ?? null,
       lastTestMessage: connectionTest?.message ?? existing?.lastTestMessage ?? null,
@@ -205,6 +219,7 @@ export async function updatePlatformGatewayConfiguration(input: FormData, actor:
       environment: parsed.environment,
       publicKey: parsed.publicKey,
       accessTokenEncrypted: nextAccessTokenEncrypted,
+      webhookSecretEncrypted: nextWebhookSecretEncrypted,
       status,
       lastTestStatus: connectionTest?.status ?? null,
       lastTestMessage: connectionTest?.message ?? null,
@@ -235,5 +250,6 @@ export async function resolveMercadoPagoGatewayCredentials() {
     environment: normalizeGatewayEnvironment(configuration.environment),
     publicKey: configuration.publicKey,
     accessToken,
+    webhookSecret: decryptSecretValue(configuration.webhookSecretEncrypted),
   };
 }

@@ -22,10 +22,15 @@ import {
   getPlatformGatewayConfigurationSnapshot,
   type PlatformGatewayConfigurationSnapshot,
 } from "@/application/platform/gateway-service";
+import {
+  formatCentsToBRL,
+} from "@/domain/platform/billing-plans";
+import { listPlatformBillingSummaries } from "@/application/platform/mercado-pago-billing-service";
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
 import { SuperAdminGatewayForm } from "@/components/platform/super-admin-gateway-form";
 import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
+import { TenantSubscriptionCheckoutButton } from "@/components/platform/tenant-subscription-checkout-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,6 +135,10 @@ function maskPublicKey(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-6)}`;
 }
 
+function getPublicSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://xp-pdv.vercel.app").replace(/\/$/, "");
+}
+
 function getGatewayStatus(gateway: PlatformGatewayConfigurationSnapshot) {
   if (gateway.status === "active") {
     return {
@@ -188,6 +197,28 @@ function getEnvironmentLabel(tenant: PlatformTenantRow) {
   return "Ambiente não provisionado";
 }
 
+function billingStatusLabel(status?: string | null) {
+  const normalized = status?.toLowerCase();
+
+  if (normalized === "authorized" || normalized === "active") {
+    return "Assinatura ativa";
+  }
+
+  if (normalized === "pending") {
+    return "Aguardando pagamento";
+  }
+
+  if (normalized === "paused") {
+    return "Pausada";
+  }
+
+  if (normalized === "cancelled" || normalized === "canceled") {
+    return "Cancelada";
+  }
+
+  return status ? status : "Sem assinatura";
+}
+
 function superAdminTabLinkClassName(isActive: boolean) {
   return cn(
     "inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-[0.8rem] font-medium whitespace-nowrap transition-colors",
@@ -199,6 +230,7 @@ function superAdminTabLinkClassName(isActive: boolean) {
 
 function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapshot }) {
   const gatewayStatus = getGatewayStatus(gateway);
+  const webhookUrl = `${getPublicSiteUrl()}/api/platform/mercado-pago/webhook`;
 
   return (
     <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
@@ -226,11 +258,22 @@ function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapsh
                 {gateway.hasAccessToken ? "Configurado" : "Pendente"}
               </p>
             </div>
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Webhook Secret</p>
+              <p className="mt-2 text-lg font-black text-foreground">
+                {gateway.hasWebhookSecret ? "Configurado" : "Opcional"}
+              </p>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Public Key</p>
             <p className="mt-2 break-all font-mono text-sm text-foreground">{maskPublicKey(gateway.publicKey)}</p>
+          </div>
+
+          <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">URL do webhook</p>
+            <p className="mt-2 break-all font-mono text-sm text-foreground">{webhookUrl}</p>
           </div>
 
           <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
@@ -265,6 +308,8 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
     getPlatformGatewayConfigurationSnapshot(),
     searchParams,
   ]);
+  const billingSummaries = await listPlatformBillingSummaries(tenants.map((tenant) => tenant.id));
+  const billingByTenant = new Map(billingSummaries.map((summary) => [summary.tenantId, summary]));
   const activeTab = params.tab === "gateway" ? "gateway" : "users";
   const activeCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.ACTIVE).length;
   const pendingCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.PENDING).length;
@@ -361,6 +406,7 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
               tenants.map((tenant) => {
                 const planState = getPlanState(tenant);
                 const canOpenTenant = tenant.status === PlatformTenantStatus.ACTIVE && tenant.slug === session.user.tenantSlug;
+                const billing = billingByTenant.get(tenant.id);
 
                 return (
                   <article
@@ -392,6 +438,7 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                         ) : null}
                       </div>
 
+                      <div className="grid gap-3">
                       <form action={updateTenantPlanAction} className="rounded-2xl border border-border/60 bg-card/45 p-3">
                         <input type="hidden" name="tenantId" value={tenant.id} />
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -450,7 +497,33 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                             Salvar
                           </Button>
                         </div>
+
                       </form>
+
+                        <div className="rounded-2xl border border-border/60 bg-background/45 p-3">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                Assinatura Mercado Pago
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-foreground">
+                                {billingStatusLabel(billing?.status)}
+                              </p>
+                            </div>
+                            {billing ? (
+                              <p className="text-xs text-muted-foreground">
+                                {billing.planName} / {billing.billingCycleMonths} mes(es) -{" "}
+                                {formatCentsToBRL(billing.amountCents)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <TenantSubscriptionCheckoutButton
+                            tenantId={tenant.id}
+                            defaultPlanName={tenant.planName === "Platina" ? "Platina" : "Ouro"}
+                            defaultBillingCycleMonths={billing?.billingCycleMonths ?? 1}
+                          />
+                        </div>
+                      </div>
 
                       <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
                         {canOpenTenant ? (

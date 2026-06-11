@@ -682,6 +682,7 @@ CREATE TABLE "PlatformGatewayConfiguration" (
     "environment" TEXT NOT NULL DEFAULT 'test',
     "publicKey" TEXT,
     "accessTokenEncrypted" TEXT,
+    "webhookSecretEncrypted" TEXT,
     "status" TEXT NOT NULL DEFAULT 'inactive',
     "lastTestStatus" TEXT,
     "lastTestMessage" TEXT,
@@ -692,6 +693,50 @@ CREATE TABLE "PlatformGatewayConfiguration" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PlatformGatewayConfiguration_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PlatformSubscription" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "planName" TEXT NOT NULL,
+    "billingCycleMonths" INTEGER NOT NULL,
+    "amountCents" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'BRL',
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "mercadoPagoPreapprovalId" TEXT,
+    "mercadoPagoInitPoint" TEXT,
+    "mercadoPagoExternalReference" TEXT NOT NULL,
+    "payerEmail" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "nextPaymentAt" TIMESTAMP(3),
+    "lastPaymentAt" TIMESTAMP(3),
+    "activatedAt" TIMESTAMP(3),
+    "cancelledAt" TIMESTAMP(3),
+    "lastWebhookAt" TIMESTAMP(3),
+    "rawSnapshot" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlatformSubscription_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PlatformPaymentEvent" (
+    "id" TEXT NOT NULL,
+    "provider" TEXT NOT NULL DEFAULT 'mercado-pago',
+    "eventType" TEXT NOT NULL,
+    "resourceId" TEXT,
+    "action" TEXT,
+    "subscriptionId" TEXT,
+    "tenantId" TEXT,
+    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processedAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'received',
+    "message" TEXT,
+    "payload" JSONB,
+
+    CONSTRAINT "PlatformPaymentEvent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1089,6 +1134,39 @@ CREATE INDEX "PlatformGatewayConfiguration_provider_idx" ON "PlatformGatewayConf
 CREATE INDEX "PlatformGatewayConfiguration_status_idx" ON "PlatformGatewayConfiguration"("status");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PlatformSubscription_mercadoPagoPreapprovalId_key" ON "PlatformSubscription"("mercadoPagoPreapprovalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlatformSubscription_mercadoPagoExternalReference_key" ON "PlatformSubscription"("mercadoPagoExternalReference");
+
+-- CreateIndex
+CREATE INDEX "PlatformSubscription_tenantId_idx" ON "PlatformSubscription"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "PlatformSubscription_status_idx" ON "PlatformSubscription"("status");
+
+-- CreateIndex
+CREATE INDEX "PlatformSubscription_planName_idx" ON "PlatformSubscription"("planName");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_provider_idx" ON "PlatformPaymentEvent"("provider");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_eventType_idx" ON "PlatformPaymentEvent"("eventType");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_resourceId_idx" ON "PlatformPaymentEvent"("resourceId");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_subscriptionId_idx" ON "PlatformPaymentEvent"("subscriptionId");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_tenantId_idx" ON "PlatformPaymentEvent"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "PlatformPaymentEvent_status_idx" ON "PlatformPaymentEvent"("status");
+
+-- CreateIndex
 CREATE INDEX "SystemUpdate_createdAt_idx" ON "SystemUpdate"("createdAt");
 
 -- CreateIndex
@@ -1258,6 +1336,15 @@ ALTER TABLE "MonthlyGoalPlan" ADD CONSTRAINT "MonthlyGoalPlan_createdById_fkey" 
 
 -- AddForeignKey
 ALTER TABLE "PlatformTenantUser" ADD CONSTRAINT "PlatformTenantUser_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "PlatformTenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlatformSubscription" ADD CONSTRAINT "PlatformSubscription_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "PlatformTenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlatformPaymentEvent" ADD CONSTRAINT "PlatformPaymentEvent_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "PlatformSubscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlatformPaymentEvent" ADD CONSTRAINT "PlatformPaymentEvent_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "PlatformTenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SystemUpdate" ADD CONSTRAINT "SystemUpdate_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
