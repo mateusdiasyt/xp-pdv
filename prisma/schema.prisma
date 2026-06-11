@@ -888,6 +888,25 @@ model PlatformTenantUser {
   @@index([email])
 }
 
+model PlatformGatewayConfiguration {
+  id                   String    @id @default(cuid())
+  provider             String    @unique @default("mercado-pago")
+  environment          String    @default("test")
+  publicKey            String?
+  accessTokenEncrypted String?
+  status               String    @default("inactive")
+  lastTestStatus       String?
+  lastTestMessage      String?
+  lastTestedAt         DateTime?
+  updatedById          String?
+  updatedByName        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([provider])
+  @@index([status])
+}
+
 model SystemUpdate {
   id            String   @id @default(cuid())
   title         String

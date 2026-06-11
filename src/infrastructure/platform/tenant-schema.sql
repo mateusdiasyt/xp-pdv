@@ -667,6 +667,25 @@ CREATE TABLE "PlatformTenantUser" (
 );
 
 -- CreateTable
+CREATE TABLE "PlatformGatewayConfiguration" (
+    "id" TEXT NOT NULL,
+    "provider" TEXT NOT NULL DEFAULT 'mercado-pago',
+    "environment" TEXT NOT NULL DEFAULT 'test',
+    "publicKey" TEXT,
+    "accessTokenEncrypted" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'inactive',
+    "lastTestStatus" TEXT,
+    "lastTestMessage" TEXT,
+    "lastTestedAt" TIMESTAMP(3),
+    "updatedById" TEXT,
+    "updatedByName" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlatformGatewayConfiguration_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "SystemUpdate" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -1050,6 +1069,15 @@ CREATE INDEX "PlatformTenantUser_email_idx" ON "PlatformTenantUser"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PlatformTenantUser_tenantId_email_key" ON "PlatformTenantUser"("tenantId", "email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlatformGatewayConfiguration_provider_key" ON "PlatformGatewayConfiguration"("provider");
+
+-- CreateIndex
+CREATE INDEX "PlatformGatewayConfiguration_provider_idx" ON "PlatformGatewayConfiguration"("provider");
+
+-- CreateIndex
+CREATE INDEX "PlatformGatewayConfiguration_status_idx" ON "PlatformGatewayConfiguration"("status");
 
 -- CreateIndex
 CREATE INDEX "SystemUpdate_createdAt_idx" ON "SystemUpdate"("createdAt");

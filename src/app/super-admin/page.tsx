@@ -5,13 +5,25 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  CreditCard,
+  KeyRound,
   PowerOff,
   RotateCcw,
   ShieldCheck,
   Users,
 } from "lucide-react";
 
-import { approveTenantAction, reactivateTenantAction, suspendTenantAction, updateTenantPlanAction } from "@/app/super-admin/actions";
+import {
+  approveTenantAction,
+  reactivateTenantAction,
+  suspendTenantAction,
+  updateGatewayConfigurationAction,
+  updateTenantPlanAction,
+} from "@/app/super-admin/actions";
+import {
+  getPlatformGatewayConfigurationSnapshot,
+  type PlatformGatewayConfigurationSnapshot,
+} from "@/application/platform/gateway-service";
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
 import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
@@ -31,6 +43,12 @@ type PlatformTenantRow = PlatformTenant & {
     createdAt: Date;
     updatedAt: Date;
     tenantId: string;
+  }>;
+};
+
+type SuperAdminPageProps = {
+  searchParams: Promise<{
+    tab?: string;
   }>;
 };
 
@@ -90,6 +108,50 @@ function formatDateInput(date?: Date | string | null) {
   return new Date(date).toISOString().slice(0, 10);
 }
 
+function formatDateTime(date?: Date | string | null) {
+  if (!date) {
+    return "Nunca testado";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(date));
+}
+
+function maskPublicKey(value: string) {
+  if (!value) {
+    return "Nao configurada";
+  }
+
+  if (value.length <= 16) {
+    return value;
+  }
+
+  return `${value.slice(0, 10)}...${value.slice(-6)}`;
+}
+
+function getGatewayStatus(gateway: PlatformGatewayConfigurationSnapshot) {
+  if (gateway.status === "active") {
+    return {
+      label: "Ativo",
+      className: "border-emerald-400/35 bg-emerald-400/12 text-emerald-200",
+    };
+  }
+
+  if (gateway.status === "attention") {
+    return {
+      label: "Revisar",
+      className: "border-amber-400/35 bg-amber-400/12 text-amber-100",
+    };
+  }
+
+  return {
+    label: "Incompleto",
+    className: "border-white/10 bg-white/5 text-white/55",
+  };
+}
+
 function getPlanState(tenant: PlatformTenantRow) {
   if (!tenant.planName) {
     return {
@@ -127,9 +189,134 @@ function getEnvironmentLabel(tenant: PlatformTenantRow) {
   return "Ambiente não provisionado";
 }
 
-export default async function SuperAdminPage() {
-  const session = await requirePlatformAdmin();
-  const tenants = await listPlatformTenants();
+function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapshot }) {
+  const gatewayStatus = getGatewayStatus(gateway);
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+      <Card>
+        <CardHeader className="border-b border-border/70">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Gateway Mercado Pago</CardTitle>
+              <CardDescription>Credenciais globais para cobrar assinaturas dos planos.</CardDescription>
+            </div>
+            <Badge className={gatewayStatus.className}>{gatewayStatus.label}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Ambiente</p>
+              <p className="mt-2 text-lg font-black text-foreground">
+                {gateway.environment === "production" ? "Producao" : "Teste"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Access Token</p>
+              <p className="mt-2 text-lg font-black text-foreground">
+                {gateway.hasAccessToken ? "Configurado" : "Pendente"}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Public Key</p>
+            <p className="mt-2 break-all font-mono text-sm text-foreground">{maskPublicKey(gateway.publicKey)}</p>
+          </div>
+
+          <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Ultimo teste</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">
+              {gateway.lastTestMessage ?? "Nenhum teste executado."}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(gateway.lastTestedAt)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b border-border/70">
+          <CardTitle>Credenciais</CardTitle>
+          <CardDescription>
+            Use credenciais de teste enquanto configuramos assinaturas. Depois trocamos para producao.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4">
+          <form action={updateGatewayConfigurationAction} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground">Ambiente</span>
+                <select
+                  name="environment"
+                  defaultValue={gateway.environment}
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+                >
+                  <option value="test">Teste</option>
+                  <option value="production">Producao</option>
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground">Public Key</span>
+                <input
+                  name="publicKey"
+                  defaultValue={gateway.publicKey}
+                  placeholder="TEST-..."
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
+                  required
+                />
+              </label>
+            </div>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">Access Token</span>
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 transition-colors focus-within:border-primary">
+                <KeyRound className="h-4 w-4 text-primary" />
+                <input
+                  name="accessToken"
+                  placeholder={gateway.hasAccessToken ? "Token ja configurado. Preencha apenas para trocar." : "TEST-..."}
+                  className="h-11 min-w-0 flex-1 bg-transparent font-mono text-sm text-foreground outline-none"
+                  type="password"
+                />
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                name="runConnectionTest"
+                value="1"
+                defaultChecked
+                className="h-4 w-4 accent-primary"
+              />
+              Testar conexao com Mercado Pago ao salvar
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="submit" className="gap-2">
+                <CreditCard className="h-4 w-4" />
+                Salvar gateway
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                O Access Token fica criptografado no banco e so e usado no backend.
+              </p>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+export default async function SuperAdminPage({ searchParams }: SuperAdminPageProps) {
+  const [session, tenants, gateway, params] = await Promise.all([
+    requirePlatformAdmin(),
+    listPlatformTenants(),
+    getPlatformGatewayConfigurationSnapshot(),
+    searchParams,
+  ]);
+  const activeTab = params.tab === "gateway" ? "gateway" : "users";
   const activeCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.ACTIVE).length;
   const pendingCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.PENDING).length;
   const expiringCount = tenants.filter((tenant) => {
@@ -167,12 +354,28 @@ export default async function SuperAdminPage() {
         </section>
 
         <nav className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card/60 p-2">
-          <Button type="button" className="gap-2" size="sm">
+          <Button
+            render={<Link href="/super-admin" />}
+            className="gap-2"
+            size="sm"
+            variant={activeTab === "users" ? "default" : "outline"}
+          >
             <Users className="h-4 w-4" />
-            Usuários
+            Usuarios
+          </Button>
+          <Button
+            render={<Link href="/super-admin?tab=gateway" />}
+            className="gap-2"
+            size="sm"
+            variant={activeTab === "gateway" ? "default" : "outline"}
+          >
+            <CreditCard className="h-4 w-4" />
+            Gateway
           </Button>
         </nav>
 
+        {activeTab === "users" ? (
+          <>
         <section className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
@@ -367,10 +570,14 @@ export default async function SuperAdminPage() {
               })
             )}
           </CardContent>
-        </Card>
+            </Card>
+          </>
+        ) : (
+          <GatewayPanel gateway={gateway} />
+        )}
 
         <p className={cn("text-center text-xs text-muted-foreground")}>
-          Próximos menus serão adicionados nessa mesma navegação.
+          Use o menu acima para alternar as areas do super admin.
         </p>
       </div>
     </main>

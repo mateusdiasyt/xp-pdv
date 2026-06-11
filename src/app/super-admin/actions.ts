@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
+import { updatePlatformGatewayConfiguration } from "@/application/platform/gateway-service";
 import {
   approvePlatformTenant,
   reactivatePlatformTenant,
@@ -52,5 +53,17 @@ export async function reactivateTenantAction(formData: FormData) {
 export async function updateTenantPlanAction(formData: FormData) {
   await requirePlatformAdmin();
   await updatePlatformTenantPlan(formData);
+  revalidatePath("/super-admin");
+}
+
+export async function updateGatewayConfigurationAction(formData: FormData) {
+  const session = await requirePlatformAdmin();
+  const actorName = session.user.name ?? session.user.email ?? "Super admin";
+
+  await updatePlatformGatewayConfiguration(formData, {
+    id: session.user.id,
+    name: actorName,
+  });
+
   revalidatePath("/super-admin");
 }
