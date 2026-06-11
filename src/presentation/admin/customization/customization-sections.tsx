@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Building2, FileKey2, Link2 } from "lucide-react";
+import { Building2, FileKey2, Link2, LockKeyhole } from "lucide-react";
 
+import { ModuleLockCard } from "@/components/admin/module-lock-card";
 import { cn } from "@/lib/utils";
 
 type CustomizationSectionKey = "brand" | "link" | "fiscal";
@@ -12,6 +13,11 @@ type CustomizationSectionsProps = {
   brandPanel: ReactNode;
   linkPanel: ReactNode;
   fiscalPanel: ReactNode;
+  lockedSections?: Partial<Record<CustomizationSectionKey, {
+    title: string;
+    description: string;
+    requiredPlan?: string;
+  }>>;
 };
 
 const sections: Array<{
@@ -40,9 +46,15 @@ const sections: Array<{
   },
 ];
 
-export function CustomizationSections({ brandPanel, linkPanel, fiscalPanel }: CustomizationSectionsProps) {
+export function CustomizationSections({
+  brandPanel,
+  linkPanel,
+  fiscalPanel,
+  lockedSections = {},
+}: CustomizationSectionsProps) {
   const [activeSection, setActiveSection] = useState<CustomizationSectionKey>("brand");
   const activeTitle = sections.find((section) => section.key === activeSection)?.title ?? "Configuracoes";
+  const activeLock = lockedSections[activeSection];
 
   return (
     <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -50,6 +62,7 @@ export function CustomizationSections({ brandPanel, linkPanel, fiscalPanel }: Cu
         {sections.map((section) => {
           const Icon = section.icon;
           const isActive = section.key === activeSection;
+          const isLocked = Boolean(lockedSections[section.key]);
 
           return (
             <button
@@ -59,6 +72,7 @@ export function CustomizationSections({ brandPanel, linkPanel, fiscalPanel }: Cu
               className={cn(
                 "group rounded-2xl border bg-card/70 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card",
                 isActive ? "border-primary/45 bg-primary/10 shadow-primary/10" : "border-border/70",
+                isLocked ? "border-amber-300/22 bg-amber-300/5" : "",
               )}
             >
               <span className="flex items-start gap-3">
@@ -73,7 +87,10 @@ export function CustomizationSections({ brandPanel, linkPanel, fiscalPanel }: Cu
                   <Icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-foreground">{section.title}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    {section.title}
+                    {isLocked ? <LockKeyhole className="size-3.5 text-amber-100/80" /> : null}
+                  </span>
                   <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{section.description}</span>
                 </span>
               </span>
@@ -88,9 +105,16 @@ export function CustomizationSections({ brandPanel, linkPanel, fiscalPanel }: Cu
           <h2 className="mt-2 text-xl font-semibold text-foreground">{activeTitle}</h2>
         </div>
 
-        {activeSection === "brand" ? brandPanel : null}
-        {activeSection === "link" ? linkPanel : null}
-        {activeSection === "fiscal" ? fiscalPanel : null}
+        {activeLock ? (
+          <ModuleLockCard
+            title={activeLock.title}
+            description={activeLock.description}
+            requiredPlan={activeLock.requiredPlan}
+          />
+        ) : null}
+        {!activeLock && activeSection === "brand" ? brandPanel : null}
+        {!activeLock && activeSection === "link" ? linkPanel : null}
+        {!activeLock && activeSection === "fiscal" ? fiscalPanel : null}
       </section>
     </div>
   );

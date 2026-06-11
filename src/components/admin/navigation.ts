@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { PERMISSIONS, type PermissionKey } from "@/domain/auth/permissions";
+import type { PlatformModuleKey } from "@/domain/platform/plan-entitlements";
 
 export type AdminNavigationItem = {
   label: string;
@@ -30,6 +31,7 @@ export type AdminNavigationItem = {
   icon: LucideIcon;
   permission: PermissionKey;
   group: "Operacao" | "Financeiro" | "Cadastros" | "Sistema";
+  requiredModule?: PlatformModuleKey;
 };
 
 export const adminNavigation: AdminNavigationItem[] = [
@@ -95,6 +97,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     icon: FileCode2,
     permission: PERMISSIONS.FISCAL_VIEW,
     group: "Financeiro",
+    requiredModule: "fiscal-focus",
   },
   {
     label: "NFS-e Servicos",
@@ -102,6 +105,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     icon: FileCheck2,
     permission: PERMISSIONS.SERVICE_FISCAL_VIEW,
     group: "Financeiro",
+    requiredModule: "fiscal-focus",
   },
   {
     label: "Categorias",
@@ -172,5 +176,6 @@ export const adminNavigation: AdminNavigationItem[] = [
     icon: Tv,
     permission: PERMISSIONS.TV_APP_VIEW,
     group: "Sistema",
+    requiredModule: "tv-app",
   },
 ];

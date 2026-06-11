@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/application/auth/guards";
 import {
   checkTenantSlugAvailability,
+  getTenantModuleEntitlements,
   updateTenantCustomSlug,
 } from "@/application/platform/platform-service";
 import {
@@ -13,7 +14,16 @@ import {
 } from "@/application/fiscal/fiscal-configuration-service";
 import { updateBrandCustomizationRecord } from "@/application/customization/brand-customization-service";
 import { PERMISSIONS } from "@/domain/auth/permissions";
+import { canUsePlatformModule, type PlatformModuleKey } from "@/domain/platform/plan-entitlements";
 import { initialActionState, toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
+
+async function ensurePlatformModuleAccess(tenantSlug: string, moduleKey: PlatformModuleKey) {
+  const entitlements = await getTenantModuleEntitlements(tenantSlug);
+
+  if (!canUsePlatformModule(entitlements, moduleKey)) {
+    throw new Error("Modulo disponivel apenas no Plano Platina ativo.");
+  }
+}
 
 export async function updateBrandCustomizationAction(
   prevState: ActionState = initialActionState,
@@ -43,6 +53,7 @@ export async function updateFiscalEnvironmentAction(
   void prevState;
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
+    await ensurePlatformModuleAccess(session.user.tenantSlug, "fiscal-focus");
     const actorName = session.user.name ?? session.user.email ?? "Usuario do painel";
     const updated = await updateFiscalEnvironmentRecord(formData, {
       id: session.user.id,
@@ -67,6 +78,7 @@ export async function updateFiscalEnvironmentAction(
 export async function updateFiscalSettingsAction(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
+    await ensurePlatformModuleAccess(session.user.tenantSlug, "fiscal-focus");
     const actorName = session.user.name ?? session.user.email ?? "Usuario do painel";
     const updated = await updateFiscalConfigurationRecord(formData, {
       id: session.user.id,
@@ -88,6 +100,7 @@ export async function updateFiscalSettingsAction(formData: FormData): Promise<Ac
 export async function checkTenantCustomLinkAction(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_MANAGE);
+    await ensurePlatformModuleAccess(session.user.tenantSlug, "custom-link");
     const requestedSlug = String(formData.get("slug") ?? "");
     const result = await checkTenantSlugAvailability(session.user.tenantSlug, requestedSlug);
 
@@ -107,6 +120,7 @@ export async function checkTenantCustomLinkAction(formData: FormData): Promise<A
 export async function updateTenantCustomLinkAction(formData: FormData): Promise<ActionState> {
   try {
     const session = await requirePermission(PERMISSIONS.CUSTOMIZATION_MANAGE);
+    await ensurePlatformModuleAccess(session.user.tenantSlug, "custom-link");
     const requestedSlug = String(formData.get("slug") ?? "");
     const result = await updateTenantCustomSlug(session.user.tenantSlug, requestedSlug);
 

@@ -1,12 +1,15 @@
 import { PaymentMethod, Prisma, ProductKind, SaleStatus } from "@prisma/client";
 
 import { resolveFocusFiscalSettings } from "@/application/fiscal/fiscal-configuration-service";
+import { getTenantModuleEntitlements } from "@/application/platform/platform-service";
+import { canUsePlatformModule } from "@/domain/platform/plan-entitlements";
 import {
   getSaleFiscalSnapshot,
   getSaleFiscalStatus,
   updateSaleFiscalData,
 } from "@/infrastructure/db/repositories/sale-fiscal-repository";
 import { createAuditLog } from "@/infrastructure/db/repositories/audit-log-repository";
+import { getCurrentTenantSlug } from "@/lib/prisma";
 
 type FocusEnvironment = "homologacao" | "producao";
 type FiscalSaleStatus =
@@ -71,6 +74,11 @@ function normalizeCnpjDigits(value: string | undefined) {
   }
 
   return value.replace(/\D/g, "");
+}
+
+async function canUseFiscalFocusModule() {
+  const entitlements = await getTenantModuleEntitlements(await getCurrentTenantSlug());
+  return canUsePlatformModule(entitlements, "fiscal-focus");
 }
 
 async function getFocusNfceConfig(): Promise<FocusNfceConfig> {
@@ -268,7 +276,6 @@ async function requestFocusNfceCancellation(
 }
 
 export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
-  const config = await getFocusNfceConfig();
   const snapshot = await getSaleFiscalSnapshot(data.saleId);
 
   if (!snapshot) {
@@ -279,6 +286,25 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
   }
 
   const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
+
+  if (!(await canUseFiscalFocusModule())) {
+    const message = "NFC-e nao emitida: modulo Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalStatus: "DISABLED",
+      fiscalMessage: message,
+      fiscalErrorAt: null,
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "DISABLED" as const,
+      message,
+    };
+  }
+
+  const config = await getFocusNfceConfig();
 
   if (!config.enabled) {
     const message =
@@ -494,7 +520,6 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
 }
 
 export async function queueSaleNfceIssue(data: { saleId: string; actorId: string }) {
-  const config = await getFocusNfceConfig();
   const snapshot = await getSaleFiscalSnapshot(data.saleId);
 
   if (!snapshot) {
@@ -505,6 +530,25 @@ export async function queueSaleNfceIssue(data: { saleId: string; actorId: string
   }
 
   const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
+
+  if (!(await canUseFiscalFocusModule())) {
+    const message = "NFC-e nao enfileirada: modulo Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
+    await updateSaleFiscalData(snapshot.id, {
+      fiscalReference,
+      fiscalDocumentType: "NFCE",
+      fiscalStatus: "DISABLED",
+      fiscalMessage: message,
+      fiscalErrorAt: null,
+      fiscalUpdatedAt: new Date(),
+    });
+
+    return {
+      status: "DISABLED" as const,
+      message,
+    };
+  }
+
+  const config = await getFocusNfceConfig();
   const message = "NFC-e enfileirada para emissao em segundo plano.";
 
   await updateSaleFiscalData(snapshot.id, {

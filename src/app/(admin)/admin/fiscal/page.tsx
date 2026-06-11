@@ -1,12 +1,15 @@
 import { requirePermission } from "@/application/auth/guards";
 import { getFiscalExportsData } from "@/application/fiscal/fiscal-export-service";
+import { getTenantModuleEntitlements } from "@/application/platform/platform-service";
 import { MetricCard } from "@/components/admin/metric-card";
+import { ModuleLockCard } from "@/components/admin/module-lock-card";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PERMISSIONS } from "@/domain/auth/permissions";
+import { canUsePlatformModule } from "@/domain/platform/plan-entitlements";
 import { formatCurrency } from "@/lib/format";
 
 type FiscalPageProps = {
@@ -82,7 +85,25 @@ function getFiscalStatusBadge(status?: string | null) {
 }
 
 export default async function FiscalPage({ searchParams }: FiscalPageProps) {
-  await requirePermission(PERMISSIONS.FISCAL_VIEW);
+  const session = await requirePermission(PERMISSIONS.FISCAL_VIEW);
+  const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
+
+  if (!canUsePlatformModule(entitlements, "fiscal-focus")) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Modulo Platina"
+          title="Fiscal XML"
+          description="XML, DANFE e consulta fiscal ficam disponiveis quando o Plano Platina estiver ativo."
+        />
+        <ModuleLockCard
+          title="Fiscal / Focus NFe bloqueado"
+          description="Ative o Plano Platina no painel super admin para liberar NFC-e, DANFE, XML fiscal e configuracoes da Focus NFe."
+        />
+      </div>
+    );
+  }
+
   const filters = await searchParams;
   const fiscal = await getFiscalExportsData(filters);
 

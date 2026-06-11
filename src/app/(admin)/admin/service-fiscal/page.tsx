@@ -3,11 +3,13 @@ import Link from "next/link";
 import { CalendarDays, CheckCircle2, ExternalLink, FileCheck2 } from "lucide-react";
 
 import { requirePermission } from "@/application/auth/guards";
+import { getTenantModuleEntitlements } from "@/application/platform/platform-service";
 import {
   getServiceFiscalApurationData,
   serviceCnaeLabels,
 } from "@/application/service-fiscal/service-fiscal-service";
 import { MetricCard } from "@/components/admin/metric-card";
+import { ModuleLockCard } from "@/components/admin/module-lock-card";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/domain/auth/permissions";
+import { canUsePlatformModule } from "@/domain/platform/plan-entitlements";
 import { formatCurrency } from "@/lib/format";
 import { declareServiceNfseAction } from "@/presentation/admin/service-fiscal/actions";
 
@@ -52,7 +55,25 @@ function getStatusBadge(isDeclared: boolean) {
 }
 
 export default async function ServiceFiscalPage({ searchParams }: ServiceFiscalPageProps) {
-  await requirePermission(PERMISSIONS.SERVICE_FISCAL_VIEW);
+  const session = await requirePermission(PERMISSIONS.SERVICE_FISCAL_VIEW);
+  const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
+
+  if (!canUsePlatformModule(entitlements, "fiscal-focus")) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Modulo Platina"
+          title="Apuracao de servicos"
+          description="A apuracao fiscal de servicos fica disponivel quando o Plano Platina estiver ativo."
+        />
+        <ModuleLockCard
+          title="Fiscal de servicos bloqueado"
+          description="Ative o Plano Platina no painel super admin para liberar apuracao de servicos, NFS-e e registros fiscais avancados."
+        />
+      </div>
+    );
+  }
+
   const filters = await searchParams;
   const data = await getServiceFiscalApurationData(filters);
 

@@ -1,18 +1,21 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { LockKeyhole } from "lucide-react";
 
 import { BrandLogo } from "@/components/admin/brand-logo";
 import { adminNavigation } from "@/components/admin/navigation";
+import { canUsePlatformModule, type TenantModuleEntitlements } from "@/domain/platform/plan-entitlements";
 import { getWorkspaceSlugFromPathname, toTenantAdminHref } from "@/lib/tenant-routes";
 import { cn } from "@/lib/utils";
 
 type AdminSidebarProps = {
   roleSlug: string;
   permissions: string[];
+  entitlements: TenantModuleEntitlements;
 };
 
-export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
+export function AdminSidebar({ roleSlug, permissions, entitlements }: AdminSidebarProps) {
   const pathname = usePathname();
   const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
 
@@ -48,6 +51,9 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
                 {groupItems.map((item) => {
                   const Icon = item.icon;
                   const itemHref = toTenantAdminHref(item.href, workspaceSlug);
+                  const isLocked = item.requiredModule
+                    ? !canUsePlatformModule(entitlements, item.requiredModule)
+                    : false;
                   const isActive =
                     itemHref.endsWith("/admin")
                       ? pathname === itemHref || pathname === "/admin"
@@ -59,9 +65,20 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
                       key={item.href}
                       href={itemHref}
                       aria-label={item.label}
+                      aria-disabled={isLocked}
+                      title={isLocked ? `${item.label} - disponivel no Plano Platina ativo` : item.label}
+                      onClick={
+                        isLocked
+                          ? (event) => {
+                              event.preventDefault();
+                            }
+                          : undefined
+                      }
                       className={cn(
                         "flex h-11 w-full items-center justify-center gap-3 rounded-xl text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar group-hover/sidebar:justify-start group-hover/sidebar:px-3",
-                        isActive
+                        isLocked
+                          ? "cursor-not-allowed border border-transparent text-sidebar-foreground/34 hover:border-sidebar-border/25 hover:bg-sidebar-accent/18"
+                          : isActive
                           ? "border border-sidebar-primary/30 bg-sidebar-primary/14 text-sidebar-foreground shadow-[0_12px_28px_-22px_color-mix(in_oklab,var(--sidebar-primary)_82%,transparent)]"
                           : "border border-transparent text-sidebar-foreground/64 hover:border-sidebar-border/45 hover:bg-sidebar-accent/44 hover:text-sidebar-foreground",
                       )}
@@ -69,12 +86,19 @@ export function AdminSidebar({ roleSlug, permissions }: AdminSidebarProps) {
                       <Icon
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
-                          isActive ? "text-sidebar-primary" : "text-sidebar-foreground/64",
+                          isLocked
+                            ? "text-sidebar-foreground/34"
+                            : isActive
+                              ? "text-sidebar-primary"
+                              : "text-sidebar-foreground/64",
                         )}
                       />
                       <span className="w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/sidebar:w-auto group-hover/sidebar:opacity-100">
                         {item.label}
                       </span>
+                      {isLocked ? (
+                        <LockKeyhole className="ml-auto hidden size-3.5 shrink-0 text-sidebar-foreground/42 group-hover/sidebar:block" />
+                      ) : null}
                     </a>
                   );
                 })}

@@ -134,8 +134,12 @@ async function getTenantSlugFromRequest() {
   }
 }
 
+export async function getCurrentTenantSlug() {
+  return (await getTenantSlugFromRequest()) ?? DEFAULT_WORKSPACE_SLUG;
+}
+
 export async function getCurrentPrismaClient() {
-  const tenantSlug = await getTenantSlugFromRequest();
+  const tenantSlug = await getCurrentTenantSlug();
   return getTenantPrismaClientBySlug(tenantSlug);
 }
 

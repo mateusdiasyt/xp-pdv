@@ -7,7 +7,10 @@ import {
   getBrandCustomizationSnapshot,
 } from "@/application/customization/brand-customization-service";
 import { getAccountNotificationData } from "@/application/accounts/account-payable-service";
-import { getTenantCompanyOnboardingState } from "@/application/platform/platform-service";
+import {
+  getTenantCompanyOnboardingState,
+  getTenantModuleEntitlements,
+} from "@/application/platform/platform-service";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { CompanyNameOnboardingModal } from "@/components/admin/company-name-onboarding-modal";
@@ -45,8 +48,11 @@ export default async function AdminLayout({
     return null;
   }
 
-  const accountNotificationData = await getAccountNotificationData();
-  const companyOnboarding = await getTenantCompanyOnboardingState(user.tenantSlug);
+  const [accountNotificationData, companyOnboarding, moduleEntitlements] = await Promise.all([
+    getAccountNotificationData(),
+    getTenantCompanyOnboardingState(user.tenantSlug),
+    getTenantModuleEntitlements(user.tenantSlug),
+  ]);
   const accountNotifications = {
     count: accountNotificationData.count,
     overdueCount: accountNotificationData.overdueCount,
@@ -67,6 +73,7 @@ export default async function AdminLayout({
           <AdminSidebar
             roleSlug={user.roleSlug}
             permissions={user.permissions}
+            entitlements={moduleEntitlements}
           />
         </div>
 

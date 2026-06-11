@@ -1,4 +1,5 @@
 import { PERMISSIONS, hasAnyPermission } from "@/domain/auth/permissions";
+import { canUsePlatformModule } from "@/domain/platform/plan-entitlements";
 import {
   downloadFocusXmlContent,
   resolveFocusConnection,
@@ -9,6 +10,7 @@ import {
   getSaleFiscalDocumentById,
   updateSaleFiscalData,
 } from "@/infrastructure/db/repositories/sale-fiscal-repository";
+import { getTenantModuleEntitlements } from "@/application/platform/platform-service";
 import { getServerAuthSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,11 @@ export async function GET(
 
   if (!canDownloadXml) {
     return new Response("Sem permissao para baixar XML fiscal.", { status: 403 });
+  }
+
+  const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
+  if (!canUsePlatformModule(entitlements, "fiscal-focus")) {
+    return new Response("Modulo fiscal disponivel apenas no Plano Platina ativo.", { status: 403 });
   }
 
   const { saleId } = await context.params;

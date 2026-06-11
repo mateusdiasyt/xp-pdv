@@ -1,7 +1,9 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { Download, KeyRound, RefreshCw, Tv } from "lucide-react";
 
+import { getTenantModuleEntitlements } from "@/application/platform/platform-service";
+import { ModuleLockCard } from "@/components/admin/module-lock-card";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,6 +13,8 @@ import {
 import { tvAppUpdateManifest } from "@/domain/tv-app/update-manifest";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import { getServerAuthSession } from "@/lib/auth";
+import { DEFAULT_WORKSPACE_SLUG } from "@/lib/tenant-routes";
+import { canUsePlatformModule } from "@/domain/platform/plan-entitlements";
 
 import { unlockTvAppPageAction } from "./actions";
 
@@ -21,7 +25,12 @@ type TvAppPageProps = {
 };
 
 export default async function TvAppPage({ searchParams }: TvAppPageProps) {
-  const [session, cookieStore, params] = await Promise.all([getServerAuthSession(), cookies(), searchParams]);
+  const [session, cookieStore, requestHeaders, params] = await Promise.all([
+    getServerAuthSession(),
+    cookies(),
+    headers(),
+    searchParams,
+  ]);
   const hasPinAccess = cookieStore.get(tvAppPageAccessCookieName)?.value === tvAppPageAccessCookieValue;
   const canUseSessionAccess =
     session?.user.roleSlug === "administrador" ||
@@ -30,6 +39,21 @@ export default async function TvAppPage({ searchParams }: TvAppPageProps) {
 
   if (!canViewPage) {
     return <TvAppPinGate hasError={params.pin === "invalid"} />;
+  }
+
+  const tenantSlug = session?.user.tenantSlug ?? requestHeaders.get("x-tenant-slug") ?? DEFAULT_WORKSPACE_SLUG;
+  const entitlements = await getTenantModuleEntitlements(tenantSlug);
+
+  if (!canUsePlatformModule(entitlements, "tv-app")) {
+    return (
+      <div className="space-y-5 text-white">
+        <PageHeader eyebrow="Modulo Platina" title="App da TV" description="APK e atualizacao obrigatoria ficam disponiveis no Plano Platina." />
+        <ModuleLockCard
+          title="App TV bloqueado"
+          description="Ative o Plano Platina no painel super admin para liberar o APK, controle de atualizacoes e uso do app nas Smart TVs."
+        />
+      </div>
+    );
   }
 
   return (

@@ -3,6 +3,7 @@ import { PlatformTenantStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { provisionTenantDatabase } from "@/application/platform/tenant-provisioning-service";
+import { buildTenantModuleEntitlements } from "@/domain/platform/plan-entitlements";
 import { decryptSecretValue } from "@/lib/secret-crypto";
 import { getPlatformPrisma, getTenantPrismaClientBySlug } from "@/lib/prisma";
 
@@ -153,6 +154,24 @@ export async function getActiveTenantBySlug(slug: string) {
       slug: normalizeTenantSlug(slug),
       status: PlatformTenantStatus.ACTIVE,
     },
+  });
+}
+
+export async function getTenantModuleEntitlements(slug: string) {
+  await ensurePlatformTenantProfileColumns();
+  const tenant = await getPlatformPrisma().platformTenant.findUnique({
+    where: { slug: normalizeTenantSlug(slug) },
+    select: {
+      planName: true,
+      planStatus: true,
+      planExpiresAt: true,
+    },
+  });
+
+  return buildTenantModuleEntitlements({
+    planName: tenant?.planName,
+    planStatus: tenant?.planStatus,
+    planExpiresAt: tenant?.planExpiresAt,
   });
 }
 
