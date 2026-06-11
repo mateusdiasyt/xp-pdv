@@ -106,6 +106,12 @@ function toJsonInput(value: unknown) {
   return value as Prisma.InputJsonValue;
 }
 
+function buildMercadoPagoSubscriptionEndDate() {
+  const endDate = new Date();
+  endDate.setFullYear(endDate.getFullYear() + 10);
+  return endDate.toISOString();
+}
+
 export async function ensurePlatformBillingTables() {
   if (!platformBillingTablesPromise) {
     const prisma = getPlatformPrisma();
@@ -229,6 +235,11 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit): Promise<
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
+    console.error("[MERCADO_PAGO] request failed", {
+      path,
+      status: response.status,
+      body: body.slice(0, 500),
+    });
     throw new Error(`Mercado Pago respondeu ${response.status}${body ? `: ${body.slice(0, 220)}` : "."}`);
   }
 
@@ -466,6 +477,7 @@ export async function createPlatformSubscriptionCheckout(input: {
       auto_recurring: {
         frequency: input.billingCycleMonths,
         frequency_type: "months",
+        end_date: buildMercadoPagoSubscriptionEndDate(),
         transaction_amount: amount,
         currency_id: "BRL",
       },
