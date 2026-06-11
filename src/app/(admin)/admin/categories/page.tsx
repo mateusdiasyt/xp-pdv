@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
+import { CategoryFiscalRulesForm } from "@/presentation/admin/catalog/categories/category-fiscal-rules-form";
 import { CreateCategoryForm } from "@/presentation/admin/catalog/categories/create-category-form";
 import { toggleCategoryStatusAction } from "@/presentation/admin/catalog/categories/actions";
 
@@ -68,6 +69,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Slug</TableHead>
+                <TableHead>Regra fiscal</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Produtos</TableHead>
                 <TableHead className="text-right">Acoes</TableHead>
@@ -76,7 +78,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
             <TableBody>
               {categories.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-zinc-500">
+                  <TableCell colSpan={6} className="text-center text-sm text-zinc-500">
                     Nenhuma categoria encontrada.
                   </TableCell>
                 </TableRow>
@@ -85,6 +87,22 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                 <TableRow key={category.id}>
                   <TableCell className="font-medium text-zinc-900">{category.name}</TableCell>
                   <TableCell>{category.slug}</TableCell>
+                  <TableCell>
+                    {canManage ? (
+                      <CategoryFiscalRulesForm
+                        categoryId={category.id}
+                        fiscalCfop={category.fiscalCfop}
+                        fiscalCsosn={category.fiscalCsosn}
+                        fiscalIcmsOrigin={category.fiscalIcmsOrigin}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {[category.fiscalCfop, category.fiscalCsosn, category.fiscalIcmsOrigin]
+                          .filter(Boolean)
+                          .join(" / ") || "Sem regra"}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       className={

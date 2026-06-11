@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import { ProductKind, RecordStatus, StockUnit } from "@prisma/client";
-import { ImageIcon, Plus, Trash2 } from "lucide-react";
-import type { ChangeEvent } from "react";
-import { useActionState, useEffect, useState } from "react";
+import { ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useState } from "react";
 
 import { ActionFeedback } from "@/components/admin/action-feedback";
-import { FormSubmitButton } from "@/components/admin/form-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +42,9 @@ type ProductFormInitialData = {
   name?: string;
   sku?: string;
   ncm?: string;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
   description?: string | null;
   imageUrl?: string | null;
   kind?: ProductKind;
@@ -75,7 +77,6 @@ type ProductFormProps = {
   stockIngredients: StockIngredientOption[];
   submitLabel: string;
   initialData?: ProductFormInitialData;
-  onSuccess?: () => void;
 };
 
 function ProductImagePreview({
@@ -174,9 +175,9 @@ export function CreateProductForm({
   stockIngredients,
   submitLabel,
   initialData,
-  onSuccess,
 }: ProductFormProps) {
-  const [state, formAction] = useActionState(action, initialActionState);
+  const [state, setState] = useState<ActionState>(initialActionState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialData?.imageUrl ?? "");
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -193,11 +194,32 @@ export function CreateProductForm({
   const usesStockControls = !isServiceLike && tracksStock;
   const currentStockValue = initialData?.currentStock ?? 0;
 
-  useEffect(() => {
-    if (state.status === "success") {
-      onSuccess?.();
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
     }
-  }, [onSuccess, state.status]);
+
+    setIsSubmitting(true);
+    setState(initialActionState);
+
+    try {
+      const result = await action(initialActionState, new FormData(event.currentTarget));
+      setState(result);
+
+      if (result.status === "success") {
+        window.location.reload();
+      }
+    } catch {
+      setState({
+        status: "error",
+        message: "Nao foi possivel salvar o produto. Se o problema persistir, contate o Mateus.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   async function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -275,7 +297,7 @@ export function CreateProductForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+    <form onSubmit={handleSubmit} className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="imageFile">Imagem do produto</Label>
@@ -315,21 +337,72 @@ export function CreateProductForm({
         </div>
 
         {!isServiceLike ? (
-          <div className="space-y-2">
-            <Label htmlFor="ncm">NCM</Label>
-            <Input
-              id="ncm"
-              name="ncm"
-              placeholder="22021000"
-              defaultValue={initialData?.ncm ?? ""}
-              inputMode="numeric"
-              maxLength={8}
-              required
-            />
-            <p className="text-xs text-muted-foreground">Informe o NCM fiscal com 8 digitos.</p>
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="ncm">NCM</Label>
+              <Input
+                id="ncm"
+                name="ncm"
+                placeholder="22021000"
+                defaultValue={initialData?.ncm ?? ""}
+                inputMode="numeric"
+                maxLength={8}
+                required
+              />
+              <p className="text-xs text-muted-foreground">Informe o NCM fiscal com 8 digitos.</p>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-border/75 bg-background/35 p-4 md:col-span-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Regra fiscal da NFC-e</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Deixe em branco para herdar da categoria. Preencha aqui somente quando este produto precisar de regra propria.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="fiscalCfop">CFOP</Label>
+                  <Input
+                    id="fiscalCfop"
+                    name="fiscalCfop"
+                    placeholder="Herdar"
+                    defaultValue={initialData?.fiscalCfop ?? ""}
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fiscalCsosn">CSOSN</Label>
+                  <Input
+                    id="fiscalCsosn"
+                    name="fiscalCsosn"
+                    placeholder="Herdar"
+                    defaultValue={initialData?.fiscalCsosn ?? ""}
+                    inputMode="numeric"
+                    maxLength={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fiscalIcmsOrigin">Origem ICMS</Label>
+                  <Input
+                    id="fiscalIcmsOrigin"
+                    name="fiscalIcmsOrigin"
+                    placeholder="Herdar"
+                    defaultValue={initialData?.fiscalIcmsOrigin ?? ""}
+                    inputMode="numeric"
+                    maxLength={1}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
         ) : (
-          <input type="hidden" name="ncm" value="" />
+          <>
+            <input type="hidden" name="ncm" value="" />
+            <input type="hidden" name="fiscalCfop" value="" />
+            <input type="hidden" name="fiscalCsosn" value="" />
+            <input type="hidden" name="fiscalIcmsOrigin" value="" />
+          </>
         )}
 
         <div className="space-y-2">
@@ -716,7 +789,10 @@ export function CreateProductForm({
 
         <div className="md:col-span-2">
           <div className={cn("flex flex-col gap-3", state.status !== "idle" && "items-start")}>
-            <FormSubmitButton>{submitLabel}</FormSubmitButton>
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? "Salvando..." : submitLabel}
+            </Button>
             <ActionFeedback state={state} />
           </div>
         </div>

@@ -84,6 +84,9 @@ export async function listProducts(filters?: ListProductsFilters) {
         name: string;
         sku: string;
         ncm: string | null;
+        fiscalCfop: string | null;
+        fiscalCsosn: string | null;
+        fiscalIcmsOrigin: string | null;
         description: string | null;
         hasImage: boolean;
         kind: ProductKind;
@@ -113,6 +116,9 @@ export async function listProducts(filters?: ListProductsFilters) {
         p."name",
         p."sku",
         p."ncm",
+        p."fiscalCfop",
+        p."fiscalCsosn",
+        p."fiscalIcmsOrigin",
         p."description",
         COALESCE(length(p."imageUrl"), 0) > 0 AS "hasImage",
         p."kind",
@@ -162,6 +168,9 @@ export async function listProducts(filters?: ListProductsFilters) {
         name: true,
         sku: true,
         ncm: true,
+        fiscalCfop: true,
+        fiscalCsosn: true,
+        fiscalIcmsOrigin: true,
         description: true,
         kind: true,
         serviceCnae: true,
@@ -207,6 +216,9 @@ export async function createProduct(data: {
   name: string;
   sku: string;
   ncm: string;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
@@ -260,6 +272,9 @@ export async function updateProduct(data: {
   name: string;
   sku: string;
   ncm: string;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
   description?: string;
   imageUrl?: string;
   kind: ProductKind;
@@ -290,6 +305,9 @@ export async function updateProduct(data: {
         name: data.name,
         sku: data.sku,
         ncm: data.ncm,
+        fiscalCfop: data.fiscalCfop,
+        fiscalCsosn: data.fiscalCsosn,
+        fiscalIcmsOrigin: data.fiscalIcmsOrigin,
         description: data.description,
         imageUrl: data.imageUrl,
         kind: data.kind,
@@ -349,6 +367,9 @@ export async function getProductForEdit(productId: string) {
       name: true,
       sku: true,
       ncm: true,
+      fiscalCfop: true,
+      fiscalCsosn: true,
+      fiscalIcmsOrigin: true,
       description: true,
       imageUrl: true,
       kind: true,

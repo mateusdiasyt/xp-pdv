@@ -7,6 +7,17 @@ const imagePathRegex = /^(https?:\/\/.+|\/.+)$/i;
 const imageDataUrlRegex = /^data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+$/;
 const ncmRegex = /^\d{8}$/;
 const cnaeRegex = /^\d{7}$/;
+const cfopRegex = /^\d{4}$/;
+const csosnRegex = /^\d{3}$/;
+const icmsOriginRegex = /^[0-8]$/;
+
+function digitsOnly(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.replace(/\D/g, "");
+}
 
 export const createCategorySchema = z.object({
   name: z.string().min(2, "Nome da categoria obrigatorio"),
@@ -15,6 +26,12 @@ export const createCategorySchema = z.object({
     .min(2, "Slug obrigatoria")
     .regex(/^[a-z0-9-]+$/, "Use apenas letras minusculas, numeros e hifen"),
   description: z.string().max(500, "Descricao longa demais").optional().or(z.literal("")),
+  fiscalCfop: z.preprocess(digitsOnly, z.string().regex(cfopRegex, "CFOP invalido. Use 4 digitos.").optional().or(z.literal(""))),
+  fiscalCsosn: z.preprocess(digitsOnly, z.string().regex(csosnRegex, "CSOSN invalido. Use 3 digitos.").optional().or(z.literal(""))),
+  fiscalIcmsOrigin: z.preprocess(
+    digitsOnly,
+    z.string().regex(icmsOriginRegex, "Origem ICMS invalida. Use um digito de 0 a 8.").optional().or(z.literal("")),
+  ),
   status: z.nativeEnum(RecordStatus).default(RecordStatus.ACTIVE),
 });
 
@@ -84,14 +101,14 @@ const productSchemaBase = z.object({
   name: z.string().min(2, "Nome obrigatorio"),
   sku: z.string().min(2, "SKU obrigatorio"),
   ncm: z.preprocess(
-    (value) => {
-      if (typeof value !== "string") {
-        return value;
-      }
-
-      return value.replace(/\D/g, "");
-    },
+    digitsOnly,
     z.string().regex(ncmRegex, "NCM invalido. Use 8 digitos.").optional().or(z.literal("")),
+  ),
+  fiscalCfop: z.preprocess(digitsOnly, z.string().regex(cfopRegex, "CFOP invalido. Use 4 digitos.").optional().or(z.literal(""))),
+  fiscalCsosn: z.preprocess(digitsOnly, z.string().regex(csosnRegex, "CSOSN invalido. Use 3 digitos.").optional().or(z.literal(""))),
+  fiscalIcmsOrigin: z.preprocess(
+    digitsOnly,
+    z.string().regex(icmsOriginRegex, "Origem ICMS invalida. Use um digito de 0 a 8.").optional().or(z.literal("")),
   ),
   description: z.string().max(800).optional().or(z.literal("")),
   imageUrl: z
@@ -118,13 +135,7 @@ const productSchemaBase = z.object({
     return undefined;
   }, z.boolean().default(true)),
   serviceCnae: z.preprocess(
-    (value) => {
-      if (typeof value !== "string") {
-        return value;
-      }
-
-      return value.replace(/\D/g, "");
-    },
+    digitsOnly,
     z.string().regex(cnaeRegex, "CNAE invalido. Use 7 digitos.").optional().or(z.literal("")),
   ),
   serviceDescription: z.string().max(160, "Descricao fiscal do servico muito longa").optional().or(z.literal("")),

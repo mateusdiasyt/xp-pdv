@@ -217,14 +217,17 @@ model UserPermission {
 }
 
 model ProductCategory {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String
-  description String?
-  status      RecordStatus @default(ACTIVE)
-  unitId      String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id               String       @id @default(cuid())
+  name             String
+  slug             String
+  description      String?
+  fiscalCfop       String?
+  fiscalCsosn      String?
+  fiscalIcmsOrigin String?
+  status           RecordStatus @default(ACTIVE)
+  unitId           String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   unit             BusinessUnit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
   products         Product[]
@@ -260,6 +263,9 @@ model Product {
   name                    String
   sku                     String       @unique
   ncm                     String?
+  fiscalCfop              String?
+  fiscalCsosn             String?
+  fiscalIcmsOrigin        String?
   description             String?
   imageUrl                String?
   kind                    ProductKind  @default(STANDARD)
@@ -619,6 +625,9 @@ model SaleItem {
   productNameSnapshot        String
   skuSnapshot                String
   ncmSnapshot                String?
+  fiscalCfopSnapshot         String?
+  fiscalCsosnSnapshot        String?
+  fiscalIcmsOriginSnapshot   String?
   productKindSnapshot        ProductKind @default(STANDARD)
   serviceCnaeSnapshot        String?
   serviceDescriptionSnapshot String?
@@ -872,15 +881,15 @@ model PlatformTenant {
 }
 
 model PlatformTenantUser {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String
-  name      String
-  role      String   @default("owner")
-  isOwner   Boolean  @default(false)
-  isPlatformAdmin Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tenantId        String
+  email           String
+  name            String
+  role            String   @default("owner")
+  isOwner         Boolean  @default(false)
+  isPlatformAdmin Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant PlatformTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

@@ -29,6 +29,9 @@ export async function createCategory(data: {
   name: string;
   slug: string;
   description?: string;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
   status: RecordStatus;
 }) {
   return prisma.productCategory.create({
@@ -59,5 +62,21 @@ export async function updateCategoryStatus(data: { categoryId: string; status: R
   return prisma.productCategory.update({
     where: { id: data.categoryId },
     data: { status: data.status },
+  });
+}
+
+export async function updateCategoryFiscalRules(data: {
+  categoryId: string;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
+}) {
+  return prisma.productCategory.update({
+    where: { id: data.categoryId },
+    data: {
+      fiscalCfop: data.fiscalCfop,
+      fiscalCsosn: data.fiscalCsosn,
+      fiscalIcmsOrigin: data.fiscalIcmsOrigin,
+    },
   });
 }

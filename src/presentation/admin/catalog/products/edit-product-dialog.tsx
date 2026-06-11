@@ -42,6 +42,9 @@ type ProductEditPayload = {
   name: string;
   sku: string;
   ncm?: string | null;
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
   description?: string | null;
   imageUrl?: string | null;
   kind: ProductKind;
@@ -134,6 +137,9 @@ export function EditProductDialog({ categories, suppliers, stockIngredients, pro
                 name: productPayload.name,
                 sku: productPayload.sku,
                 ncm: productPayload.ncm ?? "",
+                fiscalCfop: productPayload.fiscalCfop ?? "",
+                fiscalCsosn: productPayload.fiscalCsosn ?? "",
+                fiscalIcmsOrigin: productPayload.fiscalIcmsOrigin ?? "",
                 description: productPayload.description,
                 imageUrl: productPayload.imageUrl,
                 kind: productPayload.kind,
@@ -153,7 +159,6 @@ export function EditProductDialog({ categories, suppliers, stockIngredients, pro
                 recipeIngredients: productPayload.recipeIngredients,
                 status: productPayload.status,
               }}
-              onSuccess={() => setOpen(false)}
             />
           ) : null}
         </div>

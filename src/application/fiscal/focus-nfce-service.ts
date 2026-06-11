@@ -427,6 +427,9 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
     items: fiscalItems.map((item, index) => {
       const lineTotal = parseMoney(item.lineTotal);
       const itemDiscount = productSubtotal > 0 ? Math.min(lineTotal, productDiscount * (lineTotal / productSubtotal)) : 0;
+      const itemCfop = String(item.fiscalCfopSnapshot ?? "").trim() || config.defaultCfop;
+      const itemCsosn = String(item.fiscalCsosnSnapshot ?? "").trim() || config.defaultIcmsSituacaoTributaria;
+      const itemIcmsOrigin = String(item.fiscalIcmsOriginSnapshot ?? "").trim() || config.defaultIcmsOrigem;
 
       return {
         numero_item: String(index + 1),
@@ -435,15 +438,15 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
         descricao: item.productNameSnapshot || `ITEM ${index + 1}`,
         quantidade_comercial: toDecimal(item.quantity, 4),
         quantidade_tributavel: toDecimal(item.quantity, 4),
-        cfop: config.defaultCfop,
+        cfop: itemCfop,
         valor_unitario_comercial: toDecimal(parseMoney(item.unitPrice), 4),
         valor_unitario_tributavel: toDecimal(parseMoney(item.unitPrice), 4),
         valor_bruto: toDecimal(lineTotal, 2),
         valor_desconto: toDecimal(itemDiscount, 2),
         unidade_comercial: config.defaultUnidade,
         unidade_tributavel: config.defaultUnidade,
-        icms_origem: config.defaultIcmsOrigem,
-        icms_situacao_tributaria: config.defaultIcmsSituacaoTributaria,
+        icms_origem: itemIcmsOrigin,
+        icms_situacao_tributaria: itemCsosn,
       };
     }),
     formas_pagamento: buildPaymentPayload(snapshot.payments, productTotal),

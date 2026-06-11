@@ -19,6 +19,9 @@ type SaleFiscalSnapshot = {
     productNameSnapshot: string;
     skuSnapshot: string;
     ncmSnapshot: string | null;
+    fiscalCfopSnapshot: string | null;
+    fiscalCsosnSnapshot: string | null;
+    fiscalIcmsOriginSnapshot: string | null;
     productKindSnapshot: ProductKind;
     quantity: number;
     unitPrice: Prisma.Decimal;
@@ -54,6 +57,9 @@ export async function getSaleFiscalSnapshot(saleId: string): Promise<SaleFiscalS
           productNameSnapshot: true,
           skuSnapshot: true,
           ncmSnapshot: true,
+          fiscalCfopSnapshot: true,
+          fiscalCsosnSnapshot: true,
+          fiscalIcmsOriginSnapshot: true,
           productKindSnapshot: true,
           quantity: true,
           unitPrice: true,

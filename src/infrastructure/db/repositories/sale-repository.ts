@@ -78,6 +78,29 @@ const PDV_TRANSACTION_OPTIONS = {
   timeout: 40_000,
 };
 
+function normalizeFiscalCode(value?: string | null) {
+  const normalized = String(value ?? "").replace(/\D/g, "").trim();
+  return normalized || null;
+}
+
+function resolveFiscalSnapshot(product: {
+  fiscalCfop?: string | null;
+  fiscalCsosn?: string | null;
+  fiscalIcmsOrigin?: string | null;
+  category?: {
+    fiscalCfop?: string | null;
+    fiscalCsosn?: string | null;
+    fiscalIcmsOrigin?: string | null;
+  } | null;
+}) {
+  return {
+    fiscalCfopSnapshot: normalizeFiscalCode(product.fiscalCfop) ?? normalizeFiscalCode(product.category?.fiscalCfop),
+    fiscalCsosnSnapshot: normalizeFiscalCode(product.fiscalCsosn) ?? normalizeFiscalCode(product.category?.fiscalCsosn),
+    fiscalIcmsOriginSnapshot:
+      normalizeFiscalCode(product.fiscalIcmsOrigin) ?? normalizeFiscalCode(product.category?.fiscalIcmsOrigin),
+  };
+}
+
 type StockBalanceProduct = {
   id: string;
   name: string;
@@ -651,6 +674,9 @@ async function runCreateSaleWithStockAdjustment(
       name: true,
       sku: true,
       ncm: true,
+      fiscalCfop: true,
+      fiscalCsosn: true,
+      fiscalIcmsOrigin: true,
       kind: true,
       tracksStock: true,
       serviceCnae: true,
@@ -660,6 +686,13 @@ async function runCreateSaleWithStockAdjustment(
       salePrice: true,
       happyHourPrice: true,
       categoryId: true,
+      category: {
+        select: {
+          fiscalCfop: true,
+          fiscalCsosn: true,
+          fiscalIcmsOrigin: true,
+        },
+      },
       costPrice: true,
       currentStock: true,
       status: true,
@@ -821,12 +854,16 @@ async function runCreateSaleWithStockAdjustment(
             happyHourActive: data.happyHourActive,
             unitPriceOverride: item.unitPrice,
           });
+          const fiscalSnapshot = resolveFiscalSnapshot(product);
 
           return {
             productId: product.id,
             productNameSnapshot: product.name,
             skuSnapshot: product.sku,
             ncmSnapshot: product.ncm,
+            fiscalCfopSnapshot: fiscalSnapshot.fiscalCfopSnapshot,
+            fiscalCsosnSnapshot: fiscalSnapshot.fiscalCsosnSnapshot,
+            fiscalIcmsOriginSnapshot: fiscalSnapshot.fiscalIcmsOriginSnapshot,
             productKindSnapshot: product.kind,
             serviceCnaeSnapshot: product.kind === ProductKind.STANDARD ? null : product.serviceCnae,
             serviceDescriptionSnapshot:

@@ -53,7 +53,6 @@ export function CreateProductDialog({ categories, suppliers, stockIngredients }:
             suppliers={suppliers}
             stockIngredients={stockIngredients}
             submitLabel="Criar produto"
-            onSuccess={() => setOpen(false)}
           />
         </div>
       </DialogContent>
