@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
-  KeyRound,
   PowerOff,
   RotateCcw,
   ShieldCheck,
@@ -17,7 +16,6 @@ import {
   approveTenantAction,
   reactivateTenantAction,
   suspendTenantAction,
-  updateGatewayConfigurationAction,
   updateTenantPlanAction,
 } from "@/app/super-admin/actions";
 import {
@@ -26,6 +24,7 @@ import {
 } from "@/application/platform/gateway-service";
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
+import { SuperAdminGatewayForm } from "@/components/platform/super-admin-gateway-form";
 import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,6 +188,15 @@ function getEnvironmentLabel(tenant: PlatformTenantRow) {
   return "Ambiente não provisionado";
 }
 
+function superAdminTabLinkClassName(isActive: boolean) {
+  return cn(
+    "inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-[0.8rem] font-medium whitespace-nowrap transition-colors",
+    isActive
+      ? "border-transparent bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+      : "border-border/80 bg-background/85 text-muted-foreground shadow-sm hover:border-border hover:bg-muted/70 hover:text-foreground",
+  );
+}
+
 function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapshot }) {
   const gatewayStatus = getGatewayStatus(gateway);
 
@@ -243,66 +251,7 @@ function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapsh
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4">
-          <form action={updateGatewayConfigurationAction} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground">Ambiente</span>
-                <select
-                  name="environment"
-                  defaultValue={gateway.environment}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-                >
-                  <option value="test">Teste</option>
-                  <option value="production">Producao</option>
-                </select>
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground">Public Key</span>
-                <input
-                  name="publicKey"
-                  defaultValue={gateway.publicKey}
-                  placeholder="TEST-..."
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
-                  required
-                />
-              </label>
-            </div>
-
-            <label className="block space-y-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Access Token</span>
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 transition-colors focus-within:border-primary">
-                <KeyRound className="h-4 w-4 text-primary" />
-                <input
-                  name="accessToken"
-                  placeholder={gateway.hasAccessToken ? "Token ja configurado. Preencha apenas para trocar." : "TEST-..."}
-                  className="h-11 min-w-0 flex-1 bg-transparent font-mono text-sm text-foreground outline-none"
-                  type="password"
-                />
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                name="runConnectionTest"
-                value="1"
-                defaultChecked
-                className="h-4 w-4 accent-primary"
-              />
-              Testar conexao com Mercado Pago ao salvar
-            </label>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" className="gap-2">
-                <CreditCard className="h-4 w-4" />
-                Salvar gateway
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                O Access Token fica criptografado no banco e so e usado no backend.
-              </p>
-            </div>
-          </form>
+          <SuperAdminGatewayForm gateway={gateway} />
         </CardContent>
       </Card>
     </section>
@@ -354,24 +303,14 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
         </section>
 
         <nav className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card/60 p-2">
-          <Button
-            render={<Link href="/super-admin" />}
-            className="gap-2"
-            size="sm"
-            variant={activeTab === "users" ? "default" : "outline"}
-          >
+          <a href="/super-admin" className={superAdminTabLinkClassName(activeTab === "users")}>
             <Users className="h-4 w-4" />
             Usuarios
-          </Button>
-          <Button
-            render={<Link href="/super-admin?tab=gateway" />}
-            className="gap-2"
-            size="sm"
-            variant={activeTab === "gateway" ? "default" : "outline"}
-          >
+          </a>
+          <a href="/super-admin?tab=gateway" className={superAdminTabLinkClassName(activeTab === "gateway")}>
             <CreditCard className="h-4 w-4" />
             Gateway
-          </Button>
+          </a>
         </nav>
 
         {activeTab === "users" ? (

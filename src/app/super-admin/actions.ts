@@ -10,6 +10,7 @@ import {
   suspendPlatformTenant,
   updatePlatformTenantPlan,
 } from "@/application/platform/platform-service";
+import { toActionErrorMessage, type ActionState } from "@/presentation/admin/common/action-state";
 
 export async function approveTenantAction(formData: FormData) {
   await requirePlatformAdmin();
@@ -56,14 +57,31 @@ export async function updateTenantPlanAction(formData: FormData) {
   revalidatePath("/super-admin");
 }
 
-export async function updateGatewayConfigurationAction(formData: FormData) {
-  const session = await requirePlatformAdmin();
-  const actorName = session.user.name ?? session.user.email ?? "Super admin";
+export async function updateGatewayConfigurationAction(
+  prevStateOrFormData: ActionState | FormData,
+  maybeFormData?: FormData,
+): Promise<ActionState> {
+  const formData = maybeFormData ?? (prevStateOrFormData as FormData);
 
-  await updatePlatformGatewayConfiguration(formData, {
-    id: session.user.id,
-    name: actorName,
-  });
+  try {
+    const session = await requirePlatformAdmin();
+    const actorName = session.user.name ?? session.user.email ?? "Super admin";
 
-  revalidatePath("/super-admin");
+    await updatePlatformGatewayConfiguration(formData, {
+      id: session.user.id,
+      name: actorName,
+    });
+
+    revalidatePath("/super-admin");
+
+    return {
+      status: "success",
+      message: "Gateway salvo com sucesso.",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
 }
