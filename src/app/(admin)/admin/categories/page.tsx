@@ -85,7 +85,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
               ) : null}
               {categories.map((category) => (
                 <TableRow key={category.id}>
-                  <TableCell className="font-medium text-zinc-900">{category.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">{category.name}</TableCell>
                   <TableCell>{category.slug}</TableCell>
                   <TableCell>
                     {canManage ? (
