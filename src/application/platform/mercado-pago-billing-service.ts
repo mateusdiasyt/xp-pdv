@@ -63,6 +63,17 @@ export type PlatformBillingSummary = {
   updatedAt: Date;
 };
 
+export type TenantPaymentPortalState = {
+  tenantId: string;
+  tenantSlug: string;
+  tenantName: string;
+  tenantStatus: string;
+  ownerEmail: string;
+  planName: string | null;
+  planStatus: string;
+  latestSubscription: PlatformBillingSummary | null;
+};
+
 function getSiteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://xp-pdv.vercel.app").replace(
     /\/$/,
@@ -532,6 +543,30 @@ export async function listPlatformBillingSummaries(tenantIds: string[]): Promise
   }
 
   return summaries;
+}
+
+export async function getTenantPaymentPortalState(slug: string): Promise<TenantPaymentPortalState | null> {
+  await ensurePlatformBillingTables();
+  const tenant = await getPlatformPrisma().platformTenant.findUnique({
+    where: { slug },
+  });
+
+  if (!tenant) {
+    return null;
+  }
+
+  const [latestSubscription] = await listPlatformBillingSummaries([tenant.id]);
+
+  return {
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    tenantStatus: tenant.status,
+    ownerEmail: tenant.ownerEmail,
+    planName: tenant.planName,
+    planStatus: tenant.planStatus,
+    latestSubscription: latestSubscription ?? null,
+  };
 }
 
 function parseSignatureHeader(value: string | null) {

@@ -9,6 +9,8 @@ declare module "next-auth" {
       status: "ACTIVE" | "INACTIVE";
       tenantSlug: string;
       tenantName?: string | null;
+      platformTenantStatus?: "PENDING" | "ACTIVE" | "SUSPENDED" | "FAILED";
+      platformPlanStatus?: string | null;
       isPlatformAdmin: boolean;
       accessScope?: "tenant" | "platform";
     } & DefaultSession["user"];
@@ -20,6 +22,8 @@ declare module "next-auth" {
     status: "ACTIVE" | "INACTIVE";
     tenantSlug: string;
     tenantName?: string | null;
+    platformTenantStatus?: "PENDING" | "ACTIVE" | "SUSPENDED" | "FAILED";
+    platformPlanStatus?: string | null;
     isPlatformAdmin: boolean;
     accessScope?: "tenant" | "platform";
   }
@@ -32,6 +36,8 @@ declare module "next-auth/jwt" {
     status?: "ACTIVE" | "INACTIVE";
     tenantSlug?: string;
     tenantName?: string | null;
+    platformTenantStatus?: "PENDING" | "ACTIVE" | "SUSPENDED" | "FAILED";
+    platformPlanStatus?: string | null;
     isPlatformAdmin?: boolean;
     accessScope?: "tenant" | "platform";
   }

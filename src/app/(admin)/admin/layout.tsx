@@ -48,6 +48,17 @@ export default async function AdminLayout({
     return null;
   }
 
+  if (user.platformTenantStatus && user.platformTenantStatus !== "ACTIVE") {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-background" style={themeVariables as CSSProperties}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_28%),radial-gradient(circle_at_86%_0%,color-mix(in_oklab,var(--accent)_14%,transparent),transparent_34%)]" />
+        <main className="relative min-h-screen px-4 py-8 md:px-6 xl:px-8">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   const [accountNotificationData, companyOnboarding, moduleEntitlements] = await Promise.all([
     getAccountNotificationData(),
     getTenantCompanyOnboardingState(user.tenantSlug),

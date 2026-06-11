@@ -188,7 +188,9 @@ export async function findLoginTenantAccessByEmail(email: string) {
     where: {
       email: normalizedEmail,
       tenant: {
-        status: PlatformTenantStatus.ACTIVE,
+        status: {
+          in: [PlatformTenantStatus.ACTIVE, PlatformTenantStatus.PENDING, PlatformTenantStatus.FAILED],
+        },
       },
     },
     include: {
@@ -208,7 +210,9 @@ export async function findLoginTenantAccessesByEmail(email: string) {
     where: {
       email: normalizedEmail,
       tenant: {
-        status: PlatformTenantStatus.ACTIVE,
+        status: {
+          in: [PlatformTenantStatus.ACTIVE, PlatformTenantStatus.PENDING, PlatformTenantStatus.FAILED],
+        },
       },
     },
     include: {
@@ -225,7 +229,9 @@ export async function findLoginTenantAccessBySlug(slug: string, email: string) {
       email: email.trim().toLowerCase(),
       tenant: {
         slug: normalizeTenantSlug(slug),
-        status: PlatformTenantStatus.ACTIVE,
+        status: {
+          in: [PlatformTenantStatus.ACTIVE, PlatformTenantStatus.PENDING, PlatformTenantStatus.FAILED],
+        },
       },
     },
     include: {

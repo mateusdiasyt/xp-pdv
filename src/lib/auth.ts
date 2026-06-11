@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { RecordStatus } from "@prisma/client";
+import { PlatformTenantStatus, RecordStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
@@ -125,7 +125,7 @@ export const authOptions: NextAuthOptions = {
         const email = parsed.data.email.toLowerCase();
         const requestedWorkspace = parsed.data.workspace ? normalizeTenantSlug(parsed.data.workspace) : null;
         const accessScope = parsed.data.accessScope ?? "tenant";
-        let tenant: Awaited<ReturnType<typeof getActiveTenantBySlug>> | null = null;
+        let tenant: NonNullable<Awaited<ReturnType<typeof findLoginTenantAccessByEmail>>>["tenant"] | null = null;
         let isPlatformAdmin = false;
 
         try {
@@ -147,6 +147,37 @@ export const authOptions: NextAuthOptions = {
         }
 
         const tenantSlug = tenant?.slug ?? requestedWorkspace ?? DEFAULT_WORKSPACE_SLUG;
+        if (
+          accessScope === "tenant" &&
+          tenant &&
+          tenant.status !== PlatformTenantStatus.ACTIVE
+        ) {
+          if (!tenant.ownerPasswordHash || tenant.ownerEmail.toLowerCase() !== email) {
+            return null;
+          }
+
+          const isOwnerPasswordValid = await bcrypt.compare(parsed.data.password, tenant.ownerPasswordHash);
+
+          if (!isOwnerPasswordValid) {
+            return null;
+          }
+
+          return {
+            id: `platform-tenant-${tenant.id}`,
+            name: tenant.ownerName,
+            email: tenant.ownerEmail,
+            roleSlug: "administrador",
+            permissions: [],
+            status: RecordStatus.ACTIVE,
+            tenantSlug,
+            tenantName: tenant.name,
+            platformTenantStatus: tenant.status,
+            platformPlanStatus: tenant.planStatus,
+            isPlatformAdmin: false,
+            accessScope,
+          };
+        }
+
         const tenantPrisma = await getTenantPrismaClientBySlug(tenantSlug);
         await ensureTenantAccessControlPresets(tenantPrisma);
 
@@ -193,6 +224,8 @@ export const authOptions: NextAuthOptions = {
           status: user.status,
           tenantSlug,
           tenantName: tenant?.name ?? "XP Arcade & Bar",
+          platformTenantStatus: tenant?.status ?? PlatformTenantStatus.ACTIVE,
+          platformPlanStatus: tenant?.planStatus ?? "active",
           isPlatformAdmin,
           accessScope,
         };
@@ -207,6 +240,8 @@ export const authOptions: NextAuthOptions = {
         token.status = user.status;
         token.tenantSlug = user.tenantSlug;
         token.tenantName = user.tenantName;
+        token.platformTenantStatus = user.platformTenantStatus;
+        token.platformPlanStatus = user.platformPlanStatus;
         token.isPlatformAdmin = user.isPlatformAdmin;
         token.accessScope = user.accessScope ?? "tenant";
       }
@@ -221,6 +256,8 @@ export const authOptions: NextAuthOptions = {
         session.user.status = token.status ?? "INACTIVE";
         session.user.tenantSlug = token.tenantSlug ?? DEFAULT_WORKSPACE_SLUG;
         session.user.tenantName = token.tenantName ?? "XP Arcade & Bar";
+        session.user.platformTenantStatus = token.platformTenantStatus ?? "ACTIVE";
+        session.user.platformPlanStatus = token.platformPlanStatus ?? "active";
         session.user.isPlatformAdmin = Boolean(token.isPlatformAdmin);
         session.user.accessScope = token.accessScope ?? "tenant";
       }

@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { RecordStatus } from "@prisma/client";
+import { PlatformTenantStatus, RecordStatus } from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -24,6 +24,7 @@ const loginTenantResolutionSchema = z.object({
 export type LoginTenantChoice = {
   slug: string;
   name: string;
+  status?: "PENDING" | "ACTIVE" | "SUSPENDED" | "FAILED";
 };
 
 export type LoginTenantResolutionState = {
@@ -84,6 +85,22 @@ async function addTenantChoiceIfPasswordMatches(
   }
 }
 
+async function isPendingPlatformPasswordValid(
+  access: NonNullable<Awaited<ReturnType<typeof findLoginTenantAccessBySlug>>>,
+  email: string,
+  password: string,
+) {
+  if (access.tenant.status === PlatformTenantStatus.ACTIVE) {
+    return false;
+  }
+
+  if (!access.tenant.ownerPasswordHash || access.tenant.ownerEmail.toLowerCase() !== email) {
+    return false;
+  }
+
+  return bcrypt.compare(password, access.tenant.ownerPasswordHash);
+}
+
 export async function resolveLoginTenantsAction(formData: FormData): Promise<LoginTenantResolutionState> {
   const parsed = loginTenantResolutionSchema.safeParse({
     email: getOptionalString(formData, "email"),
@@ -112,6 +129,20 @@ export async function resolveLoginTenantsAction(formData: FormData): Promise<Log
       continue;
     }
 
+    if (access.tenant.status !== PlatformTenantStatus.ACTIVE) {
+      const passwordMatches = await isPendingPlatformPasswordValid(access, parsed.data.email, parsed.data.password);
+
+      if (passwordMatches) {
+        validTenants.set(access.tenant.slug, {
+          slug: access.tenant.slug,
+          name: access.tenant.name,
+          status: access.tenant.status,
+        });
+      }
+
+      continue;
+    }
+
     try {
       const passwordMatches = await isTenantPasswordValid(
         access.tenant.slug,
@@ -123,6 +154,7 @@ export async function resolveLoginTenantsAction(formData: FormData): Promise<Log
         validTenants.set(access.tenant.slug, {
           slug: access.tenant.slug,
           name: access.tenant.name,
+          status: access.tenant.status,
         });
       }
     } catch {

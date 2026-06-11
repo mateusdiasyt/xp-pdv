@@ -78,6 +78,10 @@ function buildTenantPublicPath(slug: string, adminPath: string) {
   return `/app/${slug}${publicPath}`;
 }
 
+function isPendingTenant(token: NextRequestWithAuth["nextauth"]["token"]) {
+  return token?.platformTenantStatus && token.platformTenantStatus !== "ACTIVE";
+}
+
 function nextWithHeaders(request: NextRequest, isPublicAdminApp = false) {
   const requestHeaders = new Headers(request.headers);
 
@@ -105,10 +109,17 @@ const authenticatedProxy = withAuth(
 
     if (tenantRoute) {
       const tokenTenantSlug = normalizeTenantSlug(request.nextauth.token?.tenantSlug);
+      const paymentPath = buildTenantPublicPath(tokenTenantSlug, "/admin/payment");
 
       if (tokenTenantSlug !== tenantRoute.slug) {
         const url = request.nextUrl.clone();
         url.pathname = buildTenantPublicPath(tokenTenantSlug, tenantRoute.adminPath);
+        return NextResponse.redirect(url);
+      }
+
+      if (isPendingTenant(request.nextauth.token) && tenantRoute.adminPath !== "/admin/payment") {
+        const url = request.nextUrl.clone();
+        url.pathname = paymentPath;
         return NextResponse.redirect(url);
       }
 
@@ -124,7 +135,10 @@ const authenticatedProxy = withAuth(
     if (pathname === "/admin" || pathname.startsWith("/admin/")) {
       const tenantSlug = normalizeTenantSlug(request.nextauth.token?.tenantSlug);
       const url = request.nextUrl.clone();
-      url.pathname = buildTenantPublicPath(tenantSlug, pathname);
+      url.pathname = buildTenantPublicPath(
+        tenantSlug,
+        isPendingTenant(request.nextauth.token) ? "/admin/payment" : pathname,
+      );
       return NextResponse.redirect(url);
     }
 
