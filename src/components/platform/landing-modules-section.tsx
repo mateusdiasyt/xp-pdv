@@ -3,13 +3,17 @@
 import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
 import {
+  BadgePercent,
   Banknote,
   BarChart3,
   Boxes,
+  ClipboardList,
   FileCheck2,
   Gamepad2,
+  Landmark,
   Link2,
   MessageCircle,
+  Palette,
   ReceiptText,
 } from "lucide-react";
 
@@ -26,6 +30,31 @@ type ModuleItem = {
   preview: ReactNode;
 };
 
+function MiniPdvPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 px-3 py-2">
+        <span className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Venda rápida</span>
+        <strong className="text-sm text-white">R$ 49,00</strong>
+      </div>
+      {[
+        ["Chopp Pilsen", "R$ 12,00"],
+        ["Batata Crinkle", "R$ 37,00"],
+      ].map(([label, value]) => (
+        <div key={label} className="flex items-center justify-between border-b border-white/8 py-2 text-xs">
+          <span className="text-white/58">{label}</span>
+          <strong className="text-white">{value}</strong>
+        </div>
+      ))}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[0.62rem] font-black text-white/70">
+        <span className="rounded-lg border border-white/10 bg-white/[0.035] px-2 py-2 text-center">Cupom</span>
+        <span className="rounded-lg border border-white/10 bg-white/[0.035] px-2 py-2 text-center">Pix</span>
+        <span className="rounded-lg border border-white/10 bg-white/[0.035] px-2 py-2 text-center">Ticket</span>
+      </div>
+    </div>
+  );
+}
+
 function MiniCommandPreview() {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
@@ -37,7 +66,7 @@ function MiniCommandPreview() {
               "rounded-xl border p-3 text-sm font-black",
               index === 0
                 ? "border-primary/35 bg-primary/12 text-white"
-                : "border-white/10 bg-white/[0.035] text-white/52"
+                : "border-white/10 bg-white/[0.035] text-white/52",
             )}
           >
             {table}
@@ -49,12 +78,12 @@ function MiniCommandPreview() {
       </div>
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-xs text-white/58">
         <div className="flex justify-between gap-3">
-          <span>Chopp Pilsen</span>
-          <strong className="text-white">R$ 12,00</strong>
+          <span>Cliente: Mesa 12</span>
+          <strong className="text-white">3 itens</strong>
         </div>
         <div className="mt-2 flex justify-between gap-3">
-          <span>Batata</span>
-          <strong className="text-white">R$ 37,00</strong>
+          <span>Fechar depois</span>
+          <strong className="text-white">R$ 74,00</strong>
         </div>
       </div>
     </div>
@@ -104,6 +133,28 @@ function MiniXmlPreview() {
           <span className="text-white/42">{items}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function MiniCouponPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
+        <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Cupom ativo</p>
+        <p className="mt-2 text-lg font-black text-white">HAPPY10</p>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[0.62rem] font-black text-white/68">
+        {["Tudo", "Categoria", "Produto"].map((mode) => (
+          <span key={mode} className="rounded-lg border border-white/10 bg-white/[0.035] px-2 py-2 text-center">
+            {mode}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs">
+        <span className="text-white/50">Desconto</span>
+        <strong className="text-white">10% ou R$ fixo</strong>
+      </div>
     </div>
   );
 }
@@ -174,6 +225,45 @@ function MiniReportPreview() {
   );
 }
 
+function MiniAccountsPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      {[
+        ["Internet", "Dia 10", "Fixa"],
+        ["Fornecedor", "18/06", "Pendente"],
+        ["Aluguel", "Dia 05", "Pago"],
+      ].map(([name, due, status]) => (
+        <div key={name} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-white/8 py-2 text-xs">
+          <strong className="text-white">{name}</strong>
+          <span className="text-white/48">{due}</span>
+          <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[0.58rem] font-black text-white/58">
+            {status}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniBrandPreview() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
+      <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
+        <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-primary">Identidade</p>
+        <p className="mt-2 text-lg font-black text-white">Logo + cores</p>
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {["#FF0059", "#FF6600", "#121111", "#FFFFFF"].map((color) => (
+          <span key={color} className="h-8 rounded-xl border border-white/12" style={{ backgroundColor: color }} />
+        ))}
+      </div>
+      <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs font-bold text-white/62">
+        Horário operacional e preferências
+      </p>
+    </div>
+  );
+}
+
 function MiniLinkPreview() {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
@@ -197,65 +287,101 @@ function MiniLinkPreview() {
 const modules: ModuleItem[] = [
   {
     icon: ReceiptText,
-    title: "PDV rápido e comandas",
+    title: "PDV rápido",
     plan: "Ouro",
-    summary: "Venda limpa, com cupom e múltiplos pagamentos.",
+    summary: "Venda direta, cupom, múltiplos pagamentos e ticket térmico.",
     details:
-      "Ideal para balcão e mesa: o atendente monta a venda, usa cupom quando precisar, divide em várias formas de pagamento e imprime o ticket sem sair do fluxo.",
-    preview: <MiniCommandPreview />,
+      "O operador monta a venda de balcão, aplica cupom quando necessário, divide em várias formas de pagamento e finaliza com comprovante sem recarregar a página.",
+    preview: <MiniPdvPreview />,
   },
   {
     icon: Banknote,
     title: "Caixa operacional",
     plan: "Ouro",
-    summary: "Abertura, operador e fechamento do dia.",
+    summary: "Abertura, operador, suprimento, sangria e fechamento do dia.",
     details:
-      "Antes de vender, o operador abre o caixa com valor inicial. Durante o dia registra sangria e suprimento. No fechamento, o sistema cruza dinheiro, Pix, cartão e vendas.",
+      "O PDV só vende com caixa aberto. O sistema controla saldo inicial, dinheiro das vendas, sangrias, suprimentos e fechamento com resumo para conferência.",
     preview: <MiniCashPreview />,
   },
   {
     icon: Boxes,
     title: "Estoque e XML",
     plan: "Ouro",
-    summary: "Entrada por XML com conferência.",
+    summary: "Entrada por XML, anexos, conferência, perdas e baixa.",
     details:
-      "Você pode apenas guardar o XML para consulta ou transformar a compra em entrada de estoque. O histórico fica anexado para baixar e conferir depois.",
+      "Você pode salvar XML de compra, baixar anexos, conferir itens antes da entrada e registrar movimentações como perdas, ajustes e estoque fracionado.",
     preview: <MiniXmlPreview />,
   },
   {
-    icon: BarChart3,
-    title: "Relatórios claros",
+    icon: BadgePercent,
+    title: "Cupons inteligentes",
     plan: "Ouro",
-    summary: "Resumo de vendas, caixa e pagamentos.",
+    summary: "Desconto em valor ou porcentagem por venda, categoria ou produto.",
     details:
-      "Os relatórios mostram vendas por período, formas de pagamento, saldo do caixa, itens mais vendidos, lucro estimado e resumo pronto para impressão ou WhatsApp.",
+      "Crie cupons com limite de uso, valor mínimo, validade e escopo. O desconto pode valer para tudo, para categorias ou para produtos específicos.",
+    preview: <MiniCouponPreview />,
+  },
+  {
+    icon: BarChart3,
+    title: "Relatórios e WhatsApp",
+    plan: "Ouro",
+    summary: "Resumo de vendas, pagamentos, caixa, lucro e itens vendidos.",
+    details:
+      "Acompanhe vendas por período, formas de pagamento, saldo do caixa, produtos mais vendidos, lucro estimado e envie o resumo formatado pelo WhatsApp.",
     preview: <MiniReportPreview />,
   },
   {
-    icon: FileCheck2,
-    title: "NFe e NFC-e com Focus NFe",
-    plan: "Platina",
-    summary: "API fiscal integrada no sistema.",
+    icon: Palette,
+    title: "Marca e configurações",
+    plan: "Ouro",
+    summary: "Logo, cores, nome do painel, horário operacional e preferências.",
     details:
-      "Cada cliente informa seus próprios dados da Focus NFe no painel. Dá para usar homologação para testes e produção quando a emissão fiscal estiver pronta.",
+      "Personalize o ambiente do cliente com logo, cores, nome da aba, horário de funcionamento e preferências importantes para a rotina do PDV.",
+    preview: <MiniBrandPreview />,
+  },
+  {
+    icon: ClipboardList,
+    title: "Comandas",
+    plan: "Platina",
+    summary: "Comandas avulsas, nomes, itens em aberto e fechamento posterior.",
+    details:
+      "Ideal para consumo em aberto. A equipe cria ou renomeia comandas, adiciona itens durante o atendimento e fecha tudo depois com as formas de pagamento do PDV.",
+    preview: <MiniCommandPreview />,
+  },
+  {
+    icon: Landmark,
+    title: "Contas a pagar",
+    plan: "Platina",
+    summary: "Planilha de contas fixas, parceladas, vencimentos e comprovantes.",
+    details:
+      "Organize despesas recorrentes e parceladas em formato de planilha, acompanhe vencimentos, anexe comprovantes e receba alertas no sino do painel.",
+    preview: <MiniAccountsPreview />,
+  },
+  {
+    icon: FileCheck2,
+    title: "Fiscal Focus NFe",
+    plan: "Platina",
+    summary: "NFC-e, DANFE, XML e ambiente fiscal por cliente.",
+    details:
+      "Cada cliente informa seus próprios tokens, CNPJ e regras fiscais. Dá para operar em homologação ou produção e manter XML/DANFE vinculados às vendas.",
     preview: <MiniFiscalPreview />,
   },
   {
     icon: Gamepad2,
     title: "App TV para Smart TVs",
     plan: "Platina",
-    summary: "Cobrança por tempo para qualquer videogame.",
+    summary: "Controle de tempo para PS5, simulador, sinuca e videogames.",
     details:
-      "Funciona em TVs com Google TV/Android TV compatíveis. O app controla bloqueio, tempo liberado, atualização obrigatória e cobrança por minuto conforme o serviço cadastrado.",
+      "Funciona em TVs com Google TV ou Android TV compatível. O app bloqueia e libera estações, cobra por minuto, controla modo livre e exige atualização quando houver nova versão.",
     preview: <MiniTvPreview />,
   },
   {
     icon: Link2,
-    title: "Link personalizado do seu PDV",
+    title: "Link personalizado",
     plan: "Platina",
-    summary: "Seu painel com endereço próprio.",
+    summary: "Endereço próprio para o PDV do cliente.",
     details:
-      "O cliente escolhe um endereço único para acessar o painel. O sistema verifica se o link está disponível e aplica no ambiente, sem misturar com outros PDVs.",
+      "O cliente escolhe um link exclusivo para acessar o ambiente do PDV. O sistema verifica disponibilidade e aplica o endereço sem misturar com outros clientes.",
     preview: <MiniLinkPreview />,
   },
 ];
@@ -272,7 +398,7 @@ function ModuleCard({ item }: { item: ModuleItem }) {
   return (
     <article
       tabIndex={0}
-      className="group/card h-[24rem] outline-none [perspective:1400px]"
+      className="group/card h-[25rem] outline-none [perspective:1400px]"
       aria-label={`${item.title} - Plano ${item.plan}`}
     >
       <div className="relative h-full rounded-2xl transition-transform duration-500 [transform-style:preserve-3d] group-hover/card:[transform:rotateY(180deg)] group-focus-visible/card:[transform:rotateY(180deg)] motion-reduce:transition-none motion-reduce:group-hover/card:[transform:none] motion-reduce:group-focus-visible/card:[transform:none]">
@@ -291,8 +417,8 @@ function ModuleCard({ item }: { item: ModuleItem }) {
           </div>
         </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between rounded-2xl border border-primary/28 bg-[#13090e]/96 p-5 shadow-[0_28px_90px_-56px_rgba(0,0,0,0.95)] [backface-visibility:hidden] [transform:rotateY(180deg)] motion-reduce:hidden">
-          <div>
+        <div className="absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-primary/28 bg-[#13090e]/96 p-5 shadow-[0_28px_90px_-56px_rgba(0,0,0,0.95)] [backface-visibility:hidden] [transform:rotateY(180deg)] motion-reduce:hidden">
+          <div className="min-h-0 overflow-y-auto pr-1">
             <div className="mb-5 flex items-center justify-between gap-3">
               <span className={cn("rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em]", planBadgeClassName(item.plan))}>
                 Plano {item.plan}
@@ -320,11 +446,15 @@ export function LandingModulesSection() {
     <section id="modulos" className="px-4 py-20">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Módulos do PDV</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Confira agora alguns de nossos módulos disponíveis
+              Confira os módulos disponíveis no Mendoza PDV
             </h2>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-white/58">
+              O plano Ouro cobre a operação essencial. O Platina adiciona módulos avançados para bares, serviços por tempo,
+              fiscal e crescimento do negócio.
+            </p>
           </div>
 
           <div className="inline-grid w-full max-w-sm grid-cols-2 rounded-2xl border border-white/10 bg-white/[0.035] p-1">
@@ -337,11 +467,11 @@ export function LandingModulesSection() {
                   "h-10 rounded-xl text-sm font-black transition-all",
                   selectedPlan === plan
                     ? "bg-primary text-primary-foreground shadow-[0_16px_44px_-26px_hsl(var(--primary))]"
-                    : "text-white/58 hover:bg-white/8 hover:text-white"
+                    : "text-white/58 hover:bg-white/8 hover:text-white",
                 )}
                 aria-pressed={selectedPlan === plan}
               >
-                {plan}
+                {plan} ({modules.filter((moduleItem) => moduleItem.plan === plan).length})
               </button>
             ))}
           </div>
