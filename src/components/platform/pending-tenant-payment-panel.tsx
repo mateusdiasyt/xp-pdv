@@ -3,8 +3,10 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  CheckCircle2,
   Loader2,
   ShieldCheck,
+  TrendingUp,
   WalletCards,
   X,
 } from "lucide-react";
@@ -293,6 +295,14 @@ export function PendingTenantPaymentPanel({
     [billingCycleMonths, cycleOptions],
   );
   const amountCents = selectedPrice?.amountCents ?? 0;
+  const oneMonthAmountCents =
+    PLATFORM_PLAN_PRICES.find((price) => price.planName === planName && price.billingCycleMonths === 1)?.amountCents ??
+    amountCents;
+  const fullPriceCents = oneMonthAmountCents * billingCycleMonths;
+  const savingsCents = Math.max(0, fullPriceCents - amountCents);
+  const savingsPercent = fullPriceCents > 0 ? Math.round((savingsCents / fullPriceCents) * 100) : 0;
+  const monthlyEquivalentCents = Math.round(amountCents / billingCycleMonths);
+  const longTermOptions = cycleOptions.filter((option) => option.billingCycleMonths > 1);
 
   useEffect(() => {
     if (!hasActivePlan) {
@@ -703,7 +713,88 @@ export function PendingTenantPaymentPanel({
       ) : null}
 
       {shouldRenderCheckout ? (
-        <div className="mt-5 flex justify-end">
+        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,500px)]">
+          <aside className="rounded-3xl border border-border/70 bg-background/45 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Economia do plano</p>
+            <h2 className="mt-2 max-w-xl text-2xl font-black tracking-tight text-foreground">
+              Renove por mais tempo e reduza o custo mensal.
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              O periodo escolhido soma ao vencimento atual e mantem o painel ativo sem interrupcao.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-2xl border border-primary/25 bg-primary/10 p-4 sm:col-span-3 xl:col-span-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">
+                      Selecionado
+                    </p>
+                    <p className="mt-2 text-xl font-black text-foreground">
+                      {formatCycleLabel(billingCycleMonths)}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Por mes</p>
+                    <p className="text-lg font-black text-foreground">{formatCentsToBRL(monthlyEquivalentCents)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Economia</p>
+                    <p className="text-lg font-black text-foreground">
+                      {savingsCents > 0 ? formatCentsToBRL(savingsCents) : "Sem desconto"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Desconto</p>
+                    <p className="text-lg font-black text-foreground">{savingsPercent > 0 ? `${savingsPercent}%` : "0%"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {longTermOptions.map((option) => {
+                const optionIsSelected = option.billingCycleMonths === billingCycleMonths;
+
+                return (
+                  <button
+                    key={`${option.planName}-${option.billingCycleMonths}`}
+                    type="button"
+                    onClick={() => setBillingCycleMonths(option.billingCycleMonths)}
+                    className={`rounded-2xl border p-4 text-left transition-colors ${
+                      optionIsSelected
+                        ? "border-primary/45 bg-primary/10"
+                        : "border-border/70 bg-background/55 hover:border-primary/35 hover:bg-primary/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-black text-foreground">{option.label}</p>
+                      {option.discountLabel ? (
+                        <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-black text-emerald-100">
+                          {option.discountLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{formatCentsToBRL(option.amountCents)}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-border/70 bg-background/55 p-4">
+              <p className="text-sm font-black text-foreground">O que continua ativo</p>
+              <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                {["Painel liberado", "Dados preservados", "Suporte e atualizacoes", "Modulos do plano"].map((item) => (
+                  <div key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+
           <form
             id="mendoza-card-form"
             className="w-full max-w-[540px] rounded-[28px] border border-slate-200 bg-white p-5 text-slate-950 shadow-[0_30px_90px_-54px_rgba(0,158,227,0.65)]"
