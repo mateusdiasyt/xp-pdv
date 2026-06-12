@@ -326,14 +326,14 @@ export default async function ModulesPage() {
                     <article
                       key={module.title}
                       className={cn(
-                        "group relative min-h-80 overflow-hidden rounded-[1.7rem] border bg-[#111012] p-4 shadow-[0_28px_90px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-[0_34px_95px_-68px_rgba(255,0,89,0.7)]",
+                        "group relative min-h-[29rem] overflow-hidden rounded-[1.7rem] border bg-[#111012] p-4 shadow-[0_28px_90px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-primary/45 hover:shadow-[0_34px_95px_-68px_rgba(255,0,89,0.7)] focus-within:z-20",
                         isAvailable ? "border-white/12" : "border-white/8",
                       )}
                     >
                       <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80", group.tone)} />
                       <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
 
-                      <div className="relative flex h-full min-h-72 flex-col">
+                      <div className="relative flex h-full min-h-[26.5rem] flex-col">
                         <div className="flex items-start justify-between gap-4">
                           <div className="relative flex h-14 w-14 items-center justify-center rounded-[1.35rem] border border-white/10 bg-black/36 text-primary shadow-inner">
                             <div className="absolute inset-2 rounded-2xl bg-primary/18 blur-md" />
@@ -395,7 +395,7 @@ export default async function ModulesPage() {
                         </div>
                       </div>
 
-                      <div className="pointer-events-none absolute inset-3 rounded-[1.35rem] border border-primary/25 bg-[#09080a]/96 p-4 opacity-0 shadow-[0_22px_80px_-48px_rgba(0,0,0,1)] backdrop-blur-xl transition-all duration-300 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                      <div className="pointer-events-none absolute inset-3 z-10 flex flex-col overflow-hidden rounded-[1.35rem] border border-primary/25 bg-[#09080a]/96 p-4 opacity-0 shadow-[0_22px_80px_-48px_rgba(0,0,0,1)] backdrop-blur-xl transition-all duration-300 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                         <div className="flex items-start gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary">
                             <Sparkles className="h-4 w-4" />
@@ -407,21 +407,23 @@ export default async function ModulesPage() {
                           </div>
                         </div>
 
-                        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-primary">Como funciona</p>
-                          <ul className="mt-2 space-y-2 text-sm leading-5 text-white/72">
-                            {module.howItWorks.map((item) => (
-                              <li key={item} className="flex gap-2">
-                                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-primary">Como funciona</p>
+                            <ul className="mt-2 space-y-2 text-sm leading-5 text-white/72">
+                              {module.howItWorks.map((item) => (
+                                <li key={item} className="flex gap-2">
+                                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
-                        <p className="mt-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-semibold leading-5 text-white/68">
-                          Ideal para: {module.bestFor}
-                        </p>
+                          <p className="mt-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-semibold leading-5 text-white/68">
+                            Ideal para: {module.bestFor}
+                          </p>
+                        </div>
                       </div>
 
                       <details className="relative mt-4 rounded-2xl border border-border/60 bg-background/35 p-3 text-sm md:hidden">
