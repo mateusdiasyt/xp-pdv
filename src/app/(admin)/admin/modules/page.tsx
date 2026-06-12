@@ -233,131 +233,214 @@ export default async function ModulesPage() {
 
   const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
   const planHref = buildTenantAdminPath(session.user.tenantSlug, "/admin/payment");
+  const availableModuleCount = modules.filter((module) =>
+    canUseModule(entitlements.activePlan, module, module.moduleKey ? entitlements.modules[module.moduleKey] : false),
+  ).length;
+  const moduleGroups: Array<{
+    plan: PlatformPlanName;
+    title: string;
+    description: string;
+    tone: string;
+  }> = [
+    {
+      plan: "Ouro",
+      title: "Base operacional",
+      description: "Módulos essenciais para vender, controlar caixa, estoque, cupons, relatórios e identidade do PDV.",
+      tone: "from-amber-300/18 via-primary/8 to-transparent",
+    },
+    {
+      plan: "Platina",
+      title: "Módulos avançados",
+      description: "Recursos premium para comandas, contas, fiscal Focus NFe, App TV e link personalizado.",
+      tone: "from-cyan-300/16 via-primary/10 to-transparent",
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Biblioteca"
         title="Módulos"
-        description="Veja tudo que o Mendoza PDV pode ativar na sua operação. Os detalhes aparecem ao passar o mouse sobre cada módulo."
+        description="Uma biblioteca de recursos para ativar conforme a operação cresce. Passe o mouse sobre um módulo para ver como ele funciona."
       />
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border/70 bg-card/72 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Plano atual</p>
-          <p className="mt-2 text-2xl font-black text-foreground">{entitlements.activePlan ?? "Sem plano ativo"}</p>
+      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-[#151214] p-5 shadow-[0_30px_90px_-70px_rgba(0,0,0,0.95)] md:p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,0,89,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,102,0,0.12),transparent_36%)]" />
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">Biblioteca de plugins</p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight text-foreground md:text-4xl">
+              Módulos organizados por plano, com ativação clara e visual de produto real.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+              O plano Ouro mantém o PDV rodando com a operação base. O Platina libera módulos mais avançados para quem precisa de mais controle.
+            </p>
+          </div>
+
+          <div className="grid min-w-72 grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Plano</p>
+              <p className="mt-2 text-lg font-black text-foreground">{entitlements.activePlan ?? "Sem plano"}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Ativos</p>
+              <p className="mt-2 text-lg font-black text-foreground">
+                {availableModuleCount}/{modules.length}
+              </p>
+            </div>
+            <Link
+              href={planHref}
+              className="col-span-2 flex rounded-2xl border border-primary/30 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_45px_-26px_rgba(255,0,89,0.9)] transition-transform hover:-translate-y-0.5 sm:col-span-1"
+            >
+              <span className="self-end text-sm font-black">Gerenciar plano</span>
+            </Link>
+          </div>
         </div>
-        <div className="rounded-2xl border border-border/70 bg-card/72 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Módulos ativos</p>
-          <p className="mt-2 text-2xl font-black text-foreground">
-            {
-              modules.filter((module) =>
-                canUseModule(entitlements.activePlan, module, module.moduleKey ? entitlements.modules[module.moduleKey] : false),
-              ).length
-            }
-          </p>
-        </div>
-        <Link
-          href={planHref}
-          className="flex rounded-2xl border border-primary/30 bg-primary/10 p-4 text-primary transition-colors hover:bg-primary/15"
-        >
-          <span className="self-end text-sm font-black">Ver planos e liberar módulos premium</span>
-        </Link>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {modules.map((module) => {
-          const Icon = module.icon;
-          const moduleEnabled = module.moduleKey ? entitlements.modules[module.moduleKey] : false;
-          const isAvailable = canUseModule(entitlements.activePlan, module, moduleEnabled);
-          const isPremium = module.requiredPlan === "Platina";
+      <div className="space-y-6">
+        {moduleGroups.map((group) => {
+          const groupModules = modules.filter((module) => module.requiredPlan === group.plan);
 
           return (
-            <article
-              key={module.title}
-              className={cn(
-                "group relative z-0 rounded-2xl border bg-card/78 p-4 shadow-[0_22px_70px_-54px_rgba(0,0,0,0.95)] transition-all duration-200 hover:z-50 hover:-translate-y-1 hover:border-primary/35 hover:bg-card focus-within:z-50",
-                isAvailable ? "border-border/70" : "border-border/45 opacity-82",
-              )}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-                  <Icon className="h-5 w-5" />
+            <section key={group.plan} className="rounded-3xl border border-border/65 bg-card/58 p-4 md:p-5">
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <Badge className="border-primary/20 bg-primary/10 text-primary">{group.plan}</Badge>
+                  <h2 className="mt-3 text-2xl font-black text-foreground">{group.title}</h2>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{group.description}</p>
                 </div>
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Badge
-                    className={
-                      isAvailable
-                        ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                        : "border-amber-300/25 bg-amber-400/10 text-amber-100"
-                    }
-                  >
-                    {isAvailable ? "Ativo" : "Bloqueado"}
-                  </Badge>
-                  <Badge variant="outline">{isPremium ? "Platina" : "Ouro"}</Badge>
-                </div>
-              </div>
-
-              <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-primary">{module.category}</p>
-              <h2 className="mt-2 text-xl font-black text-foreground">{module.title}</h2>
-              <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">{module.summary}</p>
-
-              {!isAvailable ? (
-                <Link
-                  href={planHref}
-                  className="mt-4 inline-flex h-9 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-black text-primary transition-colors hover:bg-primary/15"
-                >
-                  <LockKeyhole className="mr-2 h-3.5 w-3.5" />
-                  Liberar módulo
-                </Link>
-              ) : (
-                <div className="mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 text-xs font-black text-emerald-100">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Disponível na conta
-                </div>
-              )}
-
-              <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-0.5rem)] z-[60] translate-y-3 rounded-2xl border border-primary/30 bg-[#121012]/98 p-4 opacity-0 shadow-[0_28px_90px_-46px_rgba(0,0,0,0.98)] backdrop-blur-xl transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white">{module.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-white/68">{module.details}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-primary">Como funciona</p>
-                  <ul className="mt-2 space-y-2 text-sm leading-5 text-white/72">
-                    {module.howItWorks.map((item) => (
-                      <li key={item} className="flex gap-2">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/22 px-3 py-2 text-xs font-semibold leading-5 text-white/68">
-                  Ideal para: {module.bestFor}
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  {groupModules.length} módulos
                 </p>
               </div>
 
-              <details className="mt-4 rounded-xl border border-border/60 bg-background/35 p-3 text-sm md:hidden">
-                <summary className="cursor-pointer font-black text-foreground">Ver detalhes</summary>
-                <p className="mt-3 leading-6 text-muted-foreground">{module.details}</p>
-                <ul className="mt-3 space-y-2 text-muted-foreground">
-                  {module.howItWorks.map((item) => (
-                    <li key={item}>- {item}</li>
-                  ))}
-                </ul>
-              </details>
-            </article>
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                {groupModules.map((module) => {
+                  const Icon = module.icon;
+                  const moduleEnabled = module.moduleKey ? entitlements.modules[module.moduleKey] : false;
+                  const isAvailable = canUseModule(entitlements.activePlan, module, moduleEnabled);
+                  const isPremium = module.requiredPlan === "Platina";
+
+                  return (
+                    <article
+                      key={module.title}
+                      className={cn(
+                        "group relative min-h-80 overflow-hidden rounded-[1.7rem] border bg-[#111012] p-4 shadow-[0_28px_90px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-[0_34px_95px_-68px_rgba(255,0,89,0.7)]",
+                        isAvailable ? "border-white/12" : "border-white/8",
+                      )}
+                    >
+                      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80", group.tone)} />
+                      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
+
+                      <div className="relative flex h-full min-h-72 flex-col">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="relative flex h-14 w-14 items-center justify-center rounded-[1.35rem] border border-white/10 bg-black/36 text-primary shadow-inner">
+                            <div className="absolute inset-2 rounded-2xl bg-primary/18 blur-md" />
+                            <Icon className="relative h-6 w-6" />
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <span
+                              className={cn(
+                                "inline-flex items-center rounded-full border px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.12em]",
+                                isAvailable
+                                  ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                                  : "border-amber-300/25 bg-amber-400/10 text-amber-100",
+                              )}
+                            >
+                              {isAvailable ? "Ativo" : "Bloqueado"}
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-black/28 px-2.5 py-1 text-[0.68rem] font-black text-foreground">
+                              {isPremium ? "Platina" : "Ouro"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-7">
+                          <p className="text-[0.68rem] font-black uppercase tracking-[0.2em] text-primary">
+                            Módulo - {module.category}
+                          </p>
+                          <h3 className="mt-2 text-2xl font-black leading-tight text-foreground">{module.title}</h3>
+                          <p className="mt-3 text-sm leading-6 text-muted-foreground">{module.summary}</p>
+                        </div>
+
+                        <div className="mt-auto pt-5">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
+                              <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Plano</p>
+                              <p className="mt-1 text-sm font-black text-foreground">{module.requiredPlan}</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
+                              <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Status</p>
+                              <p className={cn("mt-1 text-sm font-black", isAvailable ? "text-emerald-200" : "text-amber-200")}>
+                                {isAvailable ? "Liberado" : "Pendente"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {!isAvailable ? (
+                            <Link
+                              href={planHref}
+                              className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-sm font-black text-primary transition-colors hover:bg-primary/15"
+                            >
+                              <LockKeyhole className="mr-2 h-4 w-4" />
+                              Liberar módulo
+                            </Link>
+                          ) : (
+                            <div className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 text-sm font-black text-emerald-100">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Disponível na conta
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pointer-events-none absolute inset-3 rounded-[1.35rem] border border-primary/25 bg-[#09080a]/96 p-4 opacity-0 shadow-[0_22px_80px_-48px_rgba(0,0,0,1)] backdrop-blur-xl transition-all duration-300 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary">
+                            <Sparkles className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Detalhes do módulo</p>
+                            <h3 className="mt-1 text-lg font-black text-white">{module.title}</h3>
+                            <p className="mt-2 text-sm leading-6 text-white/68">{module.details}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-primary">Como funciona</p>
+                          <ul className="mt-2 space-y-2 text-sm leading-5 text-white/72">
+                            {module.howItWorks.map((item) => (
+                              <li key={item} className="flex gap-2">
+                                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <p className="mt-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-semibold leading-5 text-white/68">
+                          Ideal para: {module.bestFor}
+                        </p>
+                      </div>
+
+                      <details className="relative mt-4 rounded-2xl border border-border/60 bg-background/35 p-3 text-sm md:hidden">
+                        <summary className="cursor-pointer font-black text-foreground">Ver detalhes</summary>
+                        <p className="mt-3 leading-6 text-muted-foreground">{module.details}</p>
+                        <ul className="mt-3 space-y-2 text-muted-foreground">
+                          {module.howItWorks.map((item) => (
+                            <li key={item}>- {item}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           );
         })}
-      </section>
+      </div>
     </div>
   );
 }
