@@ -16,6 +16,7 @@ type SuperAdminGatewayFormProps = {
 export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
   const [state, setState] = useState<ActionState>(initialActionState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [environment, setEnvironment] = useState(gateway.environment);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +52,8 @@ export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
           <span className="text-xs font-semibold text-muted-foreground">Ambiente</span>
           <select
             name="environment"
-            defaultValue={gateway.environment}
+            value={environment}
+            onChange={(event) => setEnvironment(event.currentTarget.value === "production" ? "production" : "test")}
             className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
           >
             <option value="test">Teste</option>
@@ -71,19 +73,23 @@ export function SuperAdminGatewayForm({ gateway }: SuperAdminGatewayFormProps) {
         </label>
       </div>
 
-      <label className="block space-y-1.5">
-        <span className="text-xs font-semibold text-muted-foreground">Email comprador teste</span>
-        <input
-          name="testPayerEmail"
-          defaultValue={gateway.testPayerEmail ?? ""}
-          placeholder="test_user_8545504462109183292@testuser.com"
-          className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
-          type="email"
-        />
-        <span className="block text-[11px] text-muted-foreground">
-          Use o email tecnico do comprador teste, no formato test_user_...@testuser.com.
-        </span>
-      </label>
+      {environment === "test" ? (
+        <label className="block space-y-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Email comprador teste</span>
+          <input
+            name="testPayerEmail"
+            defaultValue={gateway.testPayerEmail ?? ""}
+            placeholder="test_user_8545504462109183292@testuser.com"
+            className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary"
+            type="email"
+          />
+          <span className="block text-[11px] text-muted-foreground">
+            Use o email tecnico do comprador teste, no formato test_user_...@testuser.com.
+          </span>
+        </label>
+      ) : (
+        <input type="hidden" name="testPayerEmail" value="" />
+      )}
 
       <label className="block space-y-1.5">
         <span className="text-xs font-semibold text-muted-foreground">Access Token</span>

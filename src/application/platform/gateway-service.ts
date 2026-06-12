@@ -8,7 +8,10 @@ const MERCADO_PAGO_PROVIDER = "mercado-pago";
 const gatewayConfigurationSchema = z.object({
   environment: z.enum(["test", "production"]),
   publicKey: z.string().trim().min(16, "Informe a Public Key do Mercado Pago."),
-  testPayerEmail: z.string().trim().email("Informe um email de comprador teste valido.").optional().or(z.literal("")),
+  testPayerEmail: z.preprocess(
+    (value) => (value == null ? "" : value),
+    z.string().trim().email("Informe um email de comprador teste valido.").optional().or(z.literal("")),
+  ),
   accessToken: z.string().trim().optional(),
   webhookSecret: z.string().trim().optional(),
   runConnectionTest: z.boolean().default(true),
