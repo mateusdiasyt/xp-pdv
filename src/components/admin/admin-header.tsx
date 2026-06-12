@@ -8,6 +8,9 @@ type AdminHeaderProps = {
   userEmail?: string | null;
   roleSlug: string;
   permissions: string[];
+  planLabel?: string | null;
+  planHref?: string;
+  planIsActive?: boolean;
   accountNotifications: {
     count: number;
     overdueCount: number;
@@ -26,6 +29,9 @@ export function AdminHeader({
   userEmail,
   roleSlug,
   permissions,
+  planLabel,
+  planHref,
+  planIsActive = false,
   accountNotifications,
 }: AdminHeaderProps) {
   const canViewAccounts = roleSlug === "administrador" || hasPermission(permissions, PERMISSIONS.ACCOUNTS_VIEW);
@@ -44,6 +50,18 @@ export function AdminHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {planLabel && planHref ? (
+            <a
+              href={planHref}
+              className={
+                planIsActive
+                  ? "hidden h-9 items-center justify-center rounded-full border border-emerald-300/22 bg-emerald-400/10 px-3 text-xs font-black text-emerald-100 transition-colors hover:border-emerald-300/35 hover:bg-emerald-400/15 sm:inline-flex"
+                  : "hidden h-9 items-center justify-center rounded-full border border-primary/35 bg-primary px-3 text-xs font-black text-primary-foreground shadow-[0_14px_36px_-24px_hsl(var(--primary))] transition-colors hover:bg-primary/90 sm:inline-flex"
+              }
+            >
+              {planLabel}
+            </a>
+          ) : null}
           <AdminUserMenu userName={userName} userEmail={userEmail} />
           {canViewAccounts ? <AccountNotificationBell {...accountNotifications} /> : null}
         </div>

@@ -19,7 +19,20 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { CompanyNameOnboardingModal } from "@/components/admin/company-name-onboarding-modal";
 import { FooterCredit } from "@/components/admin/footer-credit";
 import { PendingTenantHeader } from "@/components/platform/pending-tenant-header";
+import type { TenantModuleEntitlements } from "@/domain/platform/plan-entitlements";
 import { getServerAuthSession } from "@/lib/auth";
+
+const blockedTenantEntitlements: TenantModuleEntitlements = {
+  planName: null,
+  planStatus: "pending",
+  planExpiresAt: null,
+  activePlan: null,
+  modules: {
+    "fiscal-focus": false,
+    "tv-app": false,
+    "custom-link": false,
+  },
+};
 
 export default async function AdminLayout({
   children,
@@ -68,15 +81,36 @@ export default async function AdminLayout({
     return null;
   }
 
-  if ((user.platformTenantStatus && user.platformTenantStatus !== "ACTIVE") || isPlanBlocked) {
+  const hasBlockedTenantAccess = Boolean(
+    (user.platformTenantStatus && user.platformTenantStatus !== "ACTIVE") || isPlanBlocked,
+  );
+
+  if (hasBlockedTenantAccess && adminPath !== "/admin/payment") {
+    redirect(buildTenantAdminPath(user.tenantSlug, "/admin/payment"));
+  }
+
+  if (hasBlockedTenantAccess) {
+    const paymentHref = buildTenantAdminPath(user.tenantSlug, "/admin/payment");
+
     return (
       <div className="relative min-h-screen overflow-hidden bg-background" style={themeVariables as CSSProperties}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_28%),radial-gradient(circle_at_86%_0%,color-mix(in_oklab,var(--accent)_14%,transparent),transparent_34%)]" />
-        <div className="relative flex min-h-screen flex-col">
-          <PendingTenantHeader userName={user.name} userEmail={user.email} />
-          <main className="flex-1 px-4 py-8 md:px-6 xl:px-8">
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">{children}</div>
-          </main>
+        <div className="relative flex min-h-screen">
+          <div className="hidden md:block">
+            <AdminSidebar
+              roleSlug="administrador"
+              permissions={[]}
+              entitlements={blockedTenantEntitlements}
+              isTenantBlocked
+            />
+          </div>
+
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+            <PendingTenantHeader userName={user.name} userEmail={user.email} paymentHref={paymentHref} />
+            <main className="flex-1 px-4 py-8 md:px-6 xl:px-8">
+              <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">{children}</div>
+            </main>
+          </div>
         </div>
       </div>
     );
@@ -117,6 +151,9 @@ export default async function AdminLayout({
             userEmail={user.email}
             roleSlug={user.roleSlug}
             permissions={user.permissions}
+            planLabel={moduleEntitlements.activePlan ? `Plano ${moduleEntitlements.activePlan}` : "Ativar plano"}
+            planHref={buildTenantAdminPath(user.tenantSlug, "/admin/payment")}
+            planIsActive={Boolean(moduleEntitlements.activePlan)}
             accountNotifications={accountNotifications}
           />
           <main className="flex-1 px-4 pb-8 pt-5 md:px-6 xl:px-8">

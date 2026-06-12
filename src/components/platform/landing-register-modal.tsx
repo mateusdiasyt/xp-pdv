@@ -5,24 +5,18 @@ import { createPortal } from "react-dom";
 import { ChevronRight, X } from "lucide-react";
 
 import { RegisterTenantForm } from "@/components/platform/register-tenant-form";
-import type { PlatformBillingCycleMonths } from "@/domain/platform/billing-plans";
-import type { PlatformPlanName } from "@/domain/platform/plan-entitlements";
 import { cn } from "@/lib/utils";
 
 type LandingRegisterModalProps = {
   label?: string;
   className?: string;
   children?: ReactNode;
-  defaultPlanName?: PlatformPlanName;
-  defaultBillingCycleMonths?: PlatformBillingCycleMonths;
 };
 
 export function LandingRegisterModal({
   label = "Criar conta",
   className,
   children,
-  defaultPlanName = "Ouro",
-  defaultBillingCycleMonths = 1,
 }: LandingRegisterModalProps) {
   const [open, setOpen] = useState(false);
 
@@ -102,10 +96,7 @@ export function LandingRegisterModal({
                     "[&_label]:text-white/72 [&_input]:border-white/12 [&_input]:bg-black/28 [&_input]:text-white [&_input]:placeholder:text-white/28 [&_p]:text-white/45"
                   )}
                 >
-                  <RegisterTenantForm
-                    defaultPlanName={defaultPlanName}
-                    defaultBillingCycleMonths={defaultBillingCycleMonths}
-                  />
+                  <RegisterTenantForm />
                 </div>
               </section>
             </div>,

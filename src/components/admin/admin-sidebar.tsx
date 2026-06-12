@@ -13,9 +13,10 @@ type AdminSidebarProps = {
   roleSlug: string;
   permissions: string[];
   entitlements: TenantModuleEntitlements;
+  isTenantBlocked?: boolean;
 };
 
-export function AdminSidebar({ roleSlug, permissions, entitlements }: AdminSidebarProps) {
+export function AdminSidebar({ roleSlug, permissions, entitlements, isTenantBlocked = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const workspaceSlug = getWorkspaceSlugFromPathname(pathname);
 
@@ -51,9 +52,9 @@ export function AdminSidebar({ roleSlug, permissions, entitlements }: AdminSideb
                 {groupItems.map((item) => {
                   const Icon = item.icon;
                   const itemHref = toTenantAdminHref(item.href, workspaceSlug);
-                  const isLocked = item.requiredModule
+                  const isLocked = isTenantBlocked || (item.requiredModule
                     ? !canUsePlatformModule(entitlements, item.requiredModule)
-                    : false;
+                    : false);
                   const isActive =
                     itemHref.endsWith("/admin")
                       ? pathname === itemHref || pathname === "/admin"
@@ -66,7 +67,13 @@ export function AdminSidebar({ roleSlug, permissions, entitlements }: AdminSideb
                       href={itemHref}
                       aria-label={item.label}
                       aria-disabled={isLocked}
-                      title={isLocked ? `${item.label} - disponivel no Plano Platina ativo` : item.label}
+                      title={
+                        isLocked
+                          ? isTenantBlocked
+                            ? `${item.label} - ative um plano para liberar`
+                            : `${item.label} - disponivel no Plano Platina ativo`
+                          : item.label
+                      }
                       onClick={
                         isLocked
                           ? (event) => {

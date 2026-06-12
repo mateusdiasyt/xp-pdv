@@ -2,17 +2,13 @@
 
 import { ZodError } from "zod";
 
-import { createPlatformSubscriptionCheckout } from "@/application/platform/mercado-pago-billing-service";
-import { registerPlatformTenant } from "@/application/platform/platform-service";
-import {
-  normalizePlatformBillingCycle,
-  normalizePlatformPlanName,
-} from "@/domain/platform/billing-plans";
+import { buildTenantAdminPath, registerPlatformTenant } from "@/application/platform/platform-service";
 
 export type RegisterTenantState = {
   status: "idle" | "success" | "error";
   message?: string;
   redirectUrl?: string;
+  tenantSlug?: string;
 };
 
 export async function registerTenantAction(
@@ -23,16 +19,12 @@ export async function registerTenantAction(
 
   try {
     const tenant = await registerPlatformTenant(formData);
-    const checkout = await createPlatformSubscriptionCheckout({
-      tenantId: tenant.id,
-      planName: normalizePlatformPlanName(formData.get("planName") ?? "Ouro"),
-      billingCycleMonths: normalizePlatformBillingCycle(formData.get("billingCycleMonths") ?? "1"),
-    });
 
     return {
       status: "success",
-      message: "Cadastro criado. Abrindo pagamento seguro do Mercado Pago.",
-      redirectUrl: checkout.initPoint,
+      message: "Cadastro criado. Abrindo seu painel para ativar o plano.",
+      redirectUrl: buildTenantAdminPath(tenant.slug, "/admin/payment"),
+      tenantSlug: tenant.slug,
     };
   } catch (error) {
     return {
