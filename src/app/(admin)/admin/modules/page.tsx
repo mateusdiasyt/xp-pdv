@@ -292,7 +292,7 @@ export default async function ModulesPage() {
             <article
               key={module.title}
               className={cn(
-                "group relative rounded-2xl border bg-card/78 p-4 shadow-[0_22px_70px_-54px_rgba(0,0,0,0.95)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/35 hover:bg-card",
+                "group relative z-0 rounded-2xl border bg-card/78 p-4 shadow-[0_22px_70px_-54px_rgba(0,0,0,0.95)] transition-all duration-200 hover:z-50 hover:-translate-y-1 hover:border-primary/35 hover:bg-card focus-within:z-50",
                 isAvailable ? "border-border/70" : "border-border/45 opacity-82",
               )}
             >
@@ -333,7 +333,7 @@ export default async function ModulesPage() {
                 </div>
               )}
 
-              <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-0.5rem)] z-40 translate-y-3 rounded-2xl border border-primary/30 bg-[#121012]/98 p-4 opacity-0 shadow-[0_28px_90px_-46px_rgba(0,0,0,0.98)] backdrop-blur-xl transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+              <div className="pointer-events-none absolute left-4 right-4 top-[calc(100%-0.5rem)] z-[60] translate-y-3 rounded-2xl border border-primary/30 bg-[#121012]/98 p-4 opacity-0 shadow-[0_28px_90px_-46px_rgba(0,0,0,0.98)] backdrop-blur-xl transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
                 <div className="flex items-start gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
                     <Sparkles className="h-4 w-4" />
