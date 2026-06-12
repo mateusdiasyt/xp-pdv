@@ -713,10 +713,10 @@ export function PendingTenantPaymentPanel({
 
       {shouldRenderCheckout ? (
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,500px)]">
-          <aside className="relative overflow-hidden rounded-[32px] border border-primary/25 bg-[#ff0a63] p-6 text-white shadow-[0_28px_90px_-58px_rgba(255,0,89,0.95)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.24),transparent_34%),linear-gradient(180deg,rgba(87,0,60,0.35),rgba(255,10,99,0.08))]" />
+          <aside className="relative overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(180deg,#ff3aa5_0%,#c73aa6_48%,#6848b8_100%)] p-6 text-white shadow-[0_28px_90px_-58px_rgba(188,58,166,0.95)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.30),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.24),transparent_44%)]" />
             <div className="relative">
-              <p className="inline-flex rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white">
+              <p className="inline-flex rounded-full border border-black/15 bg-black px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_35px_-24px_rgba(0,0,0,0.9)]">
                 Economia inteligente
               </p>
               <h2 className="mt-4 max-w-2xl text-4xl font-black leading-[1.02] text-white sm:text-5xl">
@@ -753,9 +753,9 @@ export function PendingTenantPaymentPanel({
                   const BenefitIcon = benefit.icon;
 
                   return (
-                    <div key={benefit.title} className="rounded-[26px] bg-black/22 p-5 ring-1 ring-white/16">
-                      <BenefitIcon className="h-6 w-6 text-[#f5d529]" />
-                      <p className="mt-4 text-xl font-black text-[#f5d529]">{benefit.title}</p>
+                    <div key={benefit.title} className="rounded-[26px] bg-white/16 p-5 ring-1 ring-black/10">
+                      <BenefitIcon className="h-6 w-6 text-black" />
+                      <p className="mt-4 text-xl font-black text-black">{benefit.title}</p>
                       <p className="mt-2 text-sm font-bold leading-5 text-white">{benefit.text}</p>
                     </div>
                   );
@@ -793,8 +793,8 @@ export function PendingTenantPaymentPanel({
                           <span
                             className={
                               optionIsSelected
-                                ? "rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-black text-white"
-                                : "rounded-full bg-[#f5d529] px-2.5 py-1 text-xs font-black text-slate-950"
+                                ? "rounded-full bg-black px-2.5 py-1 text-xs font-black text-white"
+                                : "rounded-full bg-black px-2.5 py-1 text-xs font-black text-white"
                             }
                           >
                             -{optionSavingsPercent}%
@@ -813,7 +813,7 @@ export function PendingTenantPaymentPanel({
               </div>
 
               <div className="mt-6 rounded-[26px] bg-black/24 p-5 ring-1 ring-white/16">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#f5d529]">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-black">
                   Melhor escolha agora
                 </p>
                 <p className="mt-2 text-2xl font-black text-white">
