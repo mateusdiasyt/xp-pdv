@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { CreditCard, ExternalLink, Loader2, X } from "lucide-react";
+import { Copy, CreditCard, ExternalLink, Loader2, X } from "lucide-react";
 
 import { createTenantSubscriptionCheckoutAction } from "@/app/super-admin/actions";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export function TenantSubscriptionCheckoutButton({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,13 +43,13 @@ export function TenantSubscriptionCheckoutButton({
     setIsSubmitting(true);
     setError(null);
     setGeneratedUrl(null);
+    setCopied(false);
 
     try {
       const result = await createTenantSubscriptionCheckoutAction(initialActionState, new FormData(event.currentTarget));
 
       if (result.status === "success" && result.redirectUrl) {
         setGeneratedUrl(result.redirectUrl);
-        window.open(result.redirectUrl, "_blank", "noopener,noreferrer");
         return;
       }
 
@@ -58,6 +59,15 @@ export function TenantSubscriptionCheckoutButton({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleCopyLink() {
+    if (!generatedUrl) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(generatedUrl);
+    setCopied(true);
   }
 
   return (
@@ -139,8 +149,14 @@ export function TenantSubscriptionCheckoutButton({
               </label>
 
               {generatedUrl ? (
-                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
-                  Link criado. Ele foi aberto em uma nova aba e ficou registrado para o cliente.
+                <div className="space-y-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+                  <p className="font-semibold">Link criado. Copie para enviar ao cliente.</p>
+                  <input
+                    value={generatedUrl}
+                    readOnly
+                    className="h-10 w-full rounded-xl border border-emerald-300/20 bg-black/20 px-3 text-xs font-semibold text-emerald-50 outline-none"
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
                 </div>
               ) : null}
 
@@ -152,10 +168,16 @@ export function TenantSubscriptionCheckoutButton({
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 {generatedUrl ? (
-                  <Button render={<a href={generatedUrl} target="_blank" rel="noreferrer" />} type="button" variant="outline">
-                    <ExternalLink className="h-4 w-4" />
-                    Abrir link
-                  </Button>
+                  <>
+                    <Button type="button" variant="outline" className="gap-2" onClick={handleCopyLink}>
+                      <Copy className="h-4 w-4" />
+                      {copied ? "Copiado" : "Copiar link"}
+                    </Button>
+                    <Button render={<a href={generatedUrl} target="_blank" rel="noreferrer" />} type="button" variant="outline">
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir
+                    </Button>
+                  </>
                 ) : null}
                 <Button type="submit" className="gap-2" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
