@@ -45,9 +45,9 @@ export function UploadStockInvoiceXmlForm() {
     <form ref={formRef} onSubmit={handleSubmit} className="grid gap-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Label htmlFor="xmlFile">Arquivo XML da NF-e</Label>
+          <Label htmlFor="xmlFile">Arquivo XML da NF-e/NFC-e</Label>
           <span
-            title="Envie o XML recebido. Ele fica guardado para auditoria e so movimenta estoque quando voce confirmar a conferencia."
+            title="Envie XML modelo 55 ou 65. Ele fica guardado para auditoria e so movimenta estoque quando voce confirmar a conferencia."
             aria-label="Ajuda"
             className="inline-flex"
           >

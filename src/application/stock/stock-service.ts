@@ -49,6 +49,8 @@ type ParsedStockInvoiceItem = {
 
 type ParsedStockInvoiceXml = {
   accessKey: string;
+  documentModel: StockInvoiceDocumentModel;
+  documentLabel: string;
   invoiceNumber?: string;
   invoiceSeries?: string;
   supplierName?: string;
@@ -71,6 +73,7 @@ type StockXmlImportSummary = {
 };
 
 type StockInvoiceXmlReviewDecision = "existing" | "create" | "skip";
+type StockInvoiceDocumentModel = "55" | "65";
 
 const STOCK_XML_PREVIEW_ITEM_LIMIT = 8;
 
@@ -114,6 +117,41 @@ function normalizeXmlCode(rawValue?: string) {
   }
 
   return normalized;
+}
+
+function getAccessKeyDocumentModel(accessKey?: string | null) {
+  const digits = accessKey?.replace(/\D/g, "");
+  return digits && digits.length === 44 ? digits.slice(20, 22) : undefined;
+}
+
+function normalizeStockInvoiceDocumentModel(rawValue?: string | null): StockInvoiceDocumentModel | undefined {
+  const model = rawValue?.replace(/\D/g, "");
+  return model === "55" || model === "65" ? model : undefined;
+}
+
+function getStockInvoiceDocumentLabel(model: StockInvoiceDocumentModel) {
+  return model === "65" ? "NFC-e" : "NF-e";
+}
+
+function assertSupportedStockInvoiceDocumentModel(rawModel?: string | null): StockInvoiceDocumentModel {
+  const normalizedModel = normalizeStockInvoiceDocumentModel(rawModel);
+  if (normalizedModel) {
+    return normalizedModel;
+  }
+
+  const model = rawModel?.trim() || "nao identificado";
+  throw new Error(
+    `Modelo fiscal ${model} nao suportado para entrada de estoque. Use XML modelo 55 (NF-e) ou 65 (NFC-e).`,
+  );
+}
+
+function assertAccessKeyCanBeFetchedByFocus(accessKey: string) {
+  const model = assertSupportedStockInvoiceDocumentModel(getAccessKeyDocumentModel(accessKey));
+  if (model === "65") {
+    throw new Error(
+      "A chave informada e modelo 65 (NFC-e). A consulta por chave usa o recebimento de NF-e da Focus, entao para NFC-e envie o arquivo XML no campo Arquivo XML.",
+    );
+  }
 }
 
 function inferFractionalStockSuggestion(item: Pick<ParsedStockInvoiceItem, "description" | "commercialUnit" | "taxableUnit">) {
@@ -364,6 +402,10 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
 
   const invoiceNumber = extractTagValue(ideBlock, "nNF");
   const invoiceSeries = extractTagValue(ideBlock, "serie");
+  const documentModel = assertSupportedStockInvoiceDocumentModel(
+    extractTagValue(ideBlock, "mod") ?? getAccessKeyDocumentModel(accessKey),
+  );
+  const documentLabel = getStockInvoiceDocumentLabel(documentModel);
   const supplierName = extractTagValue(issuerBlock, "xNome");
   const supplierDocument = normalizeXmlDocument(extractTagValue(issuerBlock, "CNPJ") ?? extractTagValue(issuerBlock, "CPF"));
   const recipientName = extractTagValue(recipientBlock, "xNome");
@@ -377,6 +419,8 @@ function parseStockInvoiceXml(rawXml: string): ParsedStockInvoiceXml {
 
   return {
     accessKey,
+    documentModel,
+    documentLabel,
     invoiceNumber,
     invoiceSeries,
     supplierName,
@@ -896,6 +940,8 @@ function buildStockInvoiceXmlPreview(rawXml: string) {
 
   return {
     accessKey: parsedInvoice.accessKey,
+    documentModel: parsedInvoice.documentModel,
+    documentLabel: parsedInvoice.documentLabel,
     invoiceNumber: parsedInvoice.invoiceNumber,
     invoiceSeries: parsedInvoice.invoiceSeries,
     supplierName: parsedInvoice.supplierName,
@@ -928,6 +974,8 @@ export async function previewStockInvoiceXmlByAccessKey(input: FormData) {
   if (!accessKey) {
     throw new Error("Informe ou escaneie uma chave de acesso valida com 44 numeros.");
   }
+
+  assertAccessKeyCanBeFetchedByFocus(accessKey);
 
   const rawXml = await fetchReceivedNfeXmlByAccessKey(accessKey);
   const parsedInvoice = parseStockInvoiceXml(rawXml);
@@ -1067,6 +1115,8 @@ export async function getStockInvoiceXmlReview(stockInvoiceXmlId: string) {
     xml: {
       id: xmlRecord.id,
       accessKey: xmlRecord.accessKey,
+      documentModel: parsedInvoice.documentModel,
+      documentLabel: parsedInvoice.documentLabel,
       invoiceNumber: xmlRecord.invoiceNumber,
       invoiceSeries: xmlRecord.invoiceSeries,
       supplierName: parsedInvoice.supplierName,
@@ -1134,7 +1184,7 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
   }
 
   if (!maybeXmlFile.name.toLowerCase().endsWith(".xml")) {
-    throw new Error("Arquivo invalido. Envie um XML da NF-e.");
+    throw new Error("Arquivo invalido. Envie um XML da NF-e ou NFC-e.");
   }
 
   if (maybeXmlFile.size > MAX_XML_FILE_SIZE_BYTES) {
@@ -1143,7 +1193,7 @@ export async function storeStockInvoiceXmlRecord(input: FormData, actorId?: stri
 
   const rawXml = await maybeXmlFile.text();
   if (!rawXml.includes("<") || !rawXml.toLowerCase().includes("infnfe")) {
-    throw new Error("O arquivo enviado nao parece ser um XML valido de NF-e.");
+    throw new Error("O arquivo enviado nao parece ser um XML valido de NF-e ou NFC-e.");
   }
 
   return storeRawStockInvoiceXmlRecord({
@@ -1235,6 +1285,8 @@ export async function fetchAndStoreStockInvoiceXmlByAccessKey(
   if (!accessKey) {
     throw new Error("Informe ou escaneie uma chave de acesso valida com 44 numeros.");
   }
+
+  assertAccessKeyCanBeFetchedByFocus(accessKey);
 
   const rawXml = await fetchReceivedNfeXmlByAccessKey(accessKey);
   const sourceFileName = `${accessKey}-focus-recebida.xml`;

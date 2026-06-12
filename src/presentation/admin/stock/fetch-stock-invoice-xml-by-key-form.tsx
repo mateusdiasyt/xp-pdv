@@ -17,6 +17,8 @@ import {
 
 type StockXmlKeyPreview = {
   accessKey: string;
+  documentModel?: string;
+  documentLabel?: string;
   invoiceNumber?: string;
   invoiceSeries?: string;
   supplierName?: string;
@@ -58,11 +60,12 @@ function toPreviewPayload(data: unknown): StockXmlKeyPreview | null {
 }
 
 function previewTitle(preview: StockXmlKeyPreview) {
+  const label = preview.documentLabel ?? "NF-e";
   if (preview.invoiceNumber) {
-    return `NF-e ${preview.invoiceNumber}`;
+    return `${label} ${preview.invoiceNumber}`;
   }
 
-  return "NF-e encontrada";
+  return `${label} encontrada`;
 }
 
 export function FetchStockInvoiceXmlByKeyForm() {
@@ -136,9 +139,9 @@ export function FetchStockInvoiceXmlByKeyForm() {
     <form ref={formRef} onSubmit={handleSubmit} className="grid gap-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Label htmlFor="accessKey">Chave de acesso da NF-e</Label>
+          <Label htmlFor="accessKey">Chave de acesso da NF-e/NFC-e</Label>
           <span
-            title="A consulta mostra uma previa sem salvar o XML. Voce decide se quer apenas guardar ou conferir entrada."
+            title="Modelo 55 pode ser consultado pela chave. Para modelo 65, envie o arquivo XML da NFC-e no painel ao lado."
             aria-label="Ajuda"
             className="inline-flex"
           >
@@ -170,7 +173,8 @@ export function FetchStockInvoiceXmlByKeyForm() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">XML ainda nao salvo</p>
               <h3 className="mt-1 text-base font-semibold text-foreground">{previewTitle(preview)}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                {preview.supplierName ?? "Fornecedor nao identificado"} · {preview.itemLines} item(ns)
+                {preview.supplierName ?? "Fornecedor nao identificado"} - {preview.documentLabel ?? "NF-e"} -{" "}
+                {preview.itemLines} item(ns)
               </p>
             </div>
             <div className="text-left text-xs text-muted-foreground md:text-right">

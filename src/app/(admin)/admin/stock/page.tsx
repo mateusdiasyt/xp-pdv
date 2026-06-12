@@ -39,8 +39,8 @@ export default async function StockPage({ searchParams }: StockPageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <PackagePlus className="h-4 w-4" />
-              Entrada por NF-e
-              <InfoHint label="Busque pela chave do DANFE ou envie o XML. Nada entra no estoque antes da conferencia." />
+              Entrada por NF-e/NFC-e
+              <InfoHint label="Modelo 55 pode ser buscado pela chave. Para modelo 65, envie o XML. Nada entra no estoque antes da conferencia." />
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">

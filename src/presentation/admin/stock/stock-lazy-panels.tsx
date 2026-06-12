@@ -53,6 +53,8 @@ type StockXmlEntry = {
   importedAt: string | null;
   previewError?: string;
   preview: {
+    documentModel?: string;
+    documentLabel?: string;
     itemLines: number;
     shownItems: Array<{
       lineNumber: number;
@@ -510,7 +512,11 @@ export function StockLazyPanels({ canManage }: { canManage: boolean }) {
                           <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{xmlEntry.accessKey}</p>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          <p>{xmlEntry.invoiceNumber ? `Nota ${xmlEntry.invoiceNumber}` : "Nota -"}</p>
+                          <p>
+                            {xmlEntry.invoiceNumber
+                              ? `${xmlEntry.preview?.documentLabel ?? "Nota"} ${xmlEntry.invoiceNumber}`
+                              : `${xmlEntry.preview?.documentLabel ?? "Nota"} -`}
+                          </p>
                           <p>{formatDate(xmlEntry.issuedAt, "date")}</p>
                         </div>
                         <div className="text-xs text-muted-foreground">

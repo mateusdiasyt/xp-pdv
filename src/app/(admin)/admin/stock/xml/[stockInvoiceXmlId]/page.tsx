@@ -40,7 +40,7 @@ export default async function StockInvoiceXmlReviewPage({
 
       <PageHeader
         eyebrow="Entrada por XML"
-        title="Conferir NF-e antes do estoque"
+        title={`Conferir ${review.xml.documentLabel} antes do estoque`}
         description="Cada linha precisa ter destino definido antes de criar produto ou movimentar saldo."
       />
 
@@ -49,7 +49,9 @@ export default async function StockInvoiceXmlReviewPage({
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileSearch className="h-5 w-5 text-primary" />
-              {review.xml.invoiceNumber ? `NF-e ${review.xml.invoiceNumber}` : "NF-e guardada"}
+              {review.xml.invoiceNumber
+                ? `${review.xml.documentLabel} ${review.xml.invoiceNumber}`
+                : `${review.xml.documentLabel} guardada`}
             </CardTitle>
             <CardDescription className="mt-2">
               XML {review.xml.sourceFileName} guardado em {dateFormatter.format(review.xml.storedAt)}.
