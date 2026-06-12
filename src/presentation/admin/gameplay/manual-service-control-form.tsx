@@ -56,6 +56,10 @@ type GameplayProductOption = {
   };
 };
 
+type PaidOpenChargeSnapshot = ReturnType<typeof computeOpenPaidCharge> & {
+  capturedAt: string;
+};
+
 type ManualServiceControlFormProps = {
   stationId: string;
   isBusy: boolean;
@@ -299,6 +303,7 @@ export function ManualServiceControlForm({
   const [endCashReceived, setEndCashReceived] = useState("");
   const [endShowCoupon, setEndShowCoupon] = useState(false);
   const [endCouponCode, setEndCouponCode] = useState("");
+  const [endChargeSnapshot, setEndChargeSnapshot] = useState<PaidOpenChargeSnapshot | null>(null);
   const [refundStatus, setRefundStatus] = useState<RefundStatus>(RefundStatus.PENDING);
   const [refundMethod, setRefundMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   const [liveNow, setLiveNow] = useState(() => Date.now());
@@ -349,7 +354,15 @@ export function ManualServiceControlForm({
   const totalInCents = Math.max(0, subtotalInCents - couponDiscountInCents);
   const isOpenPaidStart = !isBusy && effectiveDurationPreset === "FREE" && mode === "paid";
   const activeOpenPaidCharge = activePaidOpenBilling ? computeOpenPaidCharge(activePaidOpenBilling, liveNow) : null;
-  const endSubtotalInCents = activeOpenPaidCharge?.amountInCents ?? 0;
+  const endOpenPaidCharge =
+    endChargeSnapshot ??
+    (activeOpenPaidCharge
+      ? {
+          ...activeOpenPaidCharge,
+          capturedAt: new Date(liveNow).toISOString(),
+        }
+      : null);
+  const endSubtotalInCents = endOpenPaidCharge?.amountInCents ?? 0;
   const normalizedEndCouponCode = normalizeCouponCode(endCouponCode);
   const selectedEndCoupon = normalizedEndCouponCode
     ? coupons.find((coupon) => coupon.code === normalizedEndCouponCode)
@@ -418,9 +431,30 @@ export function ManualServiceControlForm({
     setOpen(false);
   }
 
+  function openEndPaymentDialog() {
+    const now = Date.now();
+
+    setEndState(initialActionState);
+    setEndPaymentMethod(PaymentMethod.PIX);
+    setEndPaymentCardBrand("");
+    setEndCashReceived("");
+    setEndShowCoupon(false);
+    setEndCouponCode("");
+    setEndChargeSnapshot(
+      activePaidOpenBilling
+        ? {
+            ...computeOpenPaidCharge(activePaidOpenBilling, now),
+            capturedAt: new Date(now).toISOString(),
+          }
+        : null,
+    );
+    setEndPaymentOpen(true);
+  }
+
   function closeEndPaymentDialog() {
     setPdvModalOpen(false);
     setEndPaymentOpen(false);
+    setEndChargeSnapshot(null);
   }
 
   function closeCancelDialog() {
@@ -834,12 +868,16 @@ export function ManualServiceControlForm({
         titleId={`service-end-title-${stationId}`}
         onClose={closeEndPaymentDialog}
       >
-        {activePaidOpenBilling && activeOpenPaidCharge ? (
+        {activePaidOpenBilling && endOpenPaidCharge ? (
           <form onSubmit={handlePaidOpenEndSubmit} className="space-y-3">
             <input type="hidden" name="stationId" value={stationId} />
             <input type="hidden" name="customerName" value="" />
             <input type="hidden" name="couponCode" value={endCouponDiscountInCents > 0 ? selectedEndCoupon?.code ?? "" : ""} />
             <input type="hidden" name="paymentAmount" value={moneyFromCents(endTotalInCents)} />
+            <input type="hidden" name="billingSnapshotCapturedAt" value={endOpenPaidCharge.capturedAt} />
+            <input type="hidden" name="billingSnapshotElapsedMinutes" value={String(endOpenPaidCharge.elapsedMinutes)} />
+            <input type="hidden" name="billingSnapshotBilledMinutes" value={String(endOpenPaidCharge.billedMinutes)} />
+            <input type="hidden" name="billingSnapshotAmountInCents" value={String(endOpenPaidCharge.amountInCents)} />
             <input type="hidden" name="paymentApprovedAmount" value="" />
             <input type="hidden" name="paymentNsu" value="" />
             <input type="hidden" name="paymentAuthorizationCode" value="" />
@@ -849,13 +887,16 @@ export function ManualServiceControlForm({
 
             <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
               <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">
-                Tempo livre pago
+                Tempo congelado para cobrança
               </span>
               <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                <span>{activeOpenPaidCharge.elapsedMinutes} min real</span>
-                <span>{activeOpenPaidCharge.billedMinutes} min cobrado</span>
-                <span>{formatCurrencyFromFractionalCents(activeOpenPaidCharge.pricePerMinuteInCents)}/min</span>
+                <span>{endOpenPaidCharge.elapsedMinutes} min real</span>
+                <span>{endOpenPaidCharge.billedMinutes} min cobrado</span>
+                <span>{formatCurrencyFromFractionalCents(endOpenPaidCharge.pricePerMinuteInCents)}/min</span>
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Valor travado no momento em que a cobrança foi aberta.
+              </p>
               <p className="mt-2 text-lg font-black text-foreground">{formatCurrencyFromCents(endSubtotalInCents)}</p>
             </div>
 
@@ -1152,10 +1193,7 @@ export function ManualServiceControlForm({
               variant="destructive"
               className="gap-2"
               disabled={isEndPending}
-              onClick={() => {
-                setEndState(initialActionState);
-                setEndPaymentOpen(true);
-              }}
+              onClick={openEndPaymentDialog}
             >
               <Square className="h-4 w-4" />
               Encerrar e cobrar

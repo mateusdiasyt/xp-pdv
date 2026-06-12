@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/application/auth/guards";
@@ -11,6 +12,7 @@ import {
   pauseManualGameplayStation,
   releaseManualGameplayStation,
   resumeManualGameplayStation,
+  roundServiceMinutesUp,
   triggerGameplayReleaseForSale,
 } from "@/application/gameplay/gameplay-release-service";
 import { cancelSaleRecord, createSaleRecord } from "@/application/pdv/pdv-service";
@@ -23,6 +25,58 @@ function getOperatorName(user: { name?: string | null; email?: string | null }) 
 
 function moneyFromCents(value: number) {
   return (value / 100).toFixed(2);
+}
+
+function positiveIntegerFromFormData(formData: FormData, field: string) {
+  const parsed = Number(formData.get(field));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function paidOpenSnapshotFromFormData(
+  formData: FormData,
+  charge: NonNullable<Awaited<ReturnType<typeof getManualPaidOpenChargeByStationId>>>["charge"],
+) {
+  const capturedAtRaw = String(formData.get("billingSnapshotCapturedAt") ?? "");
+  const capturedAt = capturedAtRaw ? new Date(capturedAtRaw) : null;
+  const elapsedMinutes = positiveIntegerFromFormData(formData, "billingSnapshotElapsedMinutes");
+  const billedMinutes = positiveIntegerFromFormData(formData, "billingSnapshotBilledMinutes");
+  const amountInCents = positiveIntegerFromFormData(formData, "billingSnapshotAmountInCents");
+
+  if (
+    !capturedAt ||
+    Number.isNaN(capturedAt.getTime()) ||
+    !elapsedMinutes ||
+    !billedMinutes ||
+    !amountInCents
+  ) {
+    return null;
+  }
+
+  const elapsedAtCapture = Math.max(
+    1,
+    Math.ceil(Math.max(0, capturedAt.getTime() - charge.startedAt.getTime()) / 60_000),
+  );
+  const roundedBilledMinutes = roundServiceMinutesUp(elapsedMinutes);
+  const expectedAmountInCents = Math.max(
+    1,
+    Math.round((charge.basePriceInCents * roundedBilledMinutes) / charge.baseDurationMinutes),
+  );
+
+  if (
+    Math.abs(elapsedMinutes - elapsedAtCapture) > 1 ||
+    billedMinutes !== roundedBilledMinutes ||
+    amountInCents !== expectedAmountInCents
+  ) {
+    return null;
+  }
+
+  return {
+    capturedAt,
+    elapsedMinutes,
+    billedMinutes,
+    amountInCents,
+    amount: new Prisma.Decimal(amountInCents).dividedBy(100).toDecimalPlaces(2),
+  };
 }
 
 function copyPaymentAuditFields(source: FormData, target: FormData) {
@@ -214,9 +268,11 @@ export async function endPaidOpenServiceSessionAction(
     }
 
     const { charge } = chargeSnapshot;
+    const chargeSnapshotFromModal = paidOpenSnapshotFromFormData(formData, charge);
+    const billedCharge = chargeSnapshotFromModal ?? charge;
     const saleFormData = new FormData();
     const paymentMethod = String(formData.get("paymentMethod") ?? "");
-    const paymentAmount = String(formData.get("paymentAmount") ?? "") || moneyFromCents(charge.amountInCents);
+    const paymentAmount = String(formData.get("paymentAmount") ?? "") || moneyFromCents(billedCharge.amountInCents);
     const cashReceived = String(formData.get("cashReceived") ?? "");
 
     saleFormData.set("cashSessionId", String(formData.get("cashSessionId") ?? ""));
@@ -227,7 +283,7 @@ export async function endPaidOpenServiceSessionAction(
     saleFormData.set("skipGameplayRelease", "true");
     saleFormData.append("itemProductId", charge.productId);
     saleFormData.append("itemQuantity", "1");
-    saleFormData.append("itemUnitPrice", moneyFromCents(charge.amountInCents));
+    saleFormData.append("itemUnitPrice", moneyFromCents(billedCharge.amountInCents));
     saleFormData.append("gameplayProductId", charge.productId);
     saleFormData.append("gameplayStationId", stationId);
     saleFormData.append("paymentMethod", paymentMethod);
@@ -240,17 +296,19 @@ export async function endPaidOpenServiceSessionAction(
       actorId: session.user.id,
       operator: getOperatorName(session.user),
       saleId: saleResult.saleId,
-      amount: charge.amount,
-      durationMinutes: charge.billedMinutes,
+      amount: billedCharge.amount,
+      durationMinutes: billedCharge.billedMinutes,
       billingPayload: {
         manualBillingMode: charge.mode,
         billingProductId: charge.productId,
         billingProductName: charge.productName,
         billingPlanCode: charge.productPlanCode,
         billingCategoryId: charge.categoryId,
-        elapsedMinutes: charge.elapsedMinutes,
-        billedMinutes: charge.billedMinutes,
-        amountInCents: charge.amountInCents,
+        elapsedMinutes: billedCharge.elapsedMinutes,
+        billedMinutes: billedCharge.billedMinutes,
+        amountInCents: billedCharge.amountInCents,
+        frozenAt: chargeSnapshotFromModal?.capturedAt.toISOString(),
+        frozenCharge: Boolean(chargeSnapshotFromModal),
       },
     });
 
@@ -259,7 +317,7 @@ export async function endPaidOpenServiceSessionAction(
 
     return {
       status: "success",
-      message: `${endResult.message} Total cobrado: R$ ${moneyFromCents(charge.amountInCents)}.`,
+      message: `${endResult.message} Total cobrado: R$ ${moneyFromCents(billedCharge.amountInCents)}.`,
       data: {
         saleId: saleResult.saleId,
       },
