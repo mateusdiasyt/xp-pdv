@@ -17,6 +17,14 @@ import {
 import type { PlatformPlanName } from "@/domain/platform/plan-entitlements";
 import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 
+type ConfirmedPaymentModal = {
+  planName: PlatformPlanName;
+  billingCycleMonths: PlatformBillingCycleMonths;
+  amountCents: number;
+  redirectUrl?: string;
+  shouldSignOut: boolean;
+};
+
 type LatestSubscription = {
   planName: string;
   billingCycleMonths: number;
@@ -139,6 +147,10 @@ function normalizeCycle(value: string): PlatformBillingCycleMonths {
   return parsed === 3 || parsed === 6 || parsed === 12 ? parsed : 1;
 }
 
+function formatCycleLabel(value: PlatformBillingCycleMonths) {
+  return value === 1 ? "1 mes" : `${value} meses`;
+}
+
 function paymentStatusLabel(status: string) {
   const normalized = status.toLowerCase();
 
@@ -223,6 +235,7 @@ export function PendingTenantPaymentPanel({
   const [isLinkSubmitting, setIsLinkSubmitting] = useState(false);
   const [isCardFormReady, setIsCardFormReady] = useState(false);
   const [cardFormMessage, setCardFormMessage] = useState("Carregando pagamento seguro...");
+  const [confirmedPayment, setConfirmedPayment] = useState<ConfirmedPaymentModal | null>(null);
   const [planName, setPlanName] = useState<PlatformPlanName>(defaultPlanName);
   const [billingCycleMonths, setBillingCycleMonths] =
     useState<PlatformBillingCycleMonths>(defaultBillingCycleMonths);
@@ -230,6 +243,7 @@ export function PendingTenantPaymentPanel({
   const isSubmittingRef = useRef(false);
   const planNameRef = useRef(planName);
   const billingCycleMonthsRef = useRef(billingCycleMonths);
+  const amountCentsRef = useRef(0);
   const isTestEnvironment = mercadoPagoEnvironment === "test";
   const isActiveTenant = tenantStatus === "ACTIVE";
   const planExpirationDate = planExpiresAt ? new Date(planExpiresAt) : null;
@@ -291,7 +305,8 @@ export function PendingTenantPaymentPanel({
   useEffect(() => {
     planNameRef.current = planName;
     billingCycleMonthsRef.current = billingCycleMonths;
-  }, [billingCycleMonths, planName]);
+    amountCentsRef.current = amountCents;
+  }, [amountCents, billingCycleMonths, planName]);
 
   useEffect(() => {
     if (!cycleOptions.some((option) => option.billingCycleMonths === billingCycleMonths)) {
@@ -434,14 +449,13 @@ export function PendingTenantPaymentPanel({
                 setState(result);
 
                 if (result.status === "success") {
-                  if (hasActivePlan) {
-                    window.location.reload();
-                    return;
-                  }
-
-                  if (result.redirectUrl) {
-                    await signOut({ callbackUrl: result.redirectUrl });
-                  }
+                  setConfirmedPayment({
+                    planName: planNameRef.current,
+                    billingCycleMonths: billingCycleMonthsRef.current,
+                    amountCents: amountCentsRef.current,
+                    redirectUrl: result.redirectUrl,
+                    shouldSignOut: !hasActivePlan && Boolean(result.redirectUrl),
+                  });
                 }
               } catch {
                 setState({
@@ -538,8 +552,75 @@ export function PendingTenantPaymentPanel({
     }
   }
 
+  async function handleConfirmPaymentModal() {
+    if (!confirmedPayment) {
+      return;
+    }
+
+    const { redirectUrl, shouldSignOut } = confirmedPayment;
+    setConfirmedPayment(null);
+
+    if (shouldSignOut && redirectUrl) {
+      await signOut({ callbackUrl: redirectUrl });
+      return;
+    }
+
+    window.location.reload();
+  }
+
+  const paymentInputClassName =
+    "h-12 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-slate-950 outline-none transition-colors placeholder:text-slate-500 focus:border-primary";
+  const paymentFrameClassName =
+    "h-12 rounded-xl border border-border bg-white px-3 py-3 text-sm text-slate-950 outline-none transition-colors focus-within:border-primary";
+
   return (
     <section className="rounded-3xl border border-border/80 bg-card/82 p-5 shadow-[0_28px_110px_-72px_rgba(0,0,0,0.92)] sm:p-6">
+      {confirmedPayment ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-emerald-300/25 bg-card p-5 shadow-[0_34px_110px_-48px_rgba(0,0,0,0.95)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300/35 bg-emerald-400/15 text-emerald-200">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-emerald-200">
+              Pagamento confirmado
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-foreground">
+              {confirmedPayment.shouldSignOut ? "Plano contratado" : "Renovacao realizada"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {confirmedPayment.shouldSignOut
+                ? "O pagamento foi aprovado. Confirme para atualizar o acesso ao painel."
+                : "O pagamento foi aprovado e o periodo sera somado ao vencimento atual."}
+            </p>
+
+            <div className="mt-5 space-y-2 rounded-2xl border border-border/70 bg-background/55 p-4">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Plano</span>
+                <strong className="text-foreground">{confirmedPayment.planName}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Periodo</span>
+                <strong className="text-foreground">
+                  {formatCycleLabel(confirmedPayment.billingCycleMonths)}
+                </strong>
+              </div>
+              <div className="flex items-center justify-between gap-4 border-t border-border/70 pt-2 text-sm">
+                <span className="text-muted-foreground">Valor</span>
+                <strong className="text-lg text-foreground">{formatCentsToBRL(confirmedPayment.amountCents)}</strong>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleConfirmPaymentModal}
+              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-32px_hsl(var(--primary))] transition-colors hover:bg-primary/90"
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-5 border-b border-border/70 pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Mendoza PDV</p>
@@ -638,7 +719,7 @@ export function PendingTenantPaymentPanel({
               name="planName"
               value={planName}
               onChange={(event) => setPlanName(normalizePlanName(event.currentTarget.value))}
-              className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              className={paymentInputClassName}
             >
               <option value="Ouro">Ouro</option>
               <option value="Platina">Platina</option>
@@ -651,7 +732,7 @@ export function PendingTenantPaymentPanel({
               name="billingCycleMonths"
               value={String(billingCycleMonths)}
               onChange={(event) => setBillingCycleMonths(normalizeCycle(event.currentTarget.value))}
-              className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              className={paymentInputClassName}
             >
               {cycleOptions.map((option) => (
                 <option key={`${option.planName}-${option.billingCycleMonths}`} value={option.billingCycleMonths}>
@@ -667,7 +748,7 @@ export function PendingTenantPaymentPanel({
             <span className="text-xs font-semibold text-muted-foreground">Numero do cartao</span>
             <div
               id="mendoza-card-number"
-              className="h-12 rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none transition-colors focus-within:border-primary"
+              className={paymentFrameClassName}
             />
           </label>
 
@@ -676,7 +757,7 @@ export function PendingTenantPaymentPanel({
             <input
               id="mendoza-card-holder"
               defaultValue={isTestEnvironment ? "APRO" : ""}
-              className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              className={paymentInputClassName}
               placeholder="Nome impresso no cartao"
             />
           </label>
@@ -685,7 +766,7 @@ export function PendingTenantPaymentPanel({
             <span className="text-xs font-semibold text-muted-foreground">Validade</span>
             <div
               id="mendoza-card-expiration"
-              className="h-12 rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none transition-colors focus-within:border-primary"
+              className={paymentFrameClassName}
             />
           </label>
 
@@ -693,7 +774,7 @@ export function PendingTenantPaymentPanel({
             <span className="text-xs font-semibold text-muted-foreground">CVV</span>
             <div
               id="mendoza-card-security"
-              className="h-12 rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none transition-colors focus-within:border-primary"
+              className={paymentFrameClassName}
             />
           </label>
 
@@ -701,7 +782,7 @@ export function PendingTenantPaymentPanel({
             <span className="text-xs font-semibold text-muted-foreground">Documento</span>
             <select
               id="mendoza-card-document-type"
-              className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              className={paymentInputClassName}
             />
           </label>
 
@@ -710,7 +791,7 @@ export function PendingTenantPaymentPanel({
             <input
               id="mendoza-card-document"
               defaultValue={isTestEnvironment ? "12345678909" : ""}
-              className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              className={paymentInputClassName}
               placeholder="Somente numeros"
             />
           </label>
