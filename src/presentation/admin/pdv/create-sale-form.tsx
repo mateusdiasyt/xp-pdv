@@ -220,14 +220,6 @@ function productAvatarLabel(name: string) {
     .toUpperCase();
 }
 
-function getEffectiveSalePrice(product: ProductOption, happyHourActive: boolean) {
-  if (happyHourActive && product.happyHourPrice && product.happyHourPrice > 0) {
-    return product.happyHourPrice;
-  }
-
-  return product.salePrice;
-}
-
 function hasHappyHourPrice(product: ProductOption) {
   return Boolean(product.happyHourPrice && product.happyHourPrice > 0);
 }
@@ -401,7 +393,7 @@ export function CreateSaleForm({
   const [customerState, setCustomerState] = useState(initialActionState);
   const [cancelState, setCancelState] = useState(initialActionState);
   const [saleState, setSaleState] = useState<ActionState>(initialActionState);
-  const [isAddingItem, startAddTransition] = useTransition();
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const [isMutatingItem, startItemMutationTransition] = useTransition();
   const [isUpdatingCustomer, startCustomerTransition] = useTransition();
   const [isCancellingComanda, startCancelTransition] = useTransition();
@@ -612,11 +604,12 @@ export function CreateSaleForm({
     ]);
   }
 
-  function handleAddItemSubmit(event: React.FormEvent<HTMLFormElement>, product: ProductOption) {
+  async function handleAddItemSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    formData.set("_stableReload", "1");
     const quantity = Number(formData.get("quantity") ?? 0);
 
     if (!Number.isFinite(quantity) || quantity < 1) {
@@ -627,54 +620,28 @@ export function CreateSaleForm({
       return;
     }
 
-    const previousItems = optimisticItems;
-
     setAddState(initialActionState);
-    setOptimisticItems((currentItems) => {
-      const existingItem = currentItems.find((item) => item.productId === product.id);
+    setIsAddingItem(true);
 
-      if (existingItem) {
-        return currentItems.map((item) =>
-          item.productId === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + quantity,
-                lineTotal: item.lineTotal + getEffectiveSalePrice(product, happyHourActive) * quantity,
-              }
-            : item,
-        );
-      }
-
-      return [
-        ...currentItems,
-        {
-          id: `optimistic-${product.id}`,
-          productId: product.id,
-          quantity,
-          lineTotal: getEffectiveSalePrice(product, happyHourActive) * quantity,
-          product: {
-            name: product.name,
-            sku: product.sku,
-            imageUrl: product.imageUrl,
-            tracksStock: product.tracksStock,
-            currentStock: product.currentStock,
-            category: product.category,
-          },
-        },
-      ];
-    });
-
-    startAddTransition(async () => {
+    try {
       const result = await addComandaItemRequest(formData);
 
-      if (result.status === "error") {
-        setOptimisticItems(previousItems);
-      } else {
+      if (result.status === "success") {
         form.reset();
+        setAddState(result);
+        window.setTimeout(() => window.location.reload(), 80);
+        return;
       }
 
       setAddState(result);
-    });
+    } catch (error) {
+      setAddState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel adicionar o item.",
+      });
+    } finally {
+      setIsAddingItem(false);
+    }
   }
 
   function handleUpdateItem(item: SelectedComanda["items"][number]) {
@@ -694,6 +661,7 @@ export function CreateSaleForm({
     formData.set("comandaId", selectedComanda.id);
     formData.set("productId", item.productId);
     formData.set("quantity", String(quantity));
+    formData.set("_stableReload", "1");
 
     setUpdateItemState(initialActionState);
     setOptimisticItems((currentItems) =>
@@ -713,9 +681,12 @@ export function CreateSaleForm({
 
       if (result.status === "error") {
         setOptimisticItems(previousItems);
+        setUpdateItemState(result);
+        return;
       }
 
       setUpdateItemState(result);
+      window.setTimeout(() => window.location.reload(), 80);
     });
   }
 
@@ -723,6 +694,7 @@ export function CreateSaleForm({
     const formData = new FormData();
     formData.set("comandaId", selectedComanda.id);
     formData.set("productId", item.productId);
+    formData.set("_stableReload", "1");
     const previousItems = optimisticItems;
 
     setRemoveItemState(initialActionState);
@@ -733,9 +705,12 @@ export function CreateSaleForm({
 
       if (result.status === "error") {
         setOptimisticItems(previousItems);
+        setRemoveItemState(result);
+        return;
       }
 
       setRemoveItemState(result);
+      window.setTimeout(() => window.location.reload(), 80);
     });
   }
 
@@ -1088,7 +1063,7 @@ export function CreateSaleForm({
                       return (
                         <form
                           key={product.id}
-                          onSubmit={(event) => handleAddItemSubmit(event, product)}
+                          onSubmit={handleAddItemSubmit}
                           className="group relative flex h-full flex-col gap-2.5 rounded-[1.3rem] border border-border/75 bg-background/30 p-3 transition-all duration-200 hover:border-primary/30 hover:bg-background/42"
                         >
                           <input type="hidden" name="comandaId" value={selectedComanda.id} />

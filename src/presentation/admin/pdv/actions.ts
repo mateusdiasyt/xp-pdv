@@ -33,6 +33,10 @@ function revalidateSaleSurfaces() {
   revalidatePath("/admin");
 }
 
+function shouldSkipPartialRefresh(formData: FormData) {
+  return String(formData.get("_stableReload") ?? "") === "1";
+}
+
 export async function createSaleAction(
   prevState: ActionState = initialActionState,
   formData: FormData,
@@ -231,7 +235,9 @@ export async function addComandaItemRequest(formData: FormData): Promise<ActionS
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await addComandaItemRecord(formData, session.user.id);
-    revalidatePdvPage();
+    if (!shouldSkipPartialRefresh(formData)) {
+      revalidatePdvPage();
+    }
     return { status: "success", message: "Item adicionado na comanda." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -301,7 +307,9 @@ export async function removeComandaItemRequest(formData: FormData): Promise<Acti
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await removeComandaItemRecord(formData, session.user.id);
-    revalidatePdvPage();
+    if (!shouldSkipPartialRefresh(formData)) {
+      revalidatePdvPage();
+    }
     return { status: "success", message: "Item removido da comanda." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
@@ -320,7 +328,9 @@ export async function updateComandaItemRequest(formData: FormData): Promise<Acti
   try {
     const session = await requirePermission(PERMISSIONS.PDV_MANAGE);
     await updateComandaItemRecord(formData, session.user.id);
-    revalidatePdvPage();
+    if (!shouldSkipPartialRefresh(formData)) {
+      revalidatePdvPage();
+    }
     return { status: "success", message: "Item atualizado." };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };
