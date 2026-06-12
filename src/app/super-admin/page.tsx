@@ -2,9 +2,7 @@ import Link from "next/link";
 import { PlatformTenantStatus, type PlatformTenant } from "@prisma/client";
 import {
   ArrowUpRight,
-  CalendarDays,
   CheckCircle2,
-  Clock3,
   CreditCard,
   PowerOff,
   RotateCcw,
@@ -15,9 +13,7 @@ import {
 import {
   approveTenantAction,
   reactivateTenantAction,
-  removeTenantPlanAction,
   suspendTenantAction,
-  updateTenantPlanAction,
 } from "@/app/super-admin/actions";
 import {
   getPlatformGatewayConfigurationSnapshot,
@@ -30,6 +26,7 @@ import { listPlatformBillingSummaries } from "@/application/platform/mercado-pag
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
 import { SuperAdminGatewayForm } from "@/components/platform/super-admin-gateway-form";
+import { SuperAdminManualAccessForm } from "@/components/platform/super-admin-manual-access-form";
 import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
 import { TenantSubscriptionCheckoutButton } from "@/components/platform/tenant-subscription-checkout-button";
 import { Badge } from "@/components/ui/badge";
@@ -446,89 +443,12 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                       </div>
 
                       <div className="grid gap-4">
-                        <section className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
-                      <form action={updateTenantPlanAction}>
-                        <input type="hidden" name="tenantId" value={tenant.id} />
-                        <div className="mb-4 flex items-start gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
-                            <ShieldCheck className="h-4 w-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-foreground">Acesso manual do painel</p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              Libera, corrige validade ou remove o acesso sem gerar cobranca.
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Acesso atual</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              Atual: <strong className="text-foreground">{tenant.planName ?? "Não definido"}</strong>
-                            </p>
-                          </div>
-                          <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                            <CalendarDays className="h-4 w-4" />
-                            {formatDate(tenant.planExpiresAt)}
-                          </p>
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
-                          <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Plano liberado</span>
-                            <select
-                              name="planName"
-                              defaultValue={tenant.planName === "Platina" ? "Platina" : "Ouro"}
-                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-                            >
-                              <option value="Ouro">Ouro</option>
-                              <option value="Platina">Platina</option>
-                            </select>
-                          </label>
-
-                          <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Validade</span>
-                            <select
-                              name="durationMonths"
-                              defaultValue={tenant.planExpiresAt ? "custom" : "1"}
-                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-                            >
-                              <option value="1">1 mes</option>
-                              <option value="3">3 meses</option>
-                              <option value="6">6 meses</option>
-                              <option value="12">1 ano</option>
-                              <option value="custom">Data manual</option>
-                            </select>
-                          </label>
-
-                          <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Vence em</span>
-                            <input
-                              type="date"
-                              name="planExpiresAt"
-                              defaultValue={formatDateInput(tenant.planExpiresAt)}
-                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-                            />
-                          </label>
-
-                          <Button type="submit" size="sm" className="h-10 gap-2">
-                            <Clock3 className="h-4 w-4" />
-                            Salvar acesso
-                          </Button>
-                        </div>
-
-                      </form>
-
-                      {tenant.planName ? (
-                        <form action={removeTenantPlanAction} className="mt-3 flex justify-end">
-                          <input type="hidden" name="tenantId" value={tenant.id} />
-                          <Button type="submit" size="sm" variant="outline" className="gap-2">
-                            <PowerOff className="h-4 w-4" />
-                            Remover acesso manual
-                          </Button>
-                        </form>
-                      ) : null}
-                        </section>
+                        <SuperAdminManualAccessForm
+                          tenantId={tenant.id}
+                          currentPlanName={tenant.planName}
+                          planExpiresAtLabel={formatDate(tenant.planExpiresAt)}
+                          planExpiresAtInput={formatDateInput(tenant.planExpiresAt)}
+                        />
 
                         <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
                           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
