@@ -28,6 +28,7 @@ type StockIngredientOption = {
   id: string;
   name: string;
   sku: string;
+  tracksStock: boolean;
   currentStock: number;
   stockUnit: StockUnit;
 };
@@ -123,6 +124,43 @@ type RecipeIngredientDraft = {
   quantity: string;
 };
 
+type ProductMode = "STANDARD_STOCK" | "PREPARED" | "COMBO" | "GAMEPLAY" | "SERVICE";
+
+function resolveInitialProductMode(initialData?: ProductFormInitialData): ProductMode {
+  if (initialData?.kind === ProductKind.GAMEPLAY) {
+    return "GAMEPLAY";
+  }
+
+  if (initialData?.kind === ProductKind.SERVICE) {
+    return "SERVICE";
+  }
+
+  if (initialData?.kind === ProductKind.STANDARD && initialData.tracksStock === false) {
+    const hasMultipleComponents = (initialData.recipeIngredients?.length ?? 0) > 1;
+    const looksLikeCombo = `${initialData.name ?? ""} ${initialData.sku ?? ""}`.toLowerCase().includes("combo");
+
+    return hasMultipleComponents || looksLikeCombo ? "COMBO" : "PREPARED";
+  }
+
+  return "STANDARD_STOCK";
+}
+
+function productModeToKind(productMode: ProductMode) {
+  if (productMode === "GAMEPLAY") {
+    return ProductKind.GAMEPLAY;
+  }
+
+  if (productMode === "SERVICE") {
+    return ProductKind.SERVICE;
+  }
+
+  return ProductKind.STANDARD;
+}
+
+function productModeTracksStock(productMode: ProductMode) {
+  return productMode === "STANDARD_STOCK";
+}
+
 function buildRecipeIngredientDrafts(initialIngredients?: RecipeIngredientInput[]) {
   if (!initialIngredients?.length) {
     return [{ key: "recipe-0", ingredientProductId: "", quantity: "" }];
@@ -181,8 +219,9 @@ export function CreateProductForm({
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialData?.imageUrl ?? "");
   const [imageError, setImageError] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
-  const [productKind, setProductKind] = useState(initialData?.kind ?? ProductKind.STANDARD);
-  const [tracksStock, setTracksStock] = useState(initialData?.tracksStock ?? true);
+  const [productMode, setProductMode] = useState<ProductMode>(() => resolveInitialProductMode(initialData));
+  const [productKind, setProductKind] = useState(() => productModeToKind(resolveInitialProductMode(initialData)));
+  const [tracksStock, setTracksStock] = useState(() => productModeTracksStock(resolveInitialProductMode(initialData)));
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientDraft[]>(() =>
     buildRecipeIngredientDrafts(initialData?.recipeIngredients),
   );
@@ -191,6 +230,7 @@ export function CreateProductForm({
   );
   const isGameplay = productKind === ProductKind.GAMEPLAY;
   const isServiceLike = productKind !== ProductKind.STANDARD;
+  const isCombo = productMode === "COMBO";
   const usesStockControls = !isServiceLike && tracksStock;
   const currentStockValue = initialData?.currentStock ?? 0;
 
@@ -253,8 +293,12 @@ export function CreateProductForm({
     setFileInputKey((currentValue) => currentValue + 1);
   }
 
-  function handleProductKindChange(nextKind: ProductKind) {
+  function handleProductModeChange(nextMode: ProductMode) {
+    const nextKind = productModeToKind(nextMode);
+
+    setProductMode(nextMode);
     setProductKind(nextKind);
+    setTracksStock(productModeTracksStock(nextMode));
 
     if (nextKind === ProductKind.GAMEPLAY) {
       setServiceCnae("9329804");
@@ -424,19 +468,21 @@ export function CreateProductForm({
 
         <div className="space-y-2">
           <Label htmlFor="kind">Tipo de produto</Label>
+          <input type="hidden" name="kind" value={productKind} />
           <select
             id="kind"
-            name="kind"
             className="admin-native-select"
-            value={productKind}
-            onChange={(event) => handleProductKindChange(event.target.value as ProductKind)}
+            value={productMode}
+            onChange={(event) => handleProductModeChange(event.target.value as ProductMode)}
           >
-            <option value={ProductKind.STANDARD}>Produto comum</option>
-            <option value={ProductKind.GAMEPLAY}>Gameplay / TV</option>
-            <option value={ProductKind.SERVICE}>Servico manual</option>
+            <option value="STANDARD_STOCK">Produto com estoque</option>
+            <option value="PREPARED">Produto preparado / receita</option>
+            <option value="COMBO">Combo com desconto</option>
+            <option value="GAMEPLAY">Gameplay / TV</option>
+            <option value="SERVICE">Servico manual</option>
           </select>
           <p className="text-xs text-muted-foreground">
-            Drink e item preparado continuam como Produto comum para NFC-e. Gameplay e servico manual entram na apuracao de NFS-e municipal.
+            Combo aparece como um produto no PDV, mas pode consumir os produtos internos configurados abaixo.
           </p>
         </div>
 
@@ -564,21 +610,18 @@ export function CreateProductForm({
 
             <input type="hidden" name="gameplayPlanCode" value="" />
             <input type="hidden" name="gameplayDurationMinutes" value="" />
+            <input type="hidden" name="tracksStock" value={tracksStock ? "true" : "false"} />
 
-            <div className="space-y-2">
-              <Label htmlFor="tracksStock">Controle de estoque</Label>
-              <select
-                id="tracksStock"
-                name="tracksStock"
-                className="admin-native-select"
-                value={tracksStock ? "true" : "false"}
-                onChange={(event) => setTracksStock(event.target.value === "true")}
-              >
-                <option value="true">Controlar saldo</option>
-                <option value="false">Produto preparado / sem saldo proprio</option>
-              </select>
+            <div className="rounded-2xl border border-border/75 bg-background/35 p-4 text-sm text-muted-foreground">
+              <p className="font-semibold text-foreground">
+                {tracksStock ? "Controle de estoque próprio" : isCombo ? "Combo sem estoque próprio" : "Produto preparado sem saldo próprio"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Use sem saldo proprio para drinks, chopp e itens preparados. A baixa do ingrediente e configurada abaixo.
+                {tracksStock
+                  ? "O saldo deste produto é controlado diretamente na aba Estoque."
+                  : isCombo
+                    ? "O combo vende por preço único e pode baixar os itens internos configurados abaixo."
+                    : "Use para drinks, chopp e itens preparados. A baixa dos insumos fica na receita abaixo."}
               </p>
             </div>
           </>
@@ -669,9 +712,13 @@ export function CreateProductForm({
 
             <div className="space-y-3 rounded-2xl border border-border/75 bg-background/35 p-4 md:col-span-2">
               <div>
-                <p className="text-sm font-semibold text-foreground">Receita e baixa automatica do estoque</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {isCombo ? "Itens do combo e baixa automatica" : "Receita e baixa automatica do estoque"}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Adicione cada item do estoque consumido na venda. Use uma linha para a lata inteira e outras linhas para novos insumos quando precisar.
+                  {isCombo
+                    ? "Selecione os produtos que fazem parte do combo. Produtos com estoque baixam saldo; produtos preparados baixam os insumos configurados neles."
+                    : "Adicione cada item consumido na venda. Use uma linha para a lata inteira e outras linhas para novos insumos quando precisar."}
                 </p>
               </div>
               <div className="space-y-3">
@@ -682,7 +729,13 @@ export function CreateProductForm({
                   >
                     <div className="space-y-2">
                       <Label htmlFor={`recipeIngredientProductId-${recipeIngredient.key}`}>
-                        {index === 0 ? "Item do estoque consumido na venda" : `Item da receita ${index + 1}`}
+                        {isCombo
+                          ? index === 0
+                            ? "Produto principal do combo"
+                            : `Produto do combo ${index + 1}`
+                          : index === 0
+                            ? "Item consumido na venda"
+                            : `Item da receita ${index + 1}`}
                       </Label>
                       <select
                         id={`recipeIngredientProductId-${recipeIngredient.key}`}
@@ -693,19 +746,23 @@ export function CreateProductForm({
                           handleRecipeIngredientChange(recipeIngredient.key, "ingredientProductId", event.target.value)
                         }
                       >
-                        <option value="">Nao usar insumo</option>
+                        <option value="">{isCombo ? "Nao usar produto" : "Nao usar insumo"}</option>
                         {stockIngredients
                           .filter((ingredient) => ingredient.id !== initialData?.productId)
                           .map((ingredient) => (
                             <option key={ingredient.id} value={ingredient.id}>
-                              {ingredient.name} | {ingredient.sku} | {ingredient.currentStock}{" "}
-                              {ingredient.stockUnit === StockUnit.MILLILITER ? "ml" : "un"}
+                              {ingredient.name} | {ingredient.sku} |{" "}
+                              {ingredient.tracksStock
+                                ? `${ingredient.currentStock} ${ingredient.stockUnit === StockUnit.MILLILITER ? "ml" : "un"}`
+                                : "sem saldo proprio"}
                             </option>
                           ))}
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`recipeQuantity-${recipeIngredient.key}`}>Consumo por venda</Label>
+                      <Label htmlFor={`recipeQuantity-${recipeIngredient.key}`}>
+                        {isCombo ? "Quantidade no combo" : "Consumo por venda"}
+                      </Label>
                       <Input
                         id={`recipeQuantity-${recipeIngredient.key}`}
                         name="recipeQuantity"
@@ -733,10 +790,14 @@ export function CreateProductForm({
                   </div>
                 ))}
                 <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                  <p>Use 1 para uma lata inteira ou a quantidade da unidade do insumo, como 500 ml.</p>
+                  <p>
+                    {isCombo
+                      ? "Use 1 para cada produto que entra uma vez no combo."
+                      : "Use 1 para uma lata inteira ou a quantidade da unidade do insumo, como 500 ml."}
+                  </p>
                   <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={handleAddRecipeIngredient}>
                     <Plus className="h-4 w-4" />
-                    Adicionar insumo
+                    {isCombo ? "Adicionar produto ao combo" : "Adicionar insumo"}
                   </Button>
                 </div>
               </div>

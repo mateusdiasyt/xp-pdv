@@ -22,6 +22,7 @@ type StockIngredientOption = {
   id: string;
   name: string;
   sku: string;
+  tracksStock: boolean;
   currentStock: number;
   stockUnit: "UNIT" | "MILLILITER";
 };
@@ -44,7 +45,7 @@ export function CreateProductDialog({ categories, suppliers, stockIngredients }:
       <DialogContent className="max-w-[min(1100px,95vw)] gap-0 border-border/80 bg-card p-0 sm:max-w-[min(1100px,95vw)]">
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-14">
           <DialogTitle>Novo produto</DialogTitle>
-          <DialogDescription>Cadastro com imagem, fiscal, venda, estoque e receita para itens preparados.</DialogDescription>
+          <DialogDescription>Cadastro com imagem, fiscal, venda, estoque, receita e combo com desconto.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[78vh] overflow-y-auto p-5">
           <CreateProductForm

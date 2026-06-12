@@ -512,7 +512,7 @@ async function assertRecipeIngredientIsValid(
     where: {
       id: ingredientProductId,
       kind: ProductKind.STANDARD,
-      tracksStock: true,
+      status: RecordStatus.ACTIVE,
     },
     select: {
       id: true,
@@ -520,7 +520,7 @@ async function assertRecipeIngredientIsValid(
   });
 
   if (!ingredient) {
-    throw new Error("Selecione um insumo com controle de estoque para a receita.");
+    throw new Error("Selecione um produto ativo para compor a receita ou combo.");
   }
 }
 
@@ -528,13 +528,13 @@ export async function listStockIngredientOptions() {
   return prisma.product.findMany({
     where: {
       kind: ProductKind.STANDARD,
-      tracksStock: true,
       status: RecordStatus.ACTIVE,
     },
     select: {
       id: true,
       name: true,
       sku: true,
+      tracksStock: true,
       currentStock: true,
       stockUnit: true,
     },

@@ -108,6 +108,14 @@ type StockBalanceProduct = {
   costPrice: Prisma.Decimal;
 };
 
+type RecipeIngredientNode = {
+  quantity: number;
+  ingredientProduct: StockBalanceProduct & {
+    tracksStock: boolean;
+    recipeIngredients?: RecipeIngredientNode[];
+  };
+};
+
 type GameplayStationProductData = {
   name: string;
   gameplayPlanCode: string | null;
@@ -160,22 +168,54 @@ function resolveEffectiveSalePrice(
 }
 
 function resolveRecipeUnitCost(product: {
+  id?: string;
+  name?: string;
   costPrice: Prisma.Decimal;
-  recipeIngredients: Array<{
-    quantity: number;
-    ingredientProduct: {
-      costPrice: Prisma.Decimal;
-    };
-  }>;
-}) {
-  if (product.recipeIngredients.length === 0) {
+  recipeIngredients?: RecipeIngredientNode[];
+}): Prisma.Decimal {
+  const recipeIngredients = product.recipeIngredients ?? [];
+
+  if (recipeIngredients.length === 0) {
     return product.costPrice;
   }
 
-  return product.recipeIngredients.reduce(
-    (total, ingredient) => total.plus(ingredient.ingredientProduct.costPrice.times(ingredient.quantity)),
+  return recipeIngredients.reduce(
+    (total, ingredient) =>
+      total.plus(resolveRecipeUnitCost(ingredient.ingredientProduct).times(ingredient.quantity)),
     new Prisma.Decimal(0),
   );
+}
+
+function collectRecipeStockRequirements(
+  recipeIngredients: RecipeIngredientNode[],
+  multiplier: number,
+  path: Set<string>,
+): Array<{ product: StockBalanceProduct; quantity: number }> {
+  const requirements: Array<{ product: StockBalanceProduct; quantity: number }> = [];
+
+  for (const recipeIngredient of recipeIngredients) {
+    const product = recipeIngredient.ingredientProduct;
+    const requiredQuantity = recipeIngredient.quantity * multiplier;
+
+    if (product.tracksStock) {
+      requirements.push({ product, quantity: requiredQuantity });
+      continue;
+    }
+
+    if (!product.recipeIngredients?.length) {
+      continue;
+    }
+
+    if (path.has(product.id)) {
+      throw new Error(`Receita circular encontrada em ${product.name}. Contate o Mateus.`);
+    }
+
+    const nextPath = new Set(path);
+    nextPath.add(product.id);
+    requirements.push(...collectRecipeStockRequirements(product.recipeIngredients, requiredQuantity, nextPath));
+  }
+
+  return requirements;
 }
 
 async function moveTrackedStock(
@@ -705,6 +745,21 @@ async function runCreateSaleWithStockAdjustment(
               name: true,
               currentStock: true,
               costPrice: true,
+              tracksStock: true,
+              recipeIngredients: {
+                select: {
+                  quantity: true,
+                  ingredientProduct: {
+                    select: {
+                      id: true,
+                      name: true,
+                      currentStock: true,
+                      costPrice: true,
+                      tracksStock: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -742,10 +797,13 @@ async function runCreateSaleWithStockAdjustment(
     }
 
     if (product.kind === ProductKind.STANDARD) {
-      for (const recipeIngredient of product.recipeIngredients) {
-        const requiredQuantity = recipeIngredient.quantity * item.quantity;
-        if (recipeIngredient.ingredientProduct.currentStock < requiredQuantity) {
-          throw new Error(`Estoque insuficiente do insumo ${recipeIngredient.ingredientProduct.name} para ${product.name}.`);
+      for (const stockRequirement of collectRecipeStockRequirements(
+        product.recipeIngredients,
+        item.quantity,
+        new Set([product.id]),
+      )) {
+        if (stockRequirement.product.currentStock < stockRequirement.quantity) {
+          throw new Error(`Estoque insuficiente do insumo ${stockRequirement.product.name} para ${product.name}.`);
         }
       }
     }
@@ -943,12 +1001,16 @@ async function runCreateSaleWithStockAdjustment(
       );
     }
 
-    for (const recipeIngredient of product.recipeIngredients) {
+    for (const stockRequirement of collectRecipeStockRequirements(
+      product.recipeIngredients,
+      item.quantity,
+      new Set([product.id]),
+    )) {
       await moveTrackedStock(
         tx,
         stockBalances,
-        recipeIngredient.ingredientProduct,
-        recipeIngredient.quantity * item.quantity,
+        stockRequirement.product,
+        stockRequirement.quantity,
         StockMovementType.OUT,
         `Consumo por venda ${data.saleNumber}: ${product.name}`,
         data.operatorId,
@@ -1020,6 +1082,21 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
                   name: true,
                   currentStock: true,
                   costPrice: true,
+                  tracksStock: true,
+                  recipeIngredients: {
+                    select: {
+                      quantity: true,
+                      ingredientProduct: {
+                        select: {
+                          id: true,
+                          name: true,
+                          currentStock: true,
+                          costPrice: true,
+                          tracksStock: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -1111,18 +1188,21 @@ export async function cancelSaleAndRestock(data: CancelSaleAndRestockInput) {
           restoredQuantity += item.quantity;
         }
 
-        for (const recipeIngredient of product.recipeIngredients) {
-          const restoredIngredientQuantity = recipeIngredient.quantity * item.quantity;
+        for (const stockRequirement of collectRecipeStockRequirements(
+          product.recipeIngredients,
+          item.quantity,
+          new Set([product.id]),
+        )) {
           await moveTrackedStock(
             tx,
             stockBalances,
-            recipeIngredient.ingredientProduct,
-            restoredIngredientQuantity,
+            stockRequirement.product,
+            stockRequirement.quantity,
             StockMovementType.IN,
             `Retorno por cancelamento da venda ${sale.saleNumber}: insumo de ${item.productNameSnapshot}`,
             data.cancelledById,
           );
-          restoredQuantity += restoredIngredientQuantity;
+          restoredQuantity += stockRequirement.quantity;
         }
       }
 
