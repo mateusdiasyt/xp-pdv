@@ -3,9 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
-  ExternalLink,
   Loader2,
-  LockKeyhole,
   ShieldCheck,
   WalletCards,
   X,
@@ -16,7 +14,6 @@ import { signOut } from "next-auth/react";
 import {
   activateCurrentTenantPaidPlanAction,
   authorizeCurrentTenantPaymentAction,
-  createCurrentTenantPaymentCheckoutAction,
 } from "@/app/(admin)/admin/payment/actions";
 import {
   formatCentsToBRL,
@@ -241,7 +238,6 @@ export function PendingTenantPaymentPanel({
   const [state, setState] = useState<ActionState>(initialActionState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const [isLinkSubmitting, setIsLinkSubmitting] = useState(false);
   const [isCardFormReady, setIsCardFormReady] = useState(false);
   const [cardFormMessage, setCardFormMessage] = useState("Carregando pagamento seguro...");
   const [confirmedPayment, setConfirmedPayment] = useState<ConfirmedPaymentModal | null>(null);
@@ -284,21 +280,6 @@ export function PendingTenantPaymentPanel({
   const currentPlanLabel = currentPlanName ?? latestSubscription?.planName ?? defaultPlanName;
   const planStatusLabel = formatPlanStatusLabel(planStatus, planExpiredOrRemoved || planExpiredByDate);
   const remainingTimeLabel = getRemainingTimeLabel(validPlanExpirationDate, planExpiredOrRemoved || planExpiredByDate);
-  const latestSubscriptionStatus = latestSubscription?.status.toLowerCase() ?? "";
-  const latestPaymentLinkIsPending = latestSubscriptionStatus === "pending" && Boolean(latestSubscription?.mercadoPagoInitPoint);
-  const shouldShowLatestLink = Boolean(
-    latestSubscription?.mercadoPagoInitPoint &&
-      !planExpiredOrRemoved &&
-      !planExpiredByDate &&
-      (latestPaymentLinkIsPending || !hasActivePlan),
-  );
-  const fallbackLinkLabel = hasActivePlan
-    ? latestPaymentLinkIsPending
-      ? "Gerar novo link de renovacao"
-      : "Gerar link de renovacao"
-    : shouldShowLatestLink
-      ? "Link alternativo"
-      : "Gerar link de pagamento";
   const paymentButtonLabel = hasActivePlan ? "Renovar" : "Confirmar";
   const shouldRenderCheckout = !hasAuthorizedSubscription && (!hasActivePlan || isCheckoutOpen);
   const cycleOptions = useMemo(
@@ -546,37 +527,6 @@ export function PendingTenantPaymentPanel({
     }
   }
 
-  async function handleFallbackLinkSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isLinkSubmitting) {
-      return;
-    }
-
-    setIsLinkSubmitting(true);
-    setState(initialActionState);
-
-    try {
-      const formData = new FormData(event.currentTarget);
-      formData.set("planName", planName);
-      formData.set("billingCycleMonths", String(billingCycleMonths));
-
-      const result = await createCurrentTenantPaymentCheckoutAction(initialActionState, formData);
-      setState(result);
-
-      if (result.status === "success" && result.redirectUrl) {
-        window.location.assign(result.redirectUrl);
-      }
-    } catch {
-      setState({
-        status: "error",
-        message: "Nao foi possivel gerar o link agora.",
-      });
-    } finally {
-      setIsLinkSubmitting(false);
-    }
-  }
-
   function handleOpenCheckout() {
     setState(initialActionState);
     setIsCheckoutOpen(true);
@@ -753,84 +703,10 @@ export function PendingTenantPaymentPanel({
       ) : null}
 
       {shouldRenderCheckout ? (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,500px)]">
-          <aside className="rounded-3xl border border-[#009ee3]/20 bg-[#081f32]/55 p-5 shadow-[0_24px_90px_-68px_#009ee3]">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#009ee3]/35 bg-[#009ee3]/15 text-[#7fd7ff]">
-                <LockKeyhole className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#7fd7ff]">Checkout seguro</p>
-                <h2 className="text-xl font-black text-foreground">Pagamento via Mercado Pago</h2>
-              </div>
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-2xl border border-white/15 bg-white p-3">
-              <Image
-                src="/mercadopago-selo22.png"
-                alt="Compra 100% segura Mercado Pago"
-                width={600}
-                height={300}
-                className="h-auto w-full object-contain"
-              />
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-sm font-black text-foreground">Dados criptografados</p>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  Os dados do cartao sao processados pelo Mercado Pago, sem salvar numero do cartao no Mendoza PDV.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-sm font-black text-foreground">Resumo da renovacao</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Plano</span>
-                    <strong className="text-foreground">{planName}</strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Periodo</span>
-                    <strong className="text-foreground">{formatCycleLabel(billingCycleMonths)}</strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-2">
-                    <span className="text-muted-foreground">Total</span>
-                    <strong className="text-lg text-foreground">{formatCentsToBRL(amountCents)}</strong>
-                  </div>
-                </div>
-              </div>
-              <form onSubmit={handleFallbackLinkSubmit} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-sm font-black text-foreground">Prefere abrir no Mercado Pago?</p>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  Gere um link de pagamento caso queira finalizar fora do checkout transparente.
-                </p>
-                {shouldShowLatestLink ? (
-                  <a
-                    href={latestSubscription!.mercadoPagoInitPoint!}
-                    className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-xs font-black text-foreground transition-colors hover:border-[#009ee3]/45 hover:bg-[#009ee3]/15"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Abrir ultimo link
-                  </a>
-                ) : null}
-
-                <input type="hidden" name="planName" value={planName} />
-                <input type="hidden" name="billingCycleMonths" value={billingCycleMonths} />
-                <button
-                  type="submit"
-                  disabled={isLinkSubmitting}
-                  className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#009ee3]/35 bg-[#009ee3]/15 px-4 text-xs font-black text-[#9fe2ff] transition-colors hover:bg-[#009ee3]/25 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {isLinkSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-                  {fallbackLinkLabel}
-                </button>
-              </form>
-            </div>
-          </aside>
-
+        <div className="mt-5 flex justify-end">
           <form
             id="mendoza-card-form"
-            className="rounded-[28px] border border-slate-200 bg-white p-5 text-slate-950 shadow-[0_30px_90px_-54px_rgba(0,158,227,0.65)]"
+            className="w-full max-w-[540px] rounded-[28px] border border-slate-200 bg-white p-5 text-slate-950 shadow-[0_30px_90px_-54px_rgba(0,158,227,0.65)]"
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
               <div>
@@ -939,9 +815,11 @@ export function PendingTenantPaymentPanel({
                 <span className="text-slate-500">Total</span>
                 <strong className="text-xl text-slate-950">{formatCentsToBRL(amountCents)}</strong>
               </div>
-              <div className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+              <div className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-600">
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                {cardFormMessage}
+                <span>
+                  {cardFormMessage} Dados criptografados pelo Mercado Pago. O Mendoza PDV nao salva numero do cartao.
+                </span>
               </div>
             </div>
 
@@ -953,6 +831,16 @@ export function PendingTenantPaymentPanel({
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
               {isSubmitting ? "Confirmando..." : `${paymentButtonLabel} ${formatCentsToBRL(amountCents)}`}
             </button>
+
+            <div className="mt-4 flex justify-center">
+              <Image
+                src="/mercadopago-selo22.png"
+                alt="Compra 100% segura Mercado Pago"
+                width={600}
+                height={300}
+                className="h-auto w-full max-w-[230px] object-contain opacity-95"
+              />
+            </div>
 
             {state.status === "error" && state.message ? (
               <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
