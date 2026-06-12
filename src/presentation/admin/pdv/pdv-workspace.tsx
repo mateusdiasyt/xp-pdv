@@ -113,6 +113,7 @@ type PdvWorkspaceProps = {
 };
 
 const DEFAULT_SLOT_COUNT = 50;
+const resumeComandaStorageKey = "pdv:resume-comanda-id";
 
 function HappyHourToggle({
   active,
@@ -197,6 +198,20 @@ export function PdvWorkspace({
   useEffect(() => {
     setLocalOpenComandas(openComandas);
   }, [openComandas]);
+
+  useEffect(() => {
+    const resumeComandaId = window.sessionStorage.getItem(resumeComandaStorageKey);
+    if (!resumeComandaId) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(resumeComandaStorageKey);
+
+    if (localOpenComandas.some((comanda) => comanda.id === resumeComandaId)) {
+      setWorkspaceMode("comanda");
+      setSelectedComandaId(resumeComandaId);
+    }
+  }, [localOpenComandas]);
 
   const selectedComanda = localOpenComandas.find((comanda) => comanda.id === selectedComandaId) ?? null;
   const highestActiveNumber = localOpenComandas.reduce(

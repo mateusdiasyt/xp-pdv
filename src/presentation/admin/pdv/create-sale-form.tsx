@@ -180,6 +180,7 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
 
 const quantityInputClassName =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+const resumeComandaStorageKey = "pdv:resume-comanda-id";
 
 function parseMoneyToCents(value: string) {
   const trimmed = value.trim();
@@ -629,7 +630,7 @@ export function CreateSaleForm({
       if (result.status === "success") {
         form.reset();
         setAddState(result);
-        window.setTimeout(() => window.location.reload(), 80);
+        reloadKeepingComandaOpen();
         return;
       }
 
@@ -686,7 +687,7 @@ export function CreateSaleForm({
       }
 
       setUpdateItemState(result);
-      window.setTimeout(() => window.location.reload(), 80);
+      reloadKeepingComandaOpen();
     });
   }
 
@@ -710,7 +711,7 @@ export function CreateSaleForm({
       }
 
       setRemoveItemState(result);
-      window.setTimeout(() => window.location.reload(), 80);
+      reloadKeepingComandaOpen();
     });
   }
 
@@ -743,6 +744,11 @@ export function CreateSaleForm({
         },
       ];
     });
+  }
+
+  function reloadKeepingComandaOpen() {
+    window.sessionStorage.setItem(resumeComandaStorageKey, selectedComanda.id);
+    window.setTimeout(() => window.location.reload(), 80);
   }
 
   async function handleCloseComandaSubmit(event: FormEvent<HTMLFormElement>) {
