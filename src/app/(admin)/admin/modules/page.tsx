@@ -5,6 +5,7 @@ import {
   Banknote,
   Boxes,
   CheckCircle2,
+  ClipboardList,
   FileCheck2,
   Gamepad2,
   Landmark,
@@ -15,8 +16,6 @@ import {
   Receipt,
   ShieldCheck,
   Sparkles,
-  Store,
-  UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,19 +46,34 @@ const planRank: Record<PlatformPlanName, number> = {
 
 const modules: ModuleCard[] = [
   {
-    title: "PDV rápido e comandas",
+    title: "PDV rápido",
     category: "Operação",
-    summary: "Venda direta, comanda avulsa, cupom, múltiplos pagamentos e ticket.",
+    summary: "Venda direta, cupom, múltiplos pagamentos e ticket térmico.",
     details:
-      "Centraliza a venda do balcão e das comandas no mesmo fluxo. O operador monta itens, aplica cupom quando necessário, divide pagamentos e finaliza com comprovante térmico.",
+      "Atende vendas rápidas de balcão sem abrir comanda. O operador monta itens, aplica cupom quando necessário, divide pagamentos e finaliza com comprovante térmico.",
     howItWorks: [
-      "Abre venda rápida ou comanda numerada.",
-      "Adiciona produtos, serviços e pagamentos.",
+      "Abre a venda rápida no PDV.",
+      "Adiciona produtos, serviços, cupom e pagamentos.",
       "Gera comprovante, DANFE/XML quando fiscal estiver ativo e histórico da venda.",
     ],
-    bestFor: "Bares, lanchonetes, conveniências e operações com atendimento rápido.",
+    bestFor: "Balcão, conveniências, lanchonetes e operações com atendimento rápido.",
     requiredPlan: "Ouro",
     icon: Receipt,
+  },
+  {
+    title: "Comandas",
+    category: "Operação",
+    summary: "Comandas avulsas, nomes, itens em aberto e fechamento posterior.",
+    details:
+      "Permite trabalhar com consumo em aberto antes do pagamento. A equipe cria ou renomeia comandas, adiciona itens durante o atendimento e finaliza tudo no fechamento.",
+    howItWorks: [
+      "Cria comanda numerada ou avulsa.",
+      "Adiciona e remove itens enquanto o cliente consome.",
+      "Fecha a comanda com as mesmas formas de pagamento do PDV.",
+    ],
+    bestFor: "Bares e operações em que o cliente consome primeiro e paga no fim.",
+    requiredPlan: "Platina",
+    icon: ClipboardList,
   },
   {
     title: "Caixa operacional",
@@ -133,23 +147,8 @@ const modules: ModuleCard[] = [
       "O sino avisa contas vencidas ou próximas do vencimento.",
     ],
     bestFor: "Controlar despesas do negócio dentro do mesmo painel.",
-    requiredPlan: "Ouro",
+    requiredPlan: "Platina",
     icon: Landmark,
-  },
-  {
-    title: "Produtos e cadastros",
-    category: "Gestão",
-    summary: "Produtos, categorias, fornecedores e clientes organizados.",
-    details:
-      "Concentra os cadastros que sustentam a operação. Produtos podem ter preço, SKU, imagem, NCM, regra fiscal, estoque, receita, venda fracionada e vínculo com categorias.",
-    howItWorks: [
-      "Cria categorias para organizar o PDV.",
-      "Cadastra produtos, fornecedores e clientes.",
-      "Usa esses dados nas vendas, estoque, fiscal e relatórios.",
-    ],
-    bestFor: "Manter a operação padronizada antes de começar a vender.",
-    requiredPlan: "Ouro",
-    icon: Store,
   },
   {
     title: "Marca e configurações",
@@ -165,21 +164,6 @@ const modules: ModuleCard[] = [
     bestFor: "Clientes que querem o PDV com cara própria e operação bem configurada.",
     requiredPlan: "Ouro",
     icon: Palette,
-  },
-  {
-    title: "Usuários e permissões",
-    category: "Gestão",
-    summary: "Acesso por perfil: admin, financeiro, caixa, gerente e operador.",
-    details:
-      "Permite criar usuários com permissões específicas para reduzir risco operacional. Cada pessoa acessa apenas o que precisa para trabalhar.",
-    howItWorks: [
-      "Cadastra usuário com email e senha.",
-      "Define perfil e permissões.",
-      "O menu só mostra as áreas liberadas para aquele usuário.",
-    ],
-    bestFor: "Times com caixa, financeiro e gestão separados.",
-    requiredPlan: "Ouro",
-    icon: UsersRound,
   },
   {
     title: "Fiscal Focus NFe",
