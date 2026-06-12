@@ -30,6 +30,7 @@ export const PERMISSIONS = {
   PDV_CANCEL: "pdv:cancel",
   SUPPORT_VIEW: "support:view",
   SUPPORT_MANAGE: "support:manage",
+  MODULES_VIEW: "modules:view",
   GOALS_VIEW: "goals:view",
   GOALS_MANAGE: "goals:manage",
   CUSTOMIZATION_VIEW: "customization:view",

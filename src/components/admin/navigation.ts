@@ -12,6 +12,7 @@ import {
   Receipt,
   LineChart,
   Package,
+  Puzzle,
   ShieldUser,
   ScrollText,
   Store,
@@ -154,6 +155,13 @@ export const adminNavigation: AdminNavigationItem[] = [
     href: "/admin/support",
     icon: LifeBuoy,
     permission: PERMISSIONS.SUPPORT_VIEW,
+    group: "Sistema",
+  },
+  {
+    label: "Módulos",
+    href: "/admin/modules",
+    icon: Puzzle,
+    permission: PERMISSIONS.MODULES_VIEW,
     group: "Sistema",
   },
   {
