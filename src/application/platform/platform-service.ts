@@ -439,6 +439,19 @@ export async function updatePlatformTenantPlan(input: FormData) {
   });
 }
 
+export async function removePlatformTenantPlan(tenantId: string) {
+  await ensurePlatformTenantProfileColumns();
+
+  return getPlatformPrisma().platformTenant.update({
+    where: { id: tenantId },
+    data: {
+      planName: null,
+      planStatus: "pending",
+      planExpiresAt: null,
+    },
+  });
+}
+
 export async function getTenantCompanyOnboardingState(slug: string) {
   await ensurePlatformTenantProfileColumns();
   const tenant = await getPlatformPrisma().platformTenant.findFirst({

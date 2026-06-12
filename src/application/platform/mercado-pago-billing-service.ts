@@ -77,6 +77,7 @@ export type TenantPaymentPortalState = {
   ownerEmail: string;
   planName: string | null;
   planStatus: string;
+  planExpiresAt: Date | null;
   latestSubscription: PlatformBillingSummary | null;
 };
 
@@ -343,6 +344,17 @@ export async function activateLatestAuthorizedPlatformSubscription(tenantId: str
 
   if (!subscription) {
     throw new Error("Nenhum pagamento confirmado encontrado para liberar o painel.");
+  }
+
+  const tenant = await getPlatformPrisma().platformTenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      status: true,
+    },
+  });
+
+  if (tenant?.status === PlatformTenantStatus.ACTIVE) {
+    throw new Error("Plano vencido ou removido. Gere uma nova assinatura para liberar o painel novamente.");
   }
 
   await activateTenantPlan(subscription.id, subscription.status, subscription.nextPaymentAt ?? new Date());
@@ -741,6 +753,7 @@ export async function getTenantPaymentPortalState(slug: string): Promise<TenantP
     ownerEmail: tenant.ownerEmail,
     planName: tenant.planName,
     planStatus: tenant.planStatus,
+    planExpiresAt: tenant.planExpiresAt,
     latestSubscription: latestSubscription ?? null,
   };
 }

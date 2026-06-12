@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import {
   buildBrandThemeVariables,
@@ -9,6 +10,7 @@ import {
 } from "@/application/customization/brand-customization-service";
 import { getAccountNotificationData } from "@/application/accounts/account-payable-service";
 import {
+  buildTenantAdminPath,
   getTenantCompanyOnboardingState,
   getTenantModuleEntitlements,
 } from "@/application/platform/platform-service";
@@ -27,10 +29,21 @@ export default async function AdminLayout({
   const session = await getServerAuthSession();
   const requestHeaders = await headers();
   const isPublicAdminApp = requestHeaders.get("x-public-admin-app") === "1";
+  const adminPath = requestHeaders.get("x-admin-path") ?? "/admin";
   const user = session?.user;
   const shouldLoadTenantCustomization = Boolean(
     user && (!user.platformTenantStatus || user.platformTenantStatus === "ACTIVE"),
   );
+  const activeTenantEntitlements =
+    user && user.platformTenantStatus === "ACTIVE"
+      ? await getTenantModuleEntitlements(user.tenantSlug)
+      : null;
+  const isPlanBlocked = Boolean(user && user.platformTenantStatus === "ACTIVE" && !activeTenantEntitlements?.activePlan);
+
+  if (isPlanBlocked && adminPath !== "/admin/payment") {
+    redirect(buildTenantAdminPath(user!.tenantSlug, "/admin/payment"));
+  }
+
   const { customization } = shouldLoadTenantCustomization
     ? await getBrandCustomizationSnapshot()
     : { customization: defaultBrandCustomization };
@@ -55,7 +68,7 @@ export default async function AdminLayout({
     return null;
   }
 
-  if (user.platformTenantStatus && user.platformTenantStatus !== "ACTIVE") {
+  if ((user.platformTenantStatus && user.platformTenantStatus !== "ACTIVE") || isPlanBlocked) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-background" style={themeVariables as CSSProperties}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_28%),radial-gradient(circle_at_86%_0%,color-mix(in_oklab,var(--accent)_14%,transparent),transparent_34%)]" />
@@ -72,7 +85,7 @@ export default async function AdminLayout({
   const [accountNotificationData, companyOnboarding, moduleEntitlements] = await Promise.all([
     getAccountNotificationData(),
     getTenantCompanyOnboardingState(user.tenantSlug),
-    getTenantModuleEntitlements(user.tenantSlug),
+    activeTenantEntitlements ? Promise.resolve(activeTenantEntitlements) : getTenantModuleEntitlements(user.tenantSlug),
   ]);
   const accountNotifications = {
     count: accountNotificationData.count,

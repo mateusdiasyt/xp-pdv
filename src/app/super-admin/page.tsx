@@ -15,6 +15,7 @@ import {
 import {
   approveTenantAction,
   reactivateTenantAction,
+  removeTenantPlanAction,
   suspendTenantAction,
   updateTenantPlanAction,
 } from "@/app/super-admin/actions";
@@ -505,6 +506,16 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                         </div>
 
                       </form>
+
+                      {tenant.planName ? (
+                        <form action={removeTenantPlanAction} className="flex justify-end">
+                          <input type="hidden" name="tenantId" value={tenant.id} />
+                          <Button type="submit" size="sm" variant="outline" className="gap-2">
+                            <PowerOff className="h-4 w-4" />
+                            Remover plano
+                          </Button>
+                        </form>
+                      ) : null}
 
                         <div className="rounded-2xl border border-border/60 bg-background/45 p-3">
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

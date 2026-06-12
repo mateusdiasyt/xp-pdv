@@ -27,7 +27,10 @@ type LatestSubscription = {
 
 type PendingTenantPaymentPanelProps = {
   tenantName: string;
+  tenantStatus: string;
   ownerEmail: string;
+  planStatus: string;
+  planExpiresAt: string | null;
   mercadoPagoPublicKey: string;
   mercadoPagoEnvironment: "test" | "production";
   defaultPlanName: PlatformPlanName;
@@ -151,7 +154,10 @@ function paymentStatusLabel(status: string) {
 
 export function PendingTenantPaymentPanel({
   tenantName,
+  tenantStatus,
   ownerEmail,
+  planStatus,
+  planExpiresAt,
   mercadoPagoPublicKey,
   mercadoPagoEnvironment,
   defaultPlanName,
@@ -172,9 +178,18 @@ export function PendingTenantPaymentPanel({
   const planNameRef = useRef(planName);
   const billingCycleMonthsRef = useRef(billingCycleMonths);
   const isTestEnvironment = mercadoPagoEnvironment === "test";
+  const planExpiredOrRemoved = tenantStatus === "ACTIVE" && planStatus.toLowerCase() !== "active";
+  const planExpiredByDate = tenantStatus === "ACTIVE" && planExpiresAt ? new Date(planExpiresAt).getTime() < Date.now() : false;
   const hasAuthorizedSubscription = ["authorized", "active"].includes(
     latestSubscription?.status.toLowerCase() ?? "",
-  );
+  ) && tenantStatus !== "ACTIVE";
+  const heading = planExpiredOrRemoved || planExpiredByDate ? "Plano vencido" : "Aguardando pagamento";
+  const description =
+    planExpiredOrRemoved || planExpiredByDate
+      ? "Escolha um plano e confirme o pagamento para liberar o painel novamente."
+      : "Sua conta foi criada. Confirme o cartao para liberar o painel automaticamente.";
+  const shouldShowLatestLink = Boolean(latestSubscription?.mercadoPagoInitPoint && !planExpiredOrRemoved && !planExpiredByDate);
+  const fallbackLinkLabel = shouldShowLatestLink ? "Link alternativo" : "Gerar link de pagamento";
   const cycleOptions = useMemo(
     () => PLATFORM_PLAN_PRICES.filter((price) => price.planName === planName),
     [planName],
@@ -435,9 +450,9 @@ export function PendingTenantPaymentPanel({
       <div className="flex flex-col gap-5 border-b border-border/70 pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Mendoza PDV</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground">Aguardando pagamento</h1>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground">{heading}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Sua conta foi criada. Confirme o cartao para liberar o painel automaticamente.
+            {description}
           </p>
         </div>
         <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
@@ -616,9 +631,9 @@ export function PendingTenantPaymentPanel({
       )}
 
       <form onSubmit={handleFallbackLinkSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {latestSubscription?.mercadoPagoInitPoint ? (
+        {shouldShowLatestLink ? (
           <a
-            href={latestSubscription.mercadoPagoInitPoint}
+            href={latestSubscription!.mercadoPagoInitPoint!}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-xs font-black text-foreground transition-colors hover:border-primary/45 hover:bg-primary/10"
           >
             <ExternalLink className="h-4 w-4" />
@@ -634,7 +649,7 @@ export function PendingTenantPaymentPanel({
           className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-xs font-black text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground disabled:cursor-wait disabled:opacity-60"
         >
           {isLinkSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-          Link alternativo
+          {fallbackLinkLabel}
         </button>
       </form>
     </section>

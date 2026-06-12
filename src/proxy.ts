@@ -53,6 +53,7 @@ function rewriteTenantAdminRoute(request: NextRequest, slug: string, adminPath: 
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-tenant-slug", slug);
+  requestHeaders.set("x-admin-path", adminPath);
 
   if (isPublicAdminApp) {
     requestHeaders.set("x-public-admin-app", "1");

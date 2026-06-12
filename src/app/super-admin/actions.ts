@@ -8,6 +8,7 @@ import { createPlatformSubscriptionCheckoutFromForm } from "@/application/platfo
 import {
   approvePlatformTenant,
   reactivatePlatformTenant,
+  removePlatformTenantPlan,
   suspendPlatformTenant,
   updatePlatformTenantPlan,
 } from "@/application/platform/platform-service";
@@ -55,6 +56,19 @@ export async function reactivateTenantAction(formData: FormData) {
 export async function updateTenantPlanAction(formData: FormData) {
   await requirePlatformAdmin();
   await updatePlatformTenantPlan(formData);
+  revalidatePath("/super-admin");
+}
+
+export async function removeTenantPlanAction(formData: FormData) {
+  await requirePlatformAdmin();
+
+  const tenantId = String(formData.get("tenantId") ?? "");
+
+  if (!tenantId) {
+    throw new Error("Cliente invalido.");
+  }
+
+  await removePlatformTenantPlan(tenantId);
   revalidatePath("/super-admin");
 }
 
