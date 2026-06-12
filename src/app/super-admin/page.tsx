@@ -25,8 +25,11 @@ import {
 import { listPlatformBillingSummaries } from "@/application/platform/mercado-pago-billing-service";
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
 import { buildTenantAdminPath, listPlatformTenants } from "@/application/platform/platform-service";
+import { listPlatformSellersWithStats } from "@/application/platform/seller-service";
 import { SuperAdminGatewayForm } from "@/components/platform/super-admin-gateway-form";
 import { SuperAdminManualAccessForm } from "@/components/platform/super-admin-manual-access-form";
+import { SuperAdminSellerForm } from "@/components/platform/super-admin-seller-form";
+import { SuperAdminSellerStatusButton } from "@/components/platform/super-admin-seller-status-button";
 import { SuperAdminSignOutButton } from "@/components/platform/super-admin-sign-out-button";
 import { TenantSubscriptionCheckoutButton } from "@/components/platform/tenant-subscription-checkout-button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +56,8 @@ type SuperAdminPageProps = {
     tab?: string;
   }>;
 };
+
+type SuperAdminTab = "users" | "gateway" | "sellers";
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -305,16 +310,145 @@ function GatewayPanel({ gateway }: { gateway: PlatformGatewayConfigurationSnapsh
   );
 }
 
+function SellersPanel({ sellers }: { sellers: Awaited<ReturnType<typeof listPlatformSellersWithStats>> }) {
+  const activeSellers = sellers.filter((seller) => seller.status === "active").length;
+  const generatedLinks = sellers.reduce((sum, seller) => sum + seller.generatedLinks, 0);
+  const confirmedSales = sellers.reduce((sum, seller) => sum + seller.confirmedSales, 0);
+
+  return (
+    <section className="space-y-4">
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Vendedores</CardDescription>
+            <CardTitle className="text-3xl">{sellers.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Ativos</CardDescription>
+            <CardTitle className="text-3xl">{activeSellers}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Links / vendas</CardDescription>
+            <CardTitle className="text-3xl">
+              {generatedLinks} / {confirmedSales}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </section>
+
+      <SuperAdminSellerForm />
+
+      <Card>
+        <CardHeader className="border-b border-border/70">
+          <CardTitle>Vendedores</CardTitle>
+          <CardDescription>Contas com acesso ao painel de vendas e comissao.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 p-3 sm:p-4">
+          {sellers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
+              Nenhum vendedor cadastrado.
+            </div>
+          ) : (
+            sellers.map((seller) => (
+              <article key={seller.id} className="rounded-2xl border border-border/70 bg-background/45 p-4">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(460px,1.35fr)_auto] xl:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="truncate text-lg font-black text-foreground">{seller.name}</h2>
+                      <Badge
+                        className={
+                          seller.status === "active"
+                            ? "border-emerald-400/35 bg-emerald-400/12 text-emerald-200"
+                            : "border-white/10 bg-white/5 text-white/58"
+                        }
+                      >
+                        {seller.status === "active" ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 truncate text-sm text-muted-foreground">{seller.email}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Comissao: <strong className="text-foreground">{seller.commissionLabel}</strong>
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                      <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        Links
+                      </p>
+                      <p className="mt-1 text-lg font-black text-foreground">{seller.generatedLinks}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                      <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        Vendas
+                      </p>
+                      <p className="mt-1 text-lg font-black text-foreground">{seller.confirmedSales}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                      <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        Comissao
+                      </p>
+                      <p className="mt-1 text-lg font-black text-foreground">{seller.pendingCommissionLabel}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-start xl:justify-end">
+                    <SuperAdminSellerStatusButton sellerId={seller.id} currentStatus={seller.status} />
+                  </div>
+                </div>
+
+                {seller.recentSubscriptions.length > 0 ? (
+                  <div className="mt-4 rounded-xl border border-border/60">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-border/60 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      <span>Cliente</span>
+                      <span>Valor</span>
+                      <span>Status</span>
+                    </div>
+                    <div className="divide-y divide-border/60">
+                      {seller.recentSubscriptions.map((subscription) => (
+                        <div
+                          key={subscription.id}
+                          className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-foreground">{subscription.tenantName}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {subscription.planName} / {subscription.billingCycleMonths} mes(es) -{" "}
+                              {formatDateTime(subscription.createdAt)}
+                            </p>
+                          </div>
+                          <p className="font-black text-foreground">{subscription.amountLabel}</p>
+                          <Badge variant="outline">{billingStatusLabel(subscription.status)}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 export default async function SuperAdminPage({ searchParams }: SuperAdminPageProps) {
-  const [session, tenants, gateway, params] = await Promise.all([
+  const [session, tenants, gateway, sellers, params] = await Promise.all([
     requirePlatformAdmin(),
     listPlatformTenants(),
     getPlatformGatewayConfigurationSnapshot(),
+    listPlatformSellersWithStats(),
     searchParams,
   ]);
   const billingSummaries = await listPlatformBillingSummaries(tenants.map((tenant) => tenant.id));
   const billingByTenant = new Map(billingSummaries.map((summary) => [summary.tenantId, summary]));
-  const activeTab = params.tab === "gateway" ? "gateway" : "users";
+  const activeTab: SuperAdminTab =
+    params.tab === "gateway" ? "gateway" : params.tab === "sellers" ? "sellers" : "users";
   const activeCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.ACTIVE).length;
   const pendingCount = tenants.filter((tenant) => tenant.status === PlatformTenantStatus.PENDING).length;
   const expiringCount = tenants.filter((tenant) => {
@@ -359,6 +493,10 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
           <a href="/super-admin?tab=gateway" className={superAdminTabLinkClassName(activeTab === "gateway")}>
             <CreditCard className="h-4 w-4" />
             Gateway
+          </a>
+          <a href="/super-admin?tab=sellers" className={superAdminTabLinkClassName(activeTab === "sellers")}>
+            <Users className="h-4 w-4" />
+            Vendedores
           </a>
         </nav>
 
@@ -450,7 +588,7 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                           planExpiresAtInput={formatDateInput(tenant.planExpiresAt)}
                         />
 
-                        <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
+                        <div className="hidden">
                           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                             <div className="flex min-w-0 gap-3">
                               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-200">
@@ -479,6 +617,25 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                             tenantId={tenant.id}
                             defaultPlanName={tenant.planName === "Platina" ? "Platina" : "Ouro"}
                             defaultBillingCycleMonths={billing?.billingCycleMonths ?? 1}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/35 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                              Pagamento
+                            </p>
+                            <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                              {billing
+                                ? `${billingStatusLabel(billing.status)} - ${billing.planName} / ${billing.billingCycleMonths} mes(es) - ${formatCentsToBRL(billing.amountCents)}`
+                                : "Nenhuma cobranca criada"}
+                            </p>
+                          </div>
+                          <TenantSubscriptionCheckoutButton
+                            tenantId={tenant.id}
+                            defaultPlanName={tenant.planName === "Platina" ? "Platina" : "Ouro"}
+                            defaultBillingCycleMonths={billing?.billingCycleMonths ?? 1}
+                            sellers={sellers}
                           />
                         </div>
                       </div>
@@ -542,8 +699,10 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
           </CardContent>
             </Card>
           </>
-        ) : (
+        ) : activeTab === "gateway" ? (
           <GatewayPanel gateway={gateway} />
+        ) : (
+          <SellersPanel sellers={sellers} />
         )}
 
         <p className={cn("text-center text-xs text-muted-foreground")}>

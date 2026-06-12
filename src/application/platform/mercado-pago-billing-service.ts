@@ -22,6 +22,11 @@ const checkoutSchema = z.object({
   tenantId: z.string().trim().min(1, "Cliente invalido."),
   planName: z.string().transform((value) => normalizePlatformPlanName(value)),
   billingCycleMonths: z.string().or(z.number()).transform((value) => normalizePlatformBillingCycle(value)),
+  sellerId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || null),
 });
 
 const authorizedCheckoutSchema = checkoutSchema.extend({
@@ -113,6 +118,32 @@ function toJsonInput(value: unknown) {
   return value as Prisma.InputJsonValue;
 }
 
+async function resolveSellerSnapshot(sellerId: string | null | undefined) {
+  const normalizedSellerId = sellerId?.trim();
+
+  if (!normalizedSellerId) {
+    return null;
+  }
+
+  const seller = await getPlatformPrisma().platformSeller.findUnique({
+    where: { id: normalizedSellerId },
+    select: {
+      id: true,
+      commissionBps: true,
+      status: true,
+    },
+  });
+
+  if (!seller || seller.status !== "active") {
+    throw new Error("Vendedor invalido ou inativo para gerar esta cobranca.");
+  }
+
+  return {
+    sellerId: seller.id,
+    sellerCommissionBps: seller.commissionBps,
+  };
+}
+
 function buildMercadoPagoSubscriptionEndDate() {
   const endDate = new Date();
   endDate.setFullYear(endDate.getFullYear() + 10);
@@ -143,6 +174,32 @@ export async function ensurePlatformBillingTables() {
 
     platformBillingTablesPromise = (async () => {
       await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "PlatformSeller" (
+          "id" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "email" TEXT NOT NULL,
+          "passwordHash" TEXT NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'active',
+          "commissionBps" INTEGER NOT NULL DEFAULT 1000,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "PlatformSeller_pkey" PRIMARY KEY ("id")
+        )
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "PlatformSeller_email_key"
+          ON "PlatformSeller"("email")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "PlatformSeller_status_idx"
+          ON "PlatformSeller"("status")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "PlatformSeller_createdAt_idx"
+          ON "PlatformSeller"("createdAt")
+      `);
+
+      await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "PlatformSubscription" (
           "id" TEXT NOT NULL,
           "tenantId" TEXT NOT NULL,
@@ -161,11 +218,22 @@ export async function ensurePlatformBillingTables() {
           "activatedAt" TIMESTAMP(3),
           "cancelledAt" TIMESTAMP(3),
           "lastWebhookAt" TIMESTAMP(3),
+          "sellerId" TEXT,
+          "sellerCommissionBps" INTEGER,
+          "sellerCommissionCents" INTEGER,
+          "sellerCommissionStatus" TEXT NOT NULL DEFAULT 'none',
           "rawSnapshot" JSONB,
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "PlatformSubscription_pkey" PRIMARY KEY ("id")
         )
+      `);
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "PlatformSubscription"
+          ADD COLUMN IF NOT EXISTS "sellerId" TEXT,
+          ADD COLUMN IF NOT EXISTS "sellerCommissionBps" INTEGER,
+          ADD COLUMN IF NOT EXISTS "sellerCommissionCents" INTEGER,
+          ADD COLUMN IF NOT EXISTS "sellerCommissionStatus" TEXT NOT NULL DEFAULT 'none'
       `);
       await prisma.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "PlatformSubscription_mercadoPagoPreapprovalId_key"
@@ -186,6 +254,14 @@ export async function ensurePlatformBillingTables() {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS "PlatformSubscription_planName_idx"
           ON "PlatformSubscription"("planName")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "PlatformSubscription_sellerId_idx"
+          ON "PlatformSubscription"("sellerId")
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "PlatformSubscription_sellerCommissionStatus_idx"
+          ON "PlatformSubscription"("sellerCommissionStatus")
       `);
 
       await prisma.$executeRawUnsafe(`
@@ -331,6 +407,14 @@ async function activateTenantPlan(subscriptionId: string, sourceStatus: string, 
     data: {
       status: normalizeMercadoPagoStatus(sourceStatus),
       activatedAt: subscription.activatedAt ?? new Date(),
+      sellerCommissionCents:
+        subscription.sellerId && subscription.sellerCommissionBps
+          ? Math.round((subscription.amountCents * subscription.sellerCommissionBps) / 10000)
+          : subscription.sellerCommissionCents,
+      sellerCommissionStatus:
+        subscription.sellerId && subscription.sellerCommissionStatus !== "paid"
+          ? "pending"
+          : subscription.sellerCommissionStatus,
     },
   });
 }
@@ -497,6 +581,7 @@ export async function createPlatformSubscriptionCheckout(input: {
   tenantId: string;
   planName: PlatformPlanName;
   billingCycleMonths: PlatformBillingCycleMonths;
+  sellerId?: string | null;
 }) {
   await ensurePlatformBillingTables();
   const prisma = getPlatformPrisma();
@@ -522,6 +607,7 @@ export async function createPlatformSubscriptionCheckout(input: {
   const amount = Number((price.amountCents / 100).toFixed(2));
   const externalReference = `mendoza:${tenant.id}:${randomUUID()}`;
   const reason = `Mendoza PDV - Plano ${input.planName} (${price.label})`;
+  const sellerSnapshot = await resolveSellerSnapshot(input.sellerId);
   const payerEmail = resolveSubscriptionPayerEmail({
     environment: credentials.environment,
     testPayerEmail: credentials.testPayerEmail,
@@ -539,6 +625,9 @@ export async function createPlatformSubscriptionCheckout(input: {
       mercadoPagoExternalReference: externalReference,
       payerEmail,
       reason,
+      sellerId: sellerSnapshot?.sellerId,
+      sellerCommissionBps: sellerSnapshot?.sellerCommissionBps,
+      sellerCommissionStatus: sellerSnapshot ? "waiting_payment" : "none",
     },
   });
 
@@ -684,6 +773,7 @@ export async function createPlatformSubscriptionCheckoutFromForm(input: FormData
     tenantId: input.get("tenantId"),
     planName: input.get("planName"),
     billingCycleMonths: input.get("billingCycleMonths"),
+    sellerId: input.get("sellerId"),
   });
 
   return createPlatformSubscriptionCheckout(parsed);

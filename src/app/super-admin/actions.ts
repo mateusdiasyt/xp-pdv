@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { requirePlatformAdmin } from "@/application/platform/platform-guards";
+import {
+  createPlatformSellerFromForm,
+  updatePlatformSellerStatusFromForm,
+} from "@/application/platform/seller-service";
 import { updatePlatformGatewayConfiguration } from "@/application/platform/gateway-service";
 import { createPlatformSubscriptionCheckoutFromForm } from "@/application/platform/mercado-pago-billing-service";
 import {
@@ -95,6 +99,36 @@ export async function createTenantSubscriptionCheckoutAction(
       message: toActionErrorMessage(error),
     };
   }
+}
+
+export async function createPlatformSellerAction(
+  prevStateOrFormData: ActionState | FormData,
+  maybeFormData?: FormData,
+): Promise<ActionState> {
+  const formData = maybeFormData ?? (prevStateOrFormData as FormData);
+
+  try {
+    await requirePlatformAdmin();
+    await createPlatformSellerFromForm(formData);
+
+    revalidatePath("/super-admin");
+
+    return {
+      status: "success",
+      message: "Vendedor criado.",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: toActionErrorMessage(error),
+    };
+  }
+}
+
+export async function updatePlatformSellerStatusAction(formData: FormData) {
+  await requirePlatformAdmin();
+  await updatePlatformSellerStatusFromForm(formData);
+  revalidatePath("/super-admin");
 }
 
 export async function updateGatewayConfigurationAction(

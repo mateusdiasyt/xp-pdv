@@ -882,6 +882,22 @@ model PlatformTenant {
   @@index([isDefault])
 }
 
+model PlatformSeller {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  status        String   @default("active")
+  commissionBps Int      @default(1000)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions PlatformSubscription[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 model PlatformTenantUser {
   id              String   @id @default(cuid())
   tenantId        String
@@ -938,16 +954,23 @@ model PlatformSubscription {
   activatedAt                  DateTime?
   cancelledAt                  DateTime?
   lastWebhookAt                DateTime?
+  sellerId                     String?
+  sellerCommissionBps          Int?
+  sellerCommissionCents        Int?
+  sellerCommissionStatus       String    @default("none")
   rawSnapshot                  Json?
   createdAt                    DateTime  @default(now())
   updatedAt                    DateTime  @updatedAt
 
   tenant PlatformTenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  seller PlatformSeller?        @relation(fields: [sellerId], references: [id], onDelete: SetNull)
   events PlatformPaymentEvent[]
 
   @@index([tenantId])
   @@index([status])
   @@index([planName])
+  @@index([sellerId])
+  @@index([sellerCommissionStatus])
 }
 
 model PlatformPaymentEvent {
