@@ -2,10 +2,9 @@ import { redirect } from "next/navigation";
 
 import { getPlatformGatewayConfigurationSnapshot } from "@/application/platform/gateway-service";
 import { getTenantPaymentPortalState } from "@/application/platform/mercado-pago-billing-service";
-import { buildTenantAdminPath } from "@/application/platform/platform-service";
 import { PendingTenantPaymentPanel } from "@/components/platform/pending-tenant-payment-panel";
 import type { PlatformBillingCycleMonths } from "@/domain/platform/billing-plans";
-import { resolveActivePlatformPlan, type PlatformPlanName } from "@/domain/platform/plan-entitlements";
+import type { PlatformPlanName } from "@/domain/platform/plan-entitlements";
 import { getServerAuthSession } from "@/lib/auth";
 
 function normalizePlanName(value?: string | null): PlatformPlanName {
@@ -29,16 +28,6 @@ export default async function PendingTenantPaymentPage() {
     redirect("/login");
   }
 
-  const activePlan = resolveActivePlatformPlan({
-    planName: portalState.planName,
-    planStatus: portalState.planStatus,
-    planExpiresAt: portalState.planExpiresAt,
-  });
-
-  if (portalState.tenantStatus === "ACTIVE" && activePlan) {
-    redirect(buildTenantAdminPath(session.user.tenantSlug));
-  }
-
   const gateway = await getPlatformGatewayConfigurationSnapshot();
 
   return (
@@ -46,11 +35,16 @@ export default async function PendingTenantPaymentPage() {
       tenantName={portalState.tenantName}
       tenantStatus={portalState.tenantStatus}
       ownerEmail={portalState.ownerEmail}
+      currentPlanName={portalState.planName}
       planStatus={portalState.planStatus}
       planExpiresAt={portalState.planExpiresAt?.toISOString() ?? null}
       mercadoPagoPublicKey={gateway.publicKey}
       mercadoPagoEnvironment={gateway.environment}
-      defaultPlanName={normalizePlanName(portalState.latestSubscription?.planName ?? portalState.planName)}
+      defaultPlanName={normalizePlanName(
+        portalState.tenantStatus === "ACTIVE"
+          ? portalState.planName ?? portalState.latestSubscription?.planName
+          : portalState.latestSubscription?.planName ?? portalState.planName,
+      )}
       defaultBillingCycleMonths={normalizeCycle(portalState.latestSubscription?.billingCycleMonths)}
       latestSubscription={portalState.latestSubscription}
     />

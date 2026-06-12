@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
+import { CalendarDays, CreditCard, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 import {
@@ -29,6 +29,7 @@ type PendingTenantPaymentPanelProps = {
   tenantName: string;
   tenantStatus: string;
   ownerEmail: string;
+  currentPlanName: string | null;
   planStatus: string;
   planExpiresAt: string | null;
   mercadoPagoPublicKey: string;
@@ -152,10 +153,62 @@ function paymentStatusLabel(status: string) {
   return status;
 }
 
+function formatDateLabel(value: Date | null) {
+  if (!value) {
+    return "Sem vencimento";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(value);
+}
+
+function formatPlanStatusLabel(status: string, isExpired: boolean) {
+  if (isExpired) {
+    return "Vencido";
+  }
+
+  if (status.toLowerCase() === "active") {
+    return "Ativo";
+  }
+
+  if (status.toLowerCase() === "pending") {
+    return "Pendente";
+  }
+
+  return status || "Nao definido";
+}
+
+function getRemainingTimeLabel(value: Date | null, isExpired: boolean) {
+  if (!value) {
+    return "Validade indefinida";
+  }
+
+  if (isExpired) {
+    return "Vencido";
+  }
+
+  const milliseconds = value.getTime() - Date.now();
+  const days = Math.max(0, Math.ceil(milliseconds / 86_400_000));
+
+  if (days === 0) {
+    return "Vence hoje";
+  }
+
+  if (days === 1) {
+    return "1 dia restante";
+  }
+
+  return `${days} dias restantes`;
+}
+
 export function PendingTenantPaymentPanel({
   tenantName,
   tenantStatus,
   ownerEmail,
+  currentPlanName,
   planStatus,
   planExpiresAt,
   mercadoPagoPublicKey,
@@ -178,18 +231,51 @@ export function PendingTenantPaymentPanel({
   const planNameRef = useRef(planName);
   const billingCycleMonthsRef = useRef(billingCycleMonths);
   const isTestEnvironment = mercadoPagoEnvironment === "test";
-  const planExpiredOrRemoved = tenantStatus === "ACTIVE" && planStatus.toLowerCase() !== "active";
-  const planExpiredByDate = tenantStatus === "ACTIVE" && planExpiresAt ? new Date(planExpiresAt).getTime() < Date.now() : false;
+  const isActiveTenant = tenantStatus === "ACTIVE";
+  const planExpirationDate = planExpiresAt ? new Date(planExpiresAt) : null;
+  const validPlanExpirationDate =
+    planExpirationDate && !Number.isNaN(planExpirationDate.getTime()) ? planExpirationDate : null;
+  const planExpiredOrRemoved = isActiveTenant && planStatus.toLowerCase() !== "active";
+  const planExpiredByDate =
+    isActiveTenant && validPlanExpirationDate ? validPlanExpirationDate.getTime() < Date.now() : false;
+  const hasActivePlan = isActiveTenant && !planExpiredOrRemoved && !planExpiredByDate;
   const hasAuthorizedSubscription = ["authorized", "active"].includes(
     latestSubscription?.status.toLowerCase() ?? "",
   ) && tenantStatus !== "ACTIVE";
-  const heading = planExpiredOrRemoved || planExpiredByDate ? "Plano vencido" : "Aguardando pagamento";
+  const heading = hasActivePlan
+    ? "Meu plano"
+    : planExpiredOrRemoved || planExpiredByDate
+      ? "Plano vencido"
+      : "Aguardando pagamento";
   const description =
-    planExpiredOrRemoved || planExpiredByDate
+    hasActivePlan
+      ? "Acompanhe a validade do seu plano e renove quando quiser."
+      : planExpiredOrRemoved || planExpiredByDate
       ? "Escolha um plano e confirme o pagamento para liberar o painel novamente."
       : "Sua conta foi criada. Confirme o cartao para liberar o painel automaticamente.";
-  const shouldShowLatestLink = Boolean(latestSubscription?.mercadoPagoInitPoint && !planExpiredOrRemoved && !planExpiredByDate);
-  const fallbackLinkLabel = shouldShowLatestLink ? "Link alternativo" : "Gerar link de pagamento";
+  const badgeLabel = hasActivePlan ? "Plano ativo" : "Painel bloqueado";
+  const badgeClassName = hasActivePlan
+    ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+    : "border-amber-400/25 bg-amber-400/10 text-amber-100";
+  const currentPlanLabel = currentPlanName ?? latestSubscription?.planName ?? defaultPlanName;
+  const planStatusLabel = formatPlanStatusLabel(planStatus, planExpiredOrRemoved || planExpiredByDate);
+  const remainingTimeLabel = getRemainingTimeLabel(validPlanExpirationDate, planExpiredOrRemoved || planExpiredByDate);
+  const latestSubscriptionStatus = latestSubscription?.status.toLowerCase() ?? "";
+  const latestPaymentLinkIsPending = latestSubscriptionStatus === "pending" && Boolean(latestSubscription?.mercadoPagoInitPoint);
+  const shouldShowLatestLink = Boolean(
+    latestSubscription?.mercadoPagoInitPoint &&
+      !planExpiredOrRemoved &&
+      !planExpiredByDate &&
+      (latestPaymentLinkIsPending || !hasActivePlan),
+  );
+  const fallbackLinkLabel = hasActivePlan
+    ? latestPaymentLinkIsPending
+      ? "Gerar novo link de renovacao"
+      : "Gerar link de renovacao"
+    : shouldShowLatestLink
+      ? "Link alternativo"
+      : "Gerar link de pagamento";
+  const paymentButtonLabel = hasActivePlan ? "Renovar" : "Confirmar";
   const cycleOptions = useMemo(
     () => PLATFORM_PLAN_PRICES.filter((price) => price.planName === planName),
     [planName],
@@ -347,8 +433,15 @@ export function PendingTenantPaymentPanel({
                 const result = await authorizeCurrentTenantPaymentAction(initialActionState, formData);
                 setState(result);
 
-                if (result.status === "success" && result.redirectUrl) {
-                  await signOut({ callbackUrl: result.redirectUrl });
+                if (result.status === "success") {
+                  if (hasActivePlan) {
+                    window.location.reload();
+                    return;
+                  }
+
+                  if (result.redirectUrl) {
+                    await signOut({ callbackUrl: result.redirectUrl });
+                  }
                 }
               } catch {
                 setState({
@@ -385,7 +478,7 @@ export function PendingTenantPaymentPanel({
       safelyUnmountCardForm(cardFormRef.current);
       cardFormRef.current = null;
     };
-  }, [amountCents, hasAuthorizedSubscription, mercadoPagoPublicKey]);
+  }, [amountCents, hasActivePlan, hasAuthorizedSubscription, mercadoPagoPublicKey]);
 
   async function handleActivatePaidPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -455,12 +548,12 @@ export function PendingTenantPaymentPanel({
             {description}
           </p>
         </div>
-        <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
-          Painel bloqueado
+        <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${badgeClassName}`}>
+          {badgeLabel}
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
         <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Conta</p>
           <p className="mt-2 text-lg font-black text-foreground">{tenantName}</p>
@@ -468,6 +561,21 @@ export function PendingTenantPaymentPanel({
         </div>
 
         <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Plano atual</p>
+          <p className="mt-2 text-lg font-black text-foreground">{currentPlanLabel}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{planStatusLabel}</p>
+        </div>
+
+        <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
+          <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            Vencimento
+          </p>
+          <p className="mt-2 text-lg font-black text-foreground">{formatDateLabel(validPlanExpirationDate)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{remainingTimeLabel}</p>
+        </div>
+
+        <div className="rounded-2xl border border-border/70 bg-background/50 p-4 lg:col-span-3">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Ultima assinatura</p>
           <p className="mt-2 text-lg font-black text-foreground">
             {latestSubscription
@@ -512,6 +620,17 @@ export function PendingTenantPaymentPanel({
         </form>
       ) : (
       <form id="mendoza-card-form" className="mt-5 rounded-2xl border border-border/70 bg-background/45 p-4">
+        <div className="mb-4 flex flex-col gap-1">
+          <p className="text-sm font-black text-foreground">
+            {hasActivePlan ? "Renovar plano" : "Pagamento do plano"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {hasActivePlan
+              ? "Escolha o periodo adicional. O novo tempo sera somado ao vencimento atual."
+              : "Escolha o plano e confirme o cartao para liberar o acesso."}
+          </p>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-muted-foreground">Plano</span>
@@ -613,7 +732,7 @@ export function PendingTenantPaymentPanel({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-32px_hsl(var(--primary))] transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-            {isSubmitting ? "Confirmando..." : `Confirmar ${formatCentsToBRL(amountCents)}`}
+            {isSubmitting ? "Confirmando..." : `${paymentButtonLabel} ${formatCentsToBRL(amountCents)}`}
           </button>
         </div>
 

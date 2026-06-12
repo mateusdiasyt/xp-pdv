@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Megaphone, UserRound } from "lucide-react";
+import { CreditCard, LogOut, Megaphone, UserRound } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
@@ -57,6 +57,10 @@ export function AdminUserMenu({ userName, userEmail }: AdminUserMenuProps) {
         <DropdownMenuItem onClick={() => window.location.assign(toTenantAdminHref("/admin/profile", workspaceSlug))}>
           <UserRound className="h-4 w-4" />
           Perfil
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => window.location.assign(toTenantAdminHref("/admin/payment", workspaceSlug))}>
+          <CreditCard className="h-4 w-4" />
+          Plano
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => window.location.assign(toTenantAdminHref("/admin/updates", workspaceSlug))}>
           <Megaphone className="h-4 w-4" />
