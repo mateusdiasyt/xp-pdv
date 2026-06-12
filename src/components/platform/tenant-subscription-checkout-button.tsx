@@ -52,27 +52,33 @@ export function TenantSubscriptionCheckoutButton({
     <form onSubmit={handleSubmit} className="space-y-2">
       <input type="hidden" name="tenantId" value={tenantId} />
       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <select
-          name="planName"
-          defaultValue={defaultPlanName}
-          className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-        >
-          <option value="Ouro">Ouro</option>
-          <option value="Platina">Platina</option>
-        </select>
-        <select
-          name="billingCycleMonths"
-          defaultValue={String(defaultBillingCycleMonths)}
-          className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
-        >
-          <option value="1">1 mes</option>
-          <option value="3">3 meses</option>
-          <option value="6">6 meses</option>
-          <option value="12">1 ano</option>
-        </select>
-        <Button type="submit" size="sm" className="h-10 gap-2" disabled={isSubmitting}>
+        <label className="space-y-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Plano da cobrança</span>
+          <select
+            name="planName"
+            defaultValue={defaultPlanName}
+            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+          >
+            <option value="Ouro">Ouro</option>
+            <option value="Platina">Platina</option>
+          </select>
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs font-semibold text-muted-foreground">Período cobrado</span>
+          <select
+            name="billingCycleMonths"
+            defaultValue={String(defaultBillingCycleMonths)}
+            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
+          >
+            <option value="1">1 mes</option>
+            <option value="3">3 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">1 ano</option>
+          </select>
+        </label>
+        <Button type="submit" size="sm" className="h-10 gap-2 self-end" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-          {isSubmitting ? "Gerando..." : "Cobrar"}
+          {isSubmitting ? "Gerando..." : "Gerar cobrança"}
         </Button>
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

@@ -445,12 +445,24 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                         ) : null}
                       </div>
 
-                      <div className="grid gap-3">
-                      <form action={updateTenantPlanAction} className="rounded-2xl border border-border/60 bg-card/45 p-3">
+                      <div className="grid gap-4">
+                        <section className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
+                      <form action={updateTenantPlanAction}>
                         <input type="hidden" name="tenantId" value={tenant.id} />
+                        <div className="mb-4 flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
+                            <ShieldCheck className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-foreground">Acesso manual do painel</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              Libera, corrige validade ou remove o acesso sem gerar cobranca.
+                            </p>
+                          </div>
+                        </div>
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Plano</p>
+                            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Acesso atual</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                               Atual: <strong className="text-foreground">{tenant.planName ?? "Não definido"}</strong>
                             </p>
@@ -463,7 +475,7 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
 
                         <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
                           <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Plano</span>
+                            <span className="text-xs font-semibold text-muted-foreground">Plano liberado</span>
                             <select
                               name="planName"
                               defaultValue={tenant.planName === "Platina" ? "Platina" : "Ouro"}
@@ -475,13 +487,13 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                           </label>
 
                           <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Duração</span>
+                            <span className="text-xs font-semibold text-muted-foreground">Validade</span>
                             <select
                               name="durationMonths"
                               defaultValue={tenant.planExpiresAt ? "custom" : "1"}
                               className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition-colors focus:border-primary"
                             >
-                              <option value="1">1 mês</option>
+                              <option value="1">1 mes</option>
                               <option value="3">3 meses</option>
                               <option value="6">6 meses</option>
                               <option value="12">1 ano</option>
@@ -490,7 +502,7 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
                           </label>
 
                           <label className="space-y-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">Encerramento</span>
+                            <span className="text-xs font-semibold text-muted-foreground">Vence em</span>
                             <input
                               type="date"
                               name="planExpiresAt"
@@ -501,38 +513,47 @@ export default async function SuperAdminPage({ searchParams }: SuperAdminPagePro
 
                           <Button type="submit" size="sm" className="h-10 gap-2">
                             <Clock3 className="h-4 w-4" />
-                            Salvar
+                            Salvar acesso
                           </Button>
                         </div>
 
                       </form>
 
                       {tenant.planName ? (
-                        <form action={removeTenantPlanAction} className="flex justify-end">
+                        <form action={removeTenantPlanAction} className="mt-3 flex justify-end">
                           <input type="hidden" name="tenantId" value={tenant.id} />
                           <Button type="submit" size="sm" variant="outline" className="gap-2">
                             <PowerOff className="h-4 w-4" />
-                            Remover plano
+                            Remover acesso manual
                           </Button>
                         </form>
                       ) : null}
+                        </section>
 
-                        <div className="rounded-2xl border border-border/60 bg-background/45 p-3">
-                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                                Assinatura Mercado Pago
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-foreground">
-                                {billingStatusLabel(billing?.status)}
-                              </p>
+                        <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4">
+                          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex min-w-0 gap-3">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-200">
+                                <CreditCard className="h-4 w-4" />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-foreground">Cobrança Mercado Pago</p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                  Gera um novo link de assinatura para o cliente pagar.
+                                </p>
+                              </div>
                             </div>
                             {billing ? (
-                              <p className="text-xs text-muted-foreground">
-                                {billing.planName} / {billing.billingCycleMonths} mes(es) -{" "}
-                                {formatCentsToBRL(billing.amountCents)}
-                              </p>
-                            ) : null}
+                              <div className="text-right text-xs">
+                                <p className="font-semibold text-foreground">{billingStatusLabel(billing.status)}</p>
+                                <p className="mt-1 text-muted-foreground">
+                                  Ultima: {billing.planName} / {billing.billingCycleMonths} mes(es) -{" "}
+                                  {formatCentsToBRL(billing.amountCents)}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-xs font-semibold text-muted-foreground">Nenhuma cobrança criada</p>
+                            )}
                           </div>
                           <TenantSubscriptionCheckoutButton
                             tenantId={tenant.id}
