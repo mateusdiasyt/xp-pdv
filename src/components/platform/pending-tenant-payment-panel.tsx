@@ -156,7 +156,7 @@ function normalizeCycle(value: string): PlatformBillingCycleMonths {
 }
 
 function formatCycleLabel(value: PlatformBillingCycleMonths) {
-  return value === 1 ? "1 mes" : `${value} meses`;
+  return value === 1 ? "1 mês" : `${value} meses`;
 }
 
 function paymentStatusLabel(status: string) {
@@ -198,7 +198,7 @@ function formatPlanStatusLabel(status: string, isExpired: boolean) {
     return "Pendente";
   }
 
-  return status || "Nao definido";
+  return status || "Não definido";
 }
 
 function getRemainingTimeLabel(value: Date | null, isExpired: boolean) {
@@ -274,7 +274,7 @@ export function PendingTenantPaymentPanel({
       ? "Acompanhe a validade do seu plano e renove quando quiser."
       : planExpiredOrRemoved || planExpiredByDate
       ? "Escolha um plano e confirme o pagamento para liberar o painel novamente."
-      : "Sua conta foi criada. Confirme o cartao para liberar o painel automaticamente.";
+      : "Sua conta foi criada. Confirme o cartão para liberar o painel automaticamente.";
   const badgeLabel = hasActivePlan ? "Plano ativo" : "Painel bloqueado";
   const badgeClassName = hasActivePlan
     ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
@@ -340,7 +340,7 @@ export function PendingTenantPaymentPanel({
       }
 
       if (!mercadoPagoPublicKey) {
-        setCardFormMessage("Configure a Public Key do Mercado Pago no super admin.");
+        setCardFormMessage("Configure a chave pública do Mercado Pago no super admin.");
         setIsCardFormReady(false);
         return;
       }
@@ -356,7 +356,7 @@ export function PendingTenantPaymentPanel({
         }
 
         if (!window.MercadoPago) {
-          throw new Error("SDK Mercado Pago indisponivel.");
+          throw new Error("SDK Mercado Pago indisponível.");
         }
 
         safelyUnmountCardForm(cardFormRef.current);
@@ -369,7 +369,7 @@ export function PendingTenantPaymentPanel({
             id: "mendoza-card-form",
             cardNumber: {
               id: "mendoza-card-number",
-              placeholder: "Numero do cartao",
+              placeholder: "Número do cartão",
             },
             expirationDate: {
               id: "mendoza-card-expiration",
@@ -381,7 +381,7 @@ export function PendingTenantPaymentPanel({
             },
             cardholderName: {
               id: "mendoza-card-holder",
-              placeholder: "Nome impresso no cartao",
+              placeholder: "Nome impresso no cartão",
             },
             issuer: {
               id: "mendoza-card-issuer",
@@ -411,10 +411,10 @@ export function PendingTenantPaymentPanel({
               }
 
               if (error) {
-                setCardFormMessage("Nao foi possivel montar o cartao agora.");
+                setCardFormMessage("Não foi possível montar o cartão agora.");
                 setState({
                   status: "error",
-                  message: error.message || "Falha ao carregar o cartao.",
+                  message: error.message || "Falha ao carregar o cartão.",
                 });
                 return;
               }
@@ -424,7 +424,7 @@ export function PendingTenantPaymentPanel({
             },
             onFetching: () => {
               if (!disposed) {
-                setCardFormMessage("Validando dados do cartao...");
+                setCardFormMessage("Validando dados do cartão...");
               }
 
               return () => {
@@ -445,7 +445,7 @@ export function PendingTenantPaymentPanel({
               if (!cardData.token) {
                 setState({
                   status: "error",
-                  message: "Revise os dados do cartao antes de continuar.",
+                  message: "Revise os dados do cartão antes de continuar.",
                 });
                 return;
               }
@@ -475,7 +475,7 @@ export function PendingTenantPaymentPanel({
               } catch {
                 setState({
                   status: "error",
-                  message: "Nao foi possivel confirmar o pagamento agora.",
+                  message: "Não foi possível confirmar o pagamento agora.",
                 });
               } finally {
                 isSubmittingRef.current = false;
@@ -492,7 +492,7 @@ export function PendingTenantPaymentPanel({
         }
 
         setIsCardFormReady(false);
-        setCardFormMessage("Nao foi possivel carregar o pagamento seguro.");
+        setCardFormMessage("Não foi possível carregar o pagamento seguro.");
         setState({
           status: "error",
           message: error instanceof Error ? error.message : "Falha ao carregar Mercado Pago.",
@@ -529,7 +529,7 @@ export function PendingTenantPaymentPanel({
     } catch {
       setState({
         status: "error",
-        message: "Nao foi possivel liberar o painel agora.",
+        message: "Não foi possível liberar o painel agora.",
       });
     } finally {
       setIsActivating(false);
@@ -584,12 +584,12 @@ export function PendingTenantPaymentPanel({
               Pagamento confirmado
             </p>
             <h2 className="mt-2 text-2xl font-black text-foreground">
-              {confirmedPayment.shouldSignOut ? "Plano contratado" : "Renovacao realizada"}
+              {confirmedPayment.shouldSignOut ? "Plano contratado" : "Renovação realizada"}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {confirmedPayment.shouldSignOut
                 ? "O pagamento foi aprovado. Confirme para atualizar o acesso ao painel."
-                : "O pagamento foi aprovado e o periodo sera somado ao vencimento atual."}
+                : "O pagamento foi aprovado e o período será somado ao vencimento atual."}
             </p>
 
             <div className="mt-5 space-y-2 rounded-2xl border border-border/70 bg-background/55 p-4">
@@ -598,7 +598,7 @@ export function PendingTenantPaymentPanel({
                 <strong className="text-foreground">{confirmedPayment.planName}</strong>
               </div>
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-muted-foreground">Periodo</span>
+                <span className="text-muted-foreground">Período</span>
                 <strong className="text-foreground">
                   {formatCycleLabel(confirmedPayment.billingCycleMonths)}
                 </strong>
@@ -671,10 +671,10 @@ export function PendingTenantPaymentPanel({
           <p className="mt-2 text-lg font-black text-foreground">
             {latestSubscription
               ? `${latestSubscription.planName} - ${formatCentsToBRL(latestSubscription.amountCents)}`
-              : "Nenhuma cobranca criada"}
+              : "Nenhuma cobrança criada"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {latestSubscription ? paymentStatusLabel(latestSubscription.status) : "Preencha o cartao abaixo."}
+            {latestSubscription ? paymentStatusLabel(latestSubscription.status) : "Preencha o cartão abaixo."}
           </p>
         </div>
       </div>
@@ -685,7 +685,7 @@ export function PendingTenantPaymentPanel({
             <div>
               <p className="text-sm font-black text-emerald-100">Pagamento confirmado</p>
               <p className="mt-1 text-sm text-emerald-100/70">
-                Falta apenas finalizar a liberacao do ambiente do cliente.
+                Falta apenas finalizar a liberação do ambiente do cliente.
               </p>
             </div>
             <button
@@ -723,7 +723,7 @@ export function PendingTenantPaymentPanel({
                 Mais meses, menos custo. Seu PDV segue ativo sem susto.
               </h2>
               <p className="mt-4 max-w-xl text-sm font-bold leading-6 text-white/78">
-                Escolha um periodo maior e transforme renovacao em economia. O tempo comprado soma ao vencimento
+                Escolha um período maior e transforme renovação em economia. O tempo comprado soma ao vencimento
                 atual.
               </p>
 
@@ -731,22 +731,22 @@ export function PendingTenantPaymentPanel({
                 {[
                   {
                     title: "Economia real",
-                    text: savingsCents > 0 ? `${formatCentsToBRL(savingsCents)} nesta renovacao.` : "Sem desconto aplicado.",
+                    text: savingsCents > 0 ? `${formatCentsToBRL(savingsCents)} nesta renovação.` : "Sem desconto aplicado.",
                     icon: TrendingUp,
                   },
                   {
-                    title: "Custo por mes",
+                    title: "Custo por mês",
                     text: `${formatCentsToBRL(monthlyEquivalentCents)} no plano atual.`,
                     icon: WalletCards,
                   },
                   {
-                    title: "Sem interrupcao",
+                    title: "Sem interrupção",
                     text: "O vencimento atual continua contando.",
                     icon: CheckCircle2,
                   },
                   {
                     title: "Plano preservado",
-                    text: "Modulos e dados seguem ativos.",
+                    text: "Módulos e dados seguem ativos.",
                     icon: ShieldCheck,
                   },
                 ].map((benefit) => {
@@ -786,7 +786,7 @@ export function PendingTenantPaymentPanel({
                         <div>
                           <p className="text-2xl font-black">{option.label}</p>
                           <p className={optionIsSelected ? "mt-1 text-sm font-bold text-slate-500" : "mt-1 text-sm font-bold text-white/72"}>
-                            {formatCentsToBRL(optionMonthlyCents)} / mes
+                            {formatCentsToBRL(optionMonthlyCents)} / mês
                           </p>
                         </div>
                         {optionSavingsPercent > 0 ? (
@@ -820,7 +820,7 @@ export function PendingTenantPaymentPanel({
                   {formatCycleLabel(billingCycleMonths)} por {formatCentsToBRL(amountCents)}
                 </p>
                 <p className="mt-2 text-sm font-bold leading-5 text-white/76">
-                  Quanto maior o periodo, menor o valor mensal e menos preocupacao com renovacao no meio da operacao.
+                  Quanto maior o período, menor o valor mensal e menos preocupação com renovação no meio da operação.
                 </p>
               </div>
             </div>
@@ -884,7 +884,7 @@ export function PendingTenantPaymentPanel({
 
             <div className="mt-4 grid gap-3">
               <label className="space-y-1.5">
-                <span className={paymentLabelClassName}>Numero do cartao</span>
+                <span className={paymentLabelClassName}>Número do cartão</span>
                 <div id="mendoza-card-number" className={paymentFrameClassName} />
               </label>
 
@@ -906,7 +906,7 @@ export function PendingTenantPaymentPanel({
                   id="mendoza-card-holder"
                   defaultValue={isTestEnvironment ? "APRO" : ""}
                   className={paymentInputClassName}
-                  placeholder="Nome impresso no cartao"
+                  placeholder="Nome impresso no cartão"
                 />
               </label>
 
@@ -922,7 +922,7 @@ export function PendingTenantPaymentPanel({
                     id="mendoza-card-document"
                     defaultValue={isTestEnvironment ? "12345678909" : ""}
                     className={paymentInputClassName}
-                    placeholder="Somente numeros"
+                    placeholder="Somente números"
                   />
                 </label>
               </div>
@@ -940,7 +940,7 @@ export function PendingTenantPaymentPanel({
               <div className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-600">
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
                 <span>
-                  {cardFormMessage} Dados criptografados pelo Mercado Pago. O Mendoza PDV nao salva numero do cartao.
+                  {cardFormMessage} Dados criptografados pelo Mercado Pago. O Mendoza PDV não salva número do cartão.
                 </span>
               </div>
             </div>

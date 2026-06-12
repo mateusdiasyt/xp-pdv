@@ -30,7 +30,7 @@ export async function createCurrentTenantPaymentCheckoutAction(
     const portalState = await getTenantPaymentPortalState(session.user.tenantSlug);
 
     if (!portalState) {
-      throw new Error("Conta nao encontrada.");
+      throw new Error("Conta não encontrada.");
     }
 
     const checkout = await createPlatformSubscriptionCheckout({
@@ -68,7 +68,7 @@ export async function authorizeCurrentTenantPaymentAction(
     const portalState = await getTenantPaymentPortalState(session.user.tenantSlug);
 
     if (!portalState) {
-      throw new Error("Conta nao encontrada.");
+      throw new Error("Conta não encontrada.");
     }
 
     const checkout = await createPlatformSubscriptionAuthorization({
@@ -81,7 +81,7 @@ export async function authorizeCurrentTenantPaymentAction(
     if (checkout.status !== "authorized" && checkout.status !== "active") {
       return {
         status: "error",
-        message: `Mercado Pago retornou status ${checkout.status}. Revise os dados do cartao.`,
+        message: `Mercado Pago retornou status ${checkout.status}. Revise os dados do cartão.`,
       };
     }
 
@@ -109,7 +109,7 @@ export async function activateCurrentTenantPaidPlanAction(): Promise<ActionState
     const portalState = await getTenantPaymentPortalState(session.user.tenantSlug);
 
     if (!portalState) {
-      throw new Error("Conta nao encontrada.");
+      throw new Error("Conta não encontrada.");
     }
 
     await activateLatestAuthorizedPlatformSubscription(portalState.tenantId);

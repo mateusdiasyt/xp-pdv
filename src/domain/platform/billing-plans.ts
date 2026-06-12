@@ -13,11 +13,11 @@ type PlatformPlanPrice = {
 };
 
 export const PLATFORM_PLAN_PRICES: PlatformPlanPrice[] = [
-  { planName: "Ouro", billingCycleMonths: 1, label: "1 mes", amountCents: 9990 },
+  { planName: "Ouro", billingCycleMonths: 1, label: "1 mês", amountCents: 9990 },
   { planName: "Ouro", billingCycleMonths: 3, label: "3 meses", amountCents: 26990, discountLabel: "-10%" },
   { planName: "Ouro", billingCycleMonths: 6, label: "6 meses", amountCents: 49990, discountLabel: "-17%" },
   { planName: "Ouro", billingCycleMonths: 12, label: "12 meses", amountCents: 89990, discountLabel: "-25%" },
-  { planName: "Platina", billingCycleMonths: 1, label: "1 mes", amountCents: 14990 },
+  { planName: "Platina", billingCycleMonths: 1, label: "1 mês", amountCents: 14990 },
   { planName: "Platina", billingCycleMonths: 3, label: "3 meses", amountCents: 39990, discountLabel: "-11%" },
   { planName: "Platina", billingCycleMonths: 6, label: "6 meses", amountCents: 74990, discountLabel: "-17%" },
   { planName: "Platina", billingCycleMonths: 12, label: "12 meses", amountCents: 134990, discountLabel: "-25%" },
@@ -34,7 +34,7 @@ export function normalizePlatformPlanName(value: FormDataEntryValue | string | n
     return "Ouro";
   }
 
-  throw new Error(`Plano invalido. Use ${PLATFORM_PLAN_NAMES.join(" ou ")}.`);
+  throw new Error(`Plano inválido. Use ${PLATFORM_PLAN_NAMES.join(" ou ")}.`);
 }
 
 export function normalizePlatformBillingCycle(value: FormDataEntryValue | string | number | null | undefined) {
@@ -44,7 +44,7 @@ export function normalizePlatformBillingCycle(value: FormDataEntryValue | string
     return parsed as PlatformBillingCycleMonths;
   }
 
-  throw new Error("Duracao do plano invalida.");
+  throw new Error("Duração do plano inválida.");
 }
 
 export function getPlatformPlanPrice(planName: PlatformPlanName, billingCycleMonths: PlatformBillingCycleMonths) {
@@ -53,7 +53,7 @@ export function getPlatformPlanPrice(planName: PlatformPlanName, billingCycleMon
   );
 
   if (!price) {
-    throw new Error("Preco do plano nao configurado.");
+    throw new Error("Preço do plano não configurado.");
   }
 
   return price;
