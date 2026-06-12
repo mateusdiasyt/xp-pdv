@@ -45,6 +45,7 @@ type ReviewItem = {
   cfop?: string;
   quantity: number;
   sourceQuantity: number;
+  requiresQuantityReview: boolean;
   suggestedStockUnit: StockUnit;
   fractionalSuggestion?: {
     quantityMultiplier: number;
@@ -280,6 +281,12 @@ function StockInvoiceXmlReviewItem({
             <p className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
               Possivel insumo fracionado detectado. O XML traz {item.sourceQuantity} volume(s); a entrada foi sugerida como{" "}
               {item.quantity} ml ({item.fractionalSuggestion.quantityLabel}). Confirme antes de importar.
+            </p>
+          ) : null}
+          {item.requiresQuantityReview ? (
+            <p className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-muted-foreground">
+              Quantidade fracionada no XML ({item.sourceQuantity}). O sistema sugeriu {item.quantity} para permitir a
+              conferencia. Ajuste quantidade, unidade e custo antes de confirmar a entrada.
             </p>
           ) : null}
         </div>

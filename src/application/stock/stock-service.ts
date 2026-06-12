@@ -38,6 +38,8 @@ type ParsedStockInvoiceItem = {
   ncm?: string;
   cfop?: string;
   quantity: number;
+  sourceQuantity: number;
+  requiresQuantityReview: boolean;
   unitCost: Prisma.Decimal;
   commercialUnit?: string;
   commercialQuantity?: number;
@@ -301,19 +303,15 @@ function parseStockInvoiceItems(rawXml: string) {
       continue;
     }
 
-    const sellableUnitMultiplier = quantityUsesTaxableUnit ? 1 : inferSellableUnitMultiplier(description);
-    const quantity = preferredRawQuantity * sellableUnitMultiplier;
-
-    if (!Number.isInteger(quantity)) {
-      throw new Error(
-        `O item "${description}" possui quantidade vendavel fracionada (${quantity}). Ajuste manualmente antes de importar.`,
-      );
-    }
-
     const lineTotal = parseXmlDecimal(extractTagValue(productBlock, "vProd"), 2);
+    const sellableUnitMultiplier = quantityUsesTaxableUnit ? 1 : inferSellableUnitMultiplier(description);
+    const sourceQuantity = preferredRawQuantity * sellableUnitMultiplier;
+    const requiresQuantityReview = !Number.isInteger(sourceQuantity);
+    const quantity = requiresQuantityReview ? Math.max(1, Math.ceil(sourceQuantity)) : sourceQuantity;
     const commercialUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnCom"), 6);
     const taxableUnitCost = parseXmlDecimal(extractTagValue(productBlock, "vUnTrib"), 6);
     const unitCost =
+      (requiresQuantityReview && lineTotal ? lineTotal.dividedBy(quantity).toDecimalPlaces(4) : undefined) ??
       (quantityUsesTaxableUnit && taxableUnitCost ? taxableUnitCost.toDecimalPlaces(2) : undefined) ??
       (commercialUnitCost
         ? commercialUnitCost.dividedBy(sellableUnitMultiplier).toDecimalPlaces(2)
@@ -337,6 +335,8 @@ function parseStockInvoiceItems(rawXml: string) {
       ncm: normalizedNcm.length === 8 ? normalizedNcm : undefined,
       cfop: normalizeXmlText(extractTagValue(productBlock, "CFOP")),
       quantity,
+      sourceQuantity,
+      requiresQuantityReview,
       unitCost,
       commercialUnit,
       commercialQuantity,
@@ -670,7 +670,8 @@ function buildStockInvoiceReviewItem(
     ncm: item.ncm ?? "",
     cfop: item.cfop,
     quantity: suggestedQuantity,
-    sourceQuantity: item.quantity,
+    sourceQuantity: item.sourceQuantity,
+    requiresQuantityReview: item.requiresQuantityReview,
     fractionalSuggestion,
     suggestedStockUnit,
     unitCost: toCostInputValue(suggestedUnitCost),
@@ -903,6 +904,8 @@ function buildStockInvoiceXmlPreview(rawXml: string) {
       ncm: item.ncm,
       cfop: item.cfop,
       quantity: item.quantity,
+      sourceQuantity: item.sourceQuantity,
+      requiresQuantityReview: item.requiresQuantityReview,
       unitCost: Number(item.unitCost),
       totalCost: Number(item.unitCost) * item.quantity,
       commercialUnit: item.commercialUnit,
