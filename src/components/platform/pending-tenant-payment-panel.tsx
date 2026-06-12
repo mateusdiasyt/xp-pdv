@@ -1,7 +1,16 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CreditCard, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
+import {
+  CalendarDays,
+  ExternalLink,
+  Loader2,
+  LockKeyhole,
+  ShieldCheck,
+  WalletCards,
+  X,
+} from "lucide-react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 
 import {
@@ -236,6 +245,7 @@ export function PendingTenantPaymentPanel({
   const [isCardFormReady, setIsCardFormReady] = useState(false);
   const [cardFormMessage, setCardFormMessage] = useState("Carregando pagamento seguro...");
   const [confirmedPayment, setConfirmedPayment] = useState<ConfirmedPaymentModal | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [planName, setPlanName] = useState<PlatformPlanName>(defaultPlanName);
   const [billingCycleMonths, setBillingCycleMonths] =
     useState<PlatformBillingCycleMonths>(defaultBillingCycleMonths);
@@ -290,6 +300,7 @@ export function PendingTenantPaymentPanel({
       ? "Link alternativo"
       : "Gerar link de pagamento";
   const paymentButtonLabel = hasActivePlan ? "Renovar" : "Confirmar";
+  const shouldRenderCheckout = !hasAuthorizedSubscription && (!hasActivePlan || isCheckoutOpen);
   const cycleOptions = useMemo(
     () => PLATFORM_PLAN_PRICES.filter((price) => price.planName === planName),
     [planName],
@@ -301,6 +312,12 @@ export function PendingTenantPaymentPanel({
     [billingCycleMonths, cycleOptions],
   );
   const amountCents = selectedPrice?.amountCents ?? 0;
+
+  useEffect(() => {
+    if (!hasActivePlan) {
+      setIsCheckoutOpen(true);
+    }
+  }, [hasActivePlan]);
 
   useEffect(() => {
     planNameRef.current = planName;
@@ -318,6 +335,14 @@ export function PendingTenantPaymentPanel({
     let disposed = false;
 
     async function mountCardForm() {
+      if (!shouldRenderCheckout) {
+        safelyUnmountCardForm(cardFormRef.current);
+        cardFormRef.current = null;
+        setIsCardFormReady(false);
+        setCardFormMessage("Clique em Renovar para abrir o pagamento seguro.");
+        return;
+      }
+
       if (hasAuthorizedSubscription) {
         setIsCardFormReady(false);
         setCardFormMessage("Pagamento confirmado. Libere o painel para continuar.");
@@ -492,7 +517,7 @@ export function PendingTenantPaymentPanel({
       safelyUnmountCardForm(cardFormRef.current);
       cardFormRef.current = null;
     };
-  }, [amountCents, hasActivePlan, hasAuthorizedSubscription, mercadoPagoPublicKey]);
+  }, [amountCents, hasActivePlan, hasAuthorizedSubscription, mercadoPagoPublicKey, shouldRenderCheckout]);
 
   async function handleActivatePaidPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -552,6 +577,20 @@ export function PendingTenantPaymentPanel({
     }
   }
 
+  function handleOpenCheckout() {
+    setState(initialActionState);
+    setIsCheckoutOpen(true);
+  }
+
+  function handleCloseCheckout() {
+    if (isSubmitting || !hasActivePlan) {
+      return;
+    }
+
+    setState(initialActionState);
+    setIsCheckoutOpen(false);
+  }
+
   async function handleConfirmPaymentModal() {
     if (!confirmedPayment) {
       return;
@@ -569,9 +608,10 @@ export function PendingTenantPaymentPanel({
   }
 
   const paymentInputClassName =
-    "h-12 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-slate-950 outline-none transition-colors placeholder:text-slate-500 focus:border-primary";
+    "h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-950 outline-none transition-colors placeholder:text-slate-500 focus:border-[#009ee3]";
   const paymentFrameClassName =
-    "h-12 rounded-xl border border-border bg-white px-3 py-3 text-sm text-slate-950 outline-none transition-colors focus-within:border-primary";
+    "h-11 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition-colors focus-within:border-[#009ee3]";
+  const paymentLabelClassName = "text-xs font-semibold text-slate-700";
 
   return (
     <section className="rounded-3xl border border-border/80 bg-card/82 p-5 shadow-[0_28px_110px_-72px_rgba(0,0,0,0.92)] sm:p-6">
@@ -634,7 +674,7 @@ export function PendingTenantPaymentPanel({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+      <div className="mt-5 grid gap-3 xl:grid-cols-4">
         <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Conta</p>
           <p className="mt-2 text-lg font-black text-foreground">{tenantName}</p>
@@ -653,10 +693,21 @@ export function PendingTenantPaymentPanel({
             Vencimento
           </p>
           <p className="mt-2 text-lg font-black text-foreground">{formatDateLabel(validPlanExpirationDate)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{remainingTimeLabel}</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">{remainingTimeLabel}</p>
+            {hasActivePlan ? (
+              <button
+                type="button"
+                onClick={handleOpenCheckout}
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-[#009ee3]/35 bg-[#009ee3] px-4 text-xs font-black text-white shadow-[0_16px_38px_-26px_#009ee3] transition-colors hover:bg-[#008ed0]"
+              >
+                Renovar
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-border/70 bg-background/50 p-4 lg:col-span-3">
+        <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
           <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Ultima assinatura</p>
           <p className="mt-2 text-lg font-black text-foreground">
             {latestSubscription
@@ -699,159 +750,223 @@ export function PendingTenantPaymentPanel({
             </p>
           ) : null}
         </form>
-      ) : (
-      <form id="mendoza-card-form" className="mt-5 rounded-2xl border border-border/70 bg-background/45 p-4">
-        <div className="mb-4 flex flex-col gap-1">
-          <p className="text-sm font-black text-foreground">
-            {hasActivePlan ? "Renovar plano" : "Pagamento do plano"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {hasActivePlan
-              ? "Escolha o periodo adicional. O novo tempo sera somado ao vencimento atual."
-              : "Escolha o plano e confirme o cartao para liberar o acesso."}
-          </p>
-        </div>
+      ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Plano</span>
-            <select
-              name="planName"
-              value={planName}
-              onChange={(event) => setPlanName(normalizePlanName(event.currentTarget.value))}
-              className={paymentInputClassName}
-            >
-              <option value="Ouro">Ouro</option>
-              <option value="Platina">Platina</option>
-            </select>
-          </label>
+      {shouldRenderCheckout ? (
+        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,500px)]">
+          <aside className="rounded-3xl border border-[#009ee3]/20 bg-[#081f32]/55 p-5 shadow-[0_24px_90px_-68px_#009ee3]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#009ee3]/35 bg-[#009ee3]/15 text-[#7fd7ff]">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#7fd7ff]">Checkout seguro</p>
+                <h2 className="text-xl font-black text-foreground">Pagamento via Mercado Pago</h2>
+              </div>
+            </div>
 
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Pagamento</span>
-            <select
-              name="billingCycleMonths"
-              value={String(billingCycleMonths)}
-              onChange={(event) => setBillingCycleMonths(normalizeCycle(event.currentTarget.value))}
-              className={paymentInputClassName}
-            >
-              {cycleOptions.map((option) => (
-                <option key={`${option.planName}-${option.billingCycleMonths}`} value={option.billingCycleMonths}>
-                  {option.label} - {formatCentsToBRL(option.amountCents)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            <div className="mt-5 overflow-hidden rounded-2xl border border-white/15 bg-white p-3">
+              <Image
+                src="/mercadopago-selo22.png"
+                alt="Compra 100% segura Mercado Pago"
+                width={600}
+                height={300}
+                className="h-auto w-full object-contain"
+              />
+            </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Numero do cartao</span>
-            <div
-              id="mendoza-card-number"
-              className={paymentFrameClassName}
-            />
-          </label>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-black text-foreground">Dados criptografados</p>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  Os dados do cartao sao processados pelo Mercado Pago, sem salvar numero do cartao no Mendoza PDV.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-black text-foreground">Resumo da renovacao</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Plano</span>
+                    <strong className="text-foreground">{planName}</strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Periodo</span>
+                    <strong className="text-foreground">{formatCycleLabel(billingCycleMonths)}</strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-2">
+                    <span className="text-muted-foreground">Total</span>
+                    <strong className="text-lg text-foreground">{formatCentsToBRL(amountCents)}</strong>
+                  </div>
+                </div>
+              </div>
+              <form onSubmit={handleFallbackLinkSubmit} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-black text-foreground">Prefere abrir no Mercado Pago?</p>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  Gere um link de pagamento caso queira finalizar fora do checkout transparente.
+                </p>
+                {shouldShowLatestLink ? (
+                  <a
+                    href={latestSubscription!.mercadoPagoInitPoint!}
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-xs font-black text-foreground transition-colors hover:border-[#009ee3]/45 hover:bg-[#009ee3]/15"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir ultimo link
+                  </a>
+                ) : null}
 
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Nome no cartao</span>
-            <input
-              id="mendoza-card-holder"
-              defaultValue={isTestEnvironment ? "APRO" : ""}
-              className={paymentInputClassName}
-              placeholder="Nome impresso no cartao"
-            />
-          </label>
+                <input type="hidden" name="planName" value={planName} />
+                <input type="hidden" name="billingCycleMonths" value={billingCycleMonths} />
+                <button
+                  type="submit"
+                  disabled={isLinkSubmitting}
+                  className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#009ee3]/35 bg-[#009ee3]/15 px-4 text-xs font-black text-[#9fe2ff] transition-colors hover:bg-[#009ee3]/25 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isLinkSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                  {fallbackLinkLabel}
+                </button>
+              </form>
+            </div>
+          </aside>
 
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Validade</span>
-            <div
-              id="mendoza-card-expiration"
-              className={paymentFrameClassName}
-            />
-          </label>
-
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">CVV</span>
-            <div
-              id="mendoza-card-security"
-              className={paymentFrameClassName}
-            />
-          </label>
-
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Documento</span>
-            <select
-              id="mendoza-card-document-type"
-              className={paymentInputClassName}
-            />
-          </label>
-
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">CPF/CNPJ</span>
-            <input
-              id="mendoza-card-document"
-              defaultValue={isTestEnvironment ? "12345678909" : ""}
-              className={paymentInputClassName}
-              placeholder="Somente numeros"
-            />
-          </label>
-        </div>
-
-        <input id="mendoza-card-email" type="hidden" defaultValue={ownerEmail} />
-        <select id="mendoza-card-issuer" className="hidden" aria-hidden="true" />
-        <select id="mendoza-card-installments" className="hidden" aria-hidden="true" />
-
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <ShieldCheck className="h-4 w-4 text-emerald-300" />
-            {cardFormMessage}
-          </div>
-
-          <button
-            type="submit"
-            disabled={!isCardFormReady || isSubmitting || !mercadoPagoPublicKey}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_18px_52px_-32px_hsl(var(--primary))] transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+          <form
+            id="mendoza-card-form"
+            className="rounded-[28px] border border-slate-200 bg-white p-5 text-slate-950 shadow-[0_30px_90px_-54px_rgba(0,158,227,0.65)]"
           >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-            {isSubmitting ? "Confirmando..." : `${paymentButtonLabel} ${formatCentsToBRL(amountCents)}`}
-          </button>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#009ee3]">Mercado Pago</p>
+                <h2 className="mt-1 text-2xl font-light text-slate-950">Checkout transparente</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {hasActivePlan ? "Renove sem sair do seu painel." : "Finalize o pagamento para liberar o painel."}
+                </p>
+              </div>
+              {hasActivePlan ? (
+                <button
+                  type="button"
+                  onClick={handleCloseCheckout}
+                  disabled={isSubmitting}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                  aria-label="Fechar checkout"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className={paymentLabelClassName}>Plano</span>
+                <select
+                  name="planName"
+                  value={planName}
+                  onChange={(event) => setPlanName(normalizePlanName(event.currentTarget.value))}
+                  className={paymentInputClassName}
+                >
+                  <option value="Ouro">Ouro</option>
+                  <option value="Platina">Platina</option>
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className={paymentLabelClassName}>Pagamento</span>
+                <select
+                  name="billingCycleMonths"
+                  value={String(billingCycleMonths)}
+                  onChange={(event) => setBillingCycleMonths(normalizeCycle(event.currentTarget.value))}
+                  className={paymentInputClassName}
+                >
+                  {cycleOptions.map((option) => (
+                    <option key={`${option.planName}-${option.billingCycleMonths}`} value={option.billingCycleMonths}>
+                      {option.label} - {formatCentsToBRL(option.amountCents)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <label className="space-y-1.5">
+                <span className={paymentLabelClassName}>Numero do cartao</span>
+                <div id="mendoza-card-number" className={paymentFrameClassName} />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className={paymentLabelClassName}>Validade</span>
+                  <div id="mendoza-card-expiration" className={paymentFrameClassName} />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className={paymentLabelClassName}>CVV</span>
+                  <div id="mendoza-card-security" className={paymentFrameClassName} />
+                </label>
+              </div>
+
+              <label className="space-y-1.5">
+                <span className={paymentLabelClassName}>Nome completo</span>
+                <input
+                  id="mendoza-card-holder"
+                  defaultValue={isTestEnvironment ? "APRO" : ""}
+                  className={paymentInputClassName}
+                  placeholder="Nome impresso no cartao"
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className={paymentLabelClassName}>Documento</span>
+                  <select id="mendoza-card-document-type" className={paymentInputClassName} />
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className={paymentLabelClassName}>CPF/CNPJ</span>
+                  <input
+                    id="mendoza-card-document"
+                    defaultValue={isTestEnvironment ? "12345678909" : ""}
+                    className={paymentInputClassName}
+                    placeholder="Somente numeros"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <input id="mendoza-card-email" type="hidden" defaultValue={ownerEmail} />
+            <select id="mendoza-card-issuer" className="hidden" aria-hidden="true" />
+            <select id="mendoza-card-installments" className="hidden" aria-hidden="true" />
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-slate-500">Total</span>
+                <strong className="text-xl text-slate-950">{formatCentsToBRL(amountCents)}</strong>
+              </div>
+              <div className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                {cardFormMessage}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!isCardFormReady || isSubmitting || !mercadoPagoPublicKey}
+              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#009ee3] bg-[#009ee3] px-5 text-sm font-black text-white shadow-[0_18px_52px_-32px_#009ee3] transition-colors hover:bg-[#008ed0] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-500"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+              {isSubmitting ? "Confirmando..." : `${paymentButtonLabel} ${formatCentsToBRL(amountCents)}`}
+            </button>
+
+            {state.status === "error" && state.message ? (
+              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {state.message}
+              </p>
+            ) : null}
+            {state.status === "success" && state.message ? (
+              <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {state.message}
+              </p>
+            ) : null}
+          </form>
         </div>
-
-        {state.status === "error" && state.message ? (
-          <p className="mt-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {state.message}
-          </p>
-        ) : null}
-        {state.status === "success" && state.message ? (
-          <p className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
-            {state.message}
-          </p>
-        ) : null}
-      </form>
-      )}
-
-      <form onSubmit={handleFallbackLinkSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {shouldShowLatestLink ? (
-          <a
-            href={latestSubscription!.mercadoPagoInitPoint!}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-xs font-black text-foreground transition-colors hover:border-primary/45 hover:bg-primary/10"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Abrir ultimo link
-          </a>
-        ) : null}
-
-        <input type="hidden" name="planName" value={planName} />
-        <input type="hidden" name="billingCycleMonths" value={billingCycleMonths} />
-        <button
-          type="submit"
-          disabled={isLinkSubmitting}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-xs font-black text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground disabled:cursor-wait disabled:opacity-60"
-        >
-          {isLinkSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-          {fallbackLinkLabel}
-        </button>
-      </form>
+      ) : null}
     </section>
   );
 }
