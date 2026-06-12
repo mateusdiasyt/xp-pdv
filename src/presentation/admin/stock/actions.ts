@@ -7,6 +7,7 @@ import {
   fetchAndStoreStockInvoiceXmlByAccessKey,
   importReviewedStockInvoiceXmlRecord,
   importStockInvoiceXmlById,
+  previewStockInvoiceXmlByAccessKey,
   registerStockMovementRecord,
   storeStockInvoiceXmlRecord,
 } from "@/application/stock/stock-service";
@@ -90,6 +91,7 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
   void prevState;
   try {
     const session = await requirePermission(PERMISSIONS.STOCK_MANAGE);
+    const intent = String(formData.get("intent") ?? "review");
     const result = await fetchAndStoreStockInvoiceXmlByAccessKey(formData, session.user.id);
     if (result.imported) {
       revalidatePath("/admin/products");
@@ -98,19 +100,41 @@ export async function fetchStockInvoiceXmlByAccessKeyAction(
 
     return {
       status: "success",
-      message: buildStockXmlSummaryMessage(
-        {
-          stored: "NF-e recebida baixada e guardada com sucesso.",
-          imported: "NF-e recebida baixada e importada com sucesso",
-        },
-        result,
-      ),
+      message:
+        intent === "store"
+          ? "XML salvo com sucesso. Ele fica disponivel na lista de XMLs para consulta ou conferencia futura."
+          : buildStockXmlSummaryMessage(
+              {
+                stored: "NF-e recebida baixada e guardada com sucesso.",
+                imported: "NF-e recebida baixada e importada com sucesso",
+              },
+              result,
+            ),
       data: result.stockInvoiceXmlId
         ? {
             stockInvoiceXmlId: result.stockInvoiceXmlId,
-            reviewUrl: `/admin/stock/xml/${result.stockInvoiceXmlId}`,
+            reviewUrl: intent === "review" ? `/admin/stock/xml/${result.stockInvoiceXmlId}` : undefined,
           }
         : undefined,
+    };
+  } catch (error) {
+    return { status: "error", message: toActionErrorMessage(error) };
+  }
+}
+
+export async function previewStockInvoiceXmlByAccessKeyAction(
+  prevState: ActionState = initialActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  try {
+    await requirePermission(PERMISSIONS.STOCK_MANAGE);
+    const preview = await previewStockInvoiceXmlByAccessKey(formData);
+
+    return {
+      status: "success",
+      message: "Previa carregada. O XML ainda nao foi salvo.",
+      data: preview,
     };
   } catch (error) {
     return { status: "error", message: toActionErrorMessage(error) };

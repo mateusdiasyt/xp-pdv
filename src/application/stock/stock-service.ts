@@ -895,8 +895,15 @@ function buildStockInvoiceXmlPreview(rawXml: string) {
   const parsedInvoice = parseStockInvoiceXml(rawXml);
 
   return {
+    accessKey: parsedInvoice.accessKey,
+    invoiceNumber: parsedInvoice.invoiceNumber,
+    invoiceSeries: parsedInvoice.invoiceSeries,
+    supplierName: parsedInvoice.supplierName,
+    supplierDocument: parsedInvoice.supplierDocument,
     recipientName: parsedInvoice.recipientName,
     recipientDocument: parsedInvoice.recipientDocument,
+    issuedAt: parsedInvoice.issuedAt?.toISOString() ?? null,
+    totalAmount: parsedInvoice.totalAmount ? Number(parsedInvoice.totalAmount) : null,
     itemLines: parsedInvoice.items.length,
     shownItems: parsedInvoice.items.slice(0, STOCK_XML_PREVIEW_ITEM_LIMIT).map((item) => ({
       lineNumber: item.lineNumber,
@@ -914,6 +921,19 @@ function buildStockInvoiceXmlPreview(rawXml: string) {
       taxableQuantity: item.taxableQuantity,
     })),
   };
+}
+
+export async function previewStockInvoiceXmlByAccessKey(input: FormData) {
+  const accessKey = normalizeAccessKey(String(input.get("accessKey") ?? ""));
+  if (!accessKey) {
+    throw new Error("Informe ou escaneie uma chave de acesso valida com 44 numeros.");
+  }
+
+  const rawXml = await fetchReceivedNfeXmlByAccessKey(accessKey);
+  const parsedInvoice = parseStockInvoiceXml(rawXml);
+  await assertInvoiceRecipientMatchesCompany(parsedInvoice);
+
+  return buildStockInvoiceXmlPreview(rawXml);
 }
 
 export async function getStockMovements(filters?: {
