@@ -9,6 +9,7 @@ import { ActionFeedback } from "@/components/admin/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { initialActionState, type ActionState } from "@/presentation/admin/common/action-state";
 import {
   cancelServiceSessionAction,
@@ -706,12 +707,6 @@ export function ManualServiceControlForm({
                 <input type="hidden" name="gameplayProductId" value={selectedProduct?.id ?? ""} />
                 <input type="hidden" name="gameplayStationId" value={stationId} />
                 <input type="hidden" name="paymentAmount" value={moneyFromCents(totalInCents)} />
-                <input type="hidden" name="paymentApprovedAmount" value="" />
-                <input type="hidden" name="paymentNsu" value="" />
-                <input type="hidden" name="paymentAuthorizationCode" value="" />
-                <input type="hidden" name="paymentTerminalId" value="" />
-                <input type="hidden" name="paymentExternalTransactionId" value="" />
-                <input type="hidden" name="paymentReceiptText" value="" />
 
                 <div className={`grid gap-3 ${isOpenPaidStart ? "" : "sm:grid-cols-[minmax(0,1fr)_150px]"}`}>
                   <div className="space-y-1.5">
@@ -815,6 +810,61 @@ export function ManualServiceControlForm({
                     )}
                     <input type="hidden" name="paymentCardLast4" value="" />
 
+                    {paymentMethod !== PaymentMethod.CASH ? (
+                      <div className="space-y-3 rounded-2xl border border-border/70 bg-background/45 p-3">
+                        <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                          Auditoria do pagamento
+                        </span>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`service-payment-approved-${stationId}`}>Valor aprovado</Label>
+                            <Input
+                              id={`service-payment-approved-${stationId}`}
+                              name="paymentApprovedAmount"
+                              inputMode="decimal"
+                              placeholder={moneyFromCents(totalInCents)}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`service-payment-nsu-${stationId}`}>NSU / ID Pix</Label>
+                            <Input id={`service-payment-nsu-${stationId}`} name="paymentNsu" />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`service-payment-auth-${stationId}`}>Autorizacao</Label>
+                            <Input id={`service-payment-auth-${stationId}`} name="paymentAuthorizationCode" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`service-payment-terminal-${stationId}`}>Terminal</Label>
+                            <Input id={`service-payment-terminal-${stationId}`} name="paymentTerminalId" />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`service-payment-external-${stationId}`}>ID da transacao</Label>
+                          <Input id={`service-payment-external-${stationId}`} name="paymentExternalTransactionId" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`service-payment-receipt-${stationId}`}>Observacao / notinha</Label>
+                          <Textarea
+                            id={`service-payment-receipt-${stationId}`}
+                            name="paymentReceiptText"
+                            rows={2}
+                            placeholder="Opcional"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <input type="hidden" name="paymentApprovedAmount" value="" />
+                        <input type="hidden" name="paymentNsu" value="" />
+                        <input type="hidden" name="paymentAuthorizationCode" value="" />
+                        <input type="hidden" name="paymentTerminalId" value="" />
+                        <input type="hidden" name="paymentExternalTransactionId" value="" />
+                        <input type="hidden" name="paymentReceiptText" value="" />
+                      </>
+                    )}
+
                     {showCoupon ? (
                       <div className="space-y-1.5 rounded-2xl border border-border/70 bg-background/45 p-3">
                         <Label htmlFor={`service-coupon-${stationId}`}>Cupom</Label>
@@ -878,12 +928,6 @@ export function ManualServiceControlForm({
             <input type="hidden" name="billingSnapshotElapsedMinutes" value={String(endOpenPaidCharge.elapsedMinutes)} />
             <input type="hidden" name="billingSnapshotBilledMinutes" value={String(endOpenPaidCharge.billedMinutes)} />
             <input type="hidden" name="billingSnapshotAmountInCents" value={String(endOpenPaidCharge.amountInCents)} />
-            <input type="hidden" name="paymentApprovedAmount" value="" />
-            <input type="hidden" name="paymentNsu" value="" />
-            <input type="hidden" name="paymentAuthorizationCode" value="" />
-            <input type="hidden" name="paymentTerminalId" value="" />
-            <input type="hidden" name="paymentExternalTransactionId" value="" />
-            <input type="hidden" name="paymentReceiptText" value="" />
 
             <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3">
               <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-primary">
@@ -965,6 +1009,61 @@ export function ManualServiceControlForm({
               </div>
             ) : (
               <input type="hidden" name="cashReceived" value="" />
+            )}
+
+            {endPaymentMethod !== PaymentMethod.CASH ? (
+              <div className="space-y-3 rounded-2xl border border-border/70 bg-background/45 p-3">
+                <span className="block text-[0.65rem] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                  Auditoria do pagamento
+                </span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-end-approved-${stationId}`}>Valor aprovado</Label>
+                    <Input
+                      id={`service-end-approved-${stationId}`}
+                      name="paymentApprovedAmount"
+                      inputMode="decimal"
+                      placeholder={moneyFromCents(endTotalInCents)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-end-nsu-${stationId}`}>NSU / ID Pix</Label>
+                    <Input id={`service-end-nsu-${stationId}`} name="paymentNsu" />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-end-auth-${stationId}`}>Autorizacao</Label>
+                    <Input id={`service-end-auth-${stationId}`} name="paymentAuthorizationCode" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`service-end-terminal-${stationId}`}>Terminal</Label>
+                    <Input id={`service-end-terminal-${stationId}`} name="paymentTerminalId" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`service-end-external-${stationId}`}>ID da transacao</Label>
+                  <Input id={`service-end-external-${stationId}`} name="paymentExternalTransactionId" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`service-end-receipt-${stationId}`}>Observacao / notinha</Label>
+                  <Textarea
+                    id={`service-end-receipt-${stationId}`}
+                    name="paymentReceiptText"
+                    rows={2}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <input type="hidden" name="paymentApprovedAmount" value="" />
+                <input type="hidden" name="paymentNsu" value="" />
+                <input type="hidden" name="paymentAuthorizationCode" value="" />
+                <input type="hidden" name="paymentTerminalId" value="" />
+                <input type="hidden" name="paymentExternalTransactionId" value="" />
+                <input type="hidden" name="paymentReceiptText" value="" />
+              </>
             )}
 
             {endShowCoupon ? (
