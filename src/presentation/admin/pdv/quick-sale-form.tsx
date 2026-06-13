@@ -4,6 +4,7 @@ import Image from "next/image";
 
 import { CouponDiscountType, PaymentMethod, ProductKind } from "@prisma/client";
 import {
+  BadgePercent,
   Beef,
   Candy,
   Check,
@@ -405,6 +406,7 @@ export function QuickSaleForm({
   const [quickSaleStep, setQuickSaleStep] = useState<QuickSaleStep>("items");
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
   const [couponPanelOpen, setCouponPanelOpen] = useState(false);
+  const [manualPricePanelOpen, setManualPricePanelOpen] = useState(false);
 
   const hasOpenSessions = openSessions.length > 0;
   const hasProducts = products.length > 0;
@@ -1271,17 +1273,6 @@ export function QuickSaleForm({
                             required
                           />
                         </div>
-                        <div className="space-y-1">
-                          <Label htmlFor={`quick-checkout-final-price-${item.productId}`}>Preço final</Label>
-                          <Input
-                            id={`quick-checkout-final-price-${item.productId}`}
-                            value={item.finalPriceRaw}
-                            onChange={(event) => updateFinalPrice(item.productId, event.target.value)}
-                            inputMode="decimal"
-                            placeholder={formatMoneyInput(item.originalUnitPriceInCents)}
-                            className={`w-28 ${item.finalPriceInvalid ? "border-destructive text-destructive" : ""}`}
-                          />
-                        </div>
                         <Button
                           type="button"
                           variant="outline"
@@ -1589,6 +1580,81 @@ export function QuickSaleForm({
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section className="admin-form-section space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <BadgePercent className="h-4 w-4 text-primary" />
+                        Preço manual
+                      </p>
+                      {priceOverrideDiscountInCents > 0 ? (
+                        <p className="mt-1 text-xs font-medium text-emerald-100">
+                          {formatCurrency(priceOverrideDiscountInCents / 100)} de desconto aplicado.
+                        </p>
+                      ) : null}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setManualPricePanelOpen((current) => !current)}
+                    >
+                      {manualPricePanelOpen || priceOverrideDiscountInCents > 0 || hasInvalidFinalPrice
+                        ? "Ocultar"
+                        : "Ajustar preço"}
+                    </Button>
+                  </div>
+
+                  {manualPricePanelOpen || priceOverrideDiscountInCents > 0 || hasInvalidFinalPrice ? (
+                    <div className="space-y-2">
+                      {cartItems.map((item) => (
+                        <div
+                          key={`quick-final-price-${item.productId}`}
+                          className="rounded-[1rem] border border-border/70 bg-background/28 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-foreground">{item.product.name}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {item.quantity}x {formatCurrency(item.originalUnitPriceInCents / 100)}
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-sm font-semibold text-foreground">
+                              {formatCurrency(item.finalLineTotalInCents / 100)}
+                            </p>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-end">
+                            <div className="space-y-1.5">
+                              <Label htmlFor={`quick-checkout-final-price-${item.productId}`}>
+                                Preço final unitário
+                              </Label>
+                              <Input
+                                id={`quick-checkout-final-price-${item.productId}`}
+                                value={item.finalPriceRaw}
+                                onChange={(event) => updateFinalPrice(item.productId, event.target.value)}
+                                inputMode="decimal"
+                                placeholder={formatMoneyInput(item.originalUnitPriceInCents)}
+                                className={item.finalPriceInvalid ? "border-destructive text-destructive" : ""}
+                              />
+                            </div>
+                            {item.priceOverrideDiscountInCents > 0 ? (
+                              <p className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                                -{formatCurrency(item.priceOverrideDiscountInCents / 100)}
+                              </p>
+                            ) : null}
+                          </div>
+                          {item.finalPriceInvalid ? (
+                            <p className="mt-2 text-xs text-destructive">
+                              Informe um valor entre R$ 0,01 e {formatCurrency(item.originalUnitPriceInCents / 100)}.
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="admin-form-section space-y-3">
