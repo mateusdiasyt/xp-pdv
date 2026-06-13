@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  ArrowRight,
   BadgePercent,
   Banknote,
   Boxes,
-  CheckCircle2,
   ClipboardList,
   FileCheck2,
   Gamepad2,
   Landmark,
   LineChart,
   LockKeyhole,
-  MoreVertical,
   Palette,
   Plug,
   Receipt,
@@ -25,8 +24,6 @@ import { hasPermission, PERMISSIONS } from "@/domain/auth/permissions";
 import type { PlatformModuleKey, PlatformPlanName } from "@/domain/platform/plan-entitlements";
 import { cn } from "@/lib/utils";
 
-type PluginAccent = "pink" | "purple" | "cyan" | "orange" | "green" | "blue";
-
 type PluginCard = {
   title: string;
   shortTitle?: string;
@@ -36,7 +33,6 @@ type PluginCard = {
   moduleKey?: PlatformModuleKey;
   icon: LucideIcon;
   href: string;
-  accent: PluginAccent;
 };
 
 const planRank: Record<PlatformPlanName, number> = {
@@ -44,32 +40,27 @@ const planRank: Record<PlatformPlanName, number> = {
   Platina: 2,
 };
 
-const pluginAccentClassName: Record<PluginAccent, string> = {
-  pink: "border-primary/75 from-primary/18 via-[#0d181d] to-[#101114] text-primary shadow-primary/20",
-  purple: "border-violet-400/35 from-violet-400/18 via-[#0d181d] to-[#101114] text-violet-200 shadow-violet-400/20",
-  cyan: "border-cyan-300/35 from-cyan-300/18 via-[#0d181d] to-[#101114] text-cyan-200 shadow-cyan-300/20",
-  orange: "border-orange-300/35 from-orange-300/18 via-[#0d181d] to-[#101114] text-orange-200 shadow-orange-300/20",
-  green: "border-emerald-300/35 from-emerald-300/18 via-[#0d181d] to-[#101114] text-emerald-200 shadow-emerald-300/20",
-  blue: "border-sky-300/35 from-sky-300/18 via-[#0d181d] to-[#101114] text-sky-200 shadow-sky-300/20",
-};
+function pluginPlanCardClassName(plan: PlatformPlanName) {
+  return plan === "Ouro"
+    ? "border-[#e4bd37]/45 from-[#3a2a08]/55 via-[#11151a] to-[#0e1114] shadow-[#e4bd37]/18"
+    : "border-slate-100/32 from-slate-100/16 via-[#101621] to-[#0e1114] shadow-cyan-200/14";
+}
 
-const pluginIconClassName: Record<PluginAccent, string> = {
-  pink: "border-primary/25 bg-primary/18 text-primary",
-  purple: "border-violet-300/25 bg-violet-400/18 text-violet-200",
-  cyan: "border-cyan-300/25 bg-cyan-300/18 text-cyan-200",
-  orange: "border-orange-300/25 bg-orange-300/18 text-orange-200",
-  green: "border-emerald-300/25 bg-emerald-300/18 text-emerald-200",
-  blue: "border-sky-300/25 bg-sky-300/18 text-sky-200",
-};
+function pluginPlanIconClassName(plan: PlatformPlanName) {
+  return plan === "Ouro"
+    ? "border-[#e4bd37]/35 bg-[#e4bd37]/16 text-[#f6d45c]"
+    : "border-slate-100/28 bg-slate-100/12 text-slate-100";
+}
 
-const pluginToggleClassName: Record<PluginAccent, string> = {
-  pink: "bg-primary",
-  purple: "bg-violet-500",
-  cyan: "bg-cyan-400",
-  orange: "bg-orange-400",
-  green: "bg-emerald-400",
-  blue: "bg-sky-400",
-};
+function pluginPlanButtonClassName(plan: PlatformPlanName, isAvailable: boolean) {
+  if (!isAvailable) {
+    return "border-primary/30 bg-primary/12 text-primary hover:bg-primary/18";
+  }
+
+  return plan === "Ouro"
+    ? "border-[#e4bd37]/45 bg-[#e4bd37] text-black hover:bg-[#f0ca42]"
+    : "border-slate-100/32 bg-slate-100 text-black hover:bg-white";
+}
 
 const plugins: PluginCard[] = [
   {
@@ -79,7 +70,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: Receipt,
     href: "/admin/pdv",
-    accent: "pink",
   },
   {
     title: "Caixa operacional",
@@ -88,7 +78,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: Banknote,
     href: "/admin/pdv",
-    accent: "purple",
   },
   {
     title: "Estoque e XML",
@@ -97,7 +86,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: Boxes,
     href: "/admin/stock",
-    accent: "cyan",
   },
   {
     title: "Cupons inteligentes",
@@ -106,7 +94,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: BadgePercent,
     href: "/admin/coupons",
-    accent: "orange",
   },
   {
     title: "Relatorios e WhatsApp",
@@ -116,7 +103,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: LineChart,
     href: "/admin/reports",
-    accent: "green",
   },
   {
     title: "Marca e configuracoes",
@@ -125,7 +111,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Ouro",
     icon: Palette,
     href: "/admin/customization",
-    accent: "blue",
   },
   {
     title: "Comandas",
@@ -134,7 +119,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Platina",
     icon: ClipboardList,
     href: "/admin/pdv",
-    accent: "pink",
   },
   {
     title: "Contas a pagar",
@@ -143,7 +127,6 @@ const plugins: PluginCard[] = [
     requiredPlan: "Platina",
     icon: Landmark,
     href: "/admin/accounts",
-    accent: "green",
   },
   {
     title: "Fiscal Focus NFe",
@@ -153,7 +136,6 @@ const plugins: PluginCard[] = [
     moduleKey: "fiscal-focus",
     icon: FileCheck2,
     href: "/admin/fiscal",
-    accent: "orange",
   },
   {
     title: "App TV para Smart TVs",
@@ -164,7 +146,6 @@ const plugins: PluginCard[] = [
     moduleKey: "tv-app",
     icon: Gamepad2,
     href: "/admin/app",
-    accent: "purple",
   },
   {
     title: "Link personalizado",
@@ -174,7 +155,6 @@ const plugins: PluginCard[] = [
     moduleKey: "custom-link",
     icon: Plug,
     href: "/admin/customization",
-    accent: "cyan",
   },
 ];
 
@@ -205,7 +185,7 @@ export default async function PluginsPage() {
       <PageHeader
         eyebrow="Biblioteca"
         title="Plugins"
-        description="Recursos organizados por plano, com status claro para saber o que esta liberado na sua conta."
+        description="Recursos organizados por plano. Use Ativar para configurar um plugin liberado ou Liberar para mudar de plano."
       />
 
       <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-[#0b1115] p-5 shadow-[0_30px_90px_-70px_rgba(0,0,0,0.95)] md:p-6">
@@ -228,7 +208,7 @@ export default async function PluginsPage() {
               <p className="mt-2 text-lg font-black text-foreground">{entitlements.activePlan ?? "Sem plano"}</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/28 p-3">
-              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Liberados</p>
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Plugins</p>
               <p className="mt-2 text-lg font-black text-foreground">
                 {availablePluginCount}/{plugins.length}
               </p>
@@ -254,8 +234,8 @@ export default async function PluginsPage() {
             <article
               key={plugin.title}
               className={cn(
-                "group relative min-h-[17.5rem] overflow-hidden rounded-[1.35rem] border bg-gradient-to-br p-4 shadow-[0_28px_80px_-68px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_32px_90px_-64px_rgba(255,0,89,0.35)]",
-                pluginAccentClassName[plugin.accent],
+                "group relative min-h-[15.5rem] overflow-hidden rounded-[1.35rem] border bg-gradient-to-br p-4 shadow-[0_28px_80px_-68px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_32px_90px_-64px_currentColor]",
+                pluginPlanCardClassName(plugin.requiredPlan),
                 isAvailable ? "opacity-100" : "opacity-82",
               )}
             >
@@ -265,84 +245,51 @@ export default async function PluginsPage() {
                   <div
                     className={cn(
                       "grid h-11 w-11 place-items-center rounded-xl border shadow-[0_18px_42px_-28px_currentColor]",
-                      pluginIconClassName[plugin.accent],
+                      pluginPlanIconClassName(plugin.requiredPlan),
                     )}
                   >
                     <Icon className="h-5 w-5" />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-md border px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.12em]",
-                        isAvailable
-                          ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
-                          : "border-amber-300/25 bg-amber-300/10 text-amber-200",
-                      )}
-                    >
-                      {isAvailable ? "Ativo" : "Bloqueado"}
-                    </span>
-                    <Link
-                      href={href}
-                      className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/24 text-muted-foreground transition-colors hover:border-white/20 hover:text-foreground"
-                      aria-label={isAvailable ? `Abrir ${plugin.title}` : `Liberar ${plugin.title}`}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Link>
-                  </div>
+                  <Link
+                    href={href}
+                    className={cn(
+                      "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-black uppercase tracking-[0.1em] transition-colors",
+                      pluginPlanButtonClassName(plugin.requiredPlan, isAvailable),
+                    )}
+                    aria-label={isAvailable ? `Ativar ${plugin.title}` : `Liberar ${plugin.title}`}
+                  >
+                    {isAvailable ? (
+                      <>
+                        Ativar
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <LockKeyhole className="h-3.5 w-3.5" />
+                        Liberar
+                      </>
+                    )}
+                  </Link>
                 </div>
 
-                <div className="mt-7 min-h-[7.25rem]">
+                <div className="mt-7">
+                  <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                    {plugin.category}
+                  </p>
                   <h3 className="max-w-[12rem] text-xl font-black leading-tight text-foreground">
                     {plugin.shortTitle ?? plugin.title}
                   </h3>
                   <p className="mt-3 text-sm leading-5 text-muted-foreground">{plugin.summary}</p>
                 </div>
 
-                <div className="mt-auto border-t border-white/10 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Plano</p>
-                      <p className="mt-1 text-sm font-black text-foreground">{plugin.requiredPlan}</p>
-                    </div>
-                    <div className="border-l border-white/10 pl-4">
-                      <p className="text-xs text-muted-foreground">Status</p>
-                      <p className={cn("mt-1 text-sm font-black", isAvailable ? "text-emerald-300" : "text-amber-200")}>
-                        {isAvailable ? "Liberado" : "Pendente"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex justify-center">
-                    <span
-                      className={cn(
-                        "relative h-5 w-10 rounded-full transition-colors",
-                        isAvailable ? pluginToggleClassName[plugin.accent] : "bg-muted",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform",
-                          isAvailable ? "translate-x-[1.35rem]" : "translate-x-0.5",
-                        )}
-                      />
-                    </span>
-                  </div>
-
-                  {!isAvailable ? (
-                    <Link
-                      href={planHref}
-                      className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-sm font-black text-primary transition-colors hover:bg-primary/15"
-                    >
-                      <LockKeyhole className="mr-2 h-4 w-4" />
-                      Liberar plugin
-                    </Link>
-                  ) : (
-                    <div className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/18 bg-emerald-300/8 text-sm font-black text-emerald-200">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Disponivel na conta
-                    </div>
-                  )}
+                <div className="mt-auto pt-5">
+                  <div className="h-px bg-white/10" />
+                  <p className="mt-4 text-xs font-semibold leading-5 text-muted-foreground">
+                    {isAvailable
+                      ? "Plugin pronto para configurar quando voce precisar."
+                      : `Disponivel no Plano ${plugin.requiredPlan}.`}
+                  </p>
                 </div>
               </div>
             </article>

@@ -13,7 +13,6 @@ import {
   Landmark,
   Link2,
   MessageCircle,
-  MoreVertical,
   Palette,
   ReceiptText,
 } from "lucide-react";
@@ -275,8 +274,7 @@ function MiniLinkPreview() {
           <span className="truncate">/app/seu-bar</span>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between text-xs">
-        <span className="text-white/50">Status</span>
+      <div className="mt-3 flex items-center justify-start text-xs">
         <strong className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-emerald-200">
           Disponível
         </strong>
@@ -404,19 +402,11 @@ function ModuleCard({ item, index }: { item: ModuleItem; index: number }) {
   const Icon = item.icon;
 
   return (
-    <article className={cn("group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-[0_28px_86px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_34px_100px_-76px_rgba(255,0,89,0.55)]", pluginAccentClassName(index))}>
+    <article className={cn("group relative min-h-[25rem] overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-[0_28px_86px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_34px_100px_-76px_rgba(255,0,89,0.55)]", pluginAccentClassName(index))}>
       <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
       <div className="flex items-start justify-between gap-3">
         <div className="grid h-11 w-11 place-items-center rounded-xl border border-current/20 bg-current/12 shadow-[0_18px_42px_-30px_currentColor]">
           <Icon className="h-5 w-5" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.12em] text-emerald-200">
-            Ativo
-          </span>
-          <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/24 text-white/44">
-            <MoreVertical className="h-4 w-4" />
-          </span>
         </div>
       </div>
 
@@ -425,26 +415,15 @@ function ModuleCard({ item, index }: { item: ModuleItem; index: number }) {
         <p className="mt-3 text-sm leading-5 text-white/60">{item.summary}</p>
       </div>
 
-      <div className="mt-3 border-t border-white/10 pt-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-white/42">Plano</p>
-            <p className="mt-1 text-sm font-black text-white">{item.plan}</p>
-          </div>
-          <div className="border-l border-white/10 pl-4">
-            <p className="text-xs text-white/42">Status</p>
-            <p className="mt-1 text-sm font-black text-emerald-300">Liberado</p>
-          </div>
-        </div>
-        <div className="mt-4 flex justify-center">
-          <span className="relative h-5 w-10 rounded-full bg-current">
-            <span className="absolute top-1/2 h-4 w-4 translate-x-[1.35rem] -translate-y-1/2 rounded-full bg-white shadow-sm" />
-          </span>
-        </div>
-      </div>
-
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/18">
         {item.preview}
+      </div>
+
+      <div className="pointer-events-none absolute inset-3 z-10 flex translate-y-3 flex-col justify-end rounded-[1.35rem] border border-white/10 bg-[#09080a]/95 p-4 opacity-0 shadow-[0_24px_80px_-50px_rgba(0,0,0,1)] backdrop-blur-xl transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Como funciona</p>
+        <h3 className="mt-2 text-2xl font-black leading-tight text-white">{item.title}</h3>
+        <p className="mt-3 text-sm font-black leading-6 text-primary">{item.summary}</p>
+        <p className="mt-4 text-sm leading-7 text-white/70">{item.details}</p>
       </div>
     </article>
   );
