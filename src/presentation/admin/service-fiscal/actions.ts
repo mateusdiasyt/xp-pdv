@@ -13,7 +13,7 @@ export async function declareServiceNfseAction(formData: FormData): Promise<void
   const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
 
   if (!canUsePlatformModule(entitlements, "fiscal-focus")) {
-    throw new Error("Modulo fiscal disponivel apenas no Plano Platina ativo.");
+    throw new Error("Plugin fiscal disponivel apenas no Plano Platina ativo.");
   }
 
   await createServiceFiscalDeclarationRecord(formData, session.user.id);

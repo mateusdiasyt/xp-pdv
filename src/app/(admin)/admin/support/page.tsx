@@ -86,7 +86,7 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Suporte"
         description="Espaco para o responsavel abrir tickets com pedidos, correcoes e ajustes para acompanhamento posterior."
       />
@@ -102,7 +102,7 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
           <CardContent>
             {setupPending ? (
               <div className="rounded-2xl border border-amber-400/30 bg-amber-400/8 px-4 py-4 text-sm text-amber-100">
-                O modulo de suporte ja esta no painel, mas o banco deste ambiente ainda nao recebeu a tabela
+                A area de suporte ja esta no painel, mas o banco deste ambiente ainda nao recebeu a tabela
                 `SupportTicket`. Depois do `db:push`, os tickets passam a funcionar aqui normalmente.
               </div>
             ) : (

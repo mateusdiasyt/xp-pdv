@@ -27,7 +27,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Usuarios"
         description="Cadastre contas e defina perfis como Administrador, Financeiro ou Caixa."
       />

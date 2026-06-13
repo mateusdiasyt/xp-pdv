@@ -51,7 +51,7 @@ const fallbackRoutes: Array<{ permission: PermissionKey; path: string }> = [
   { permission: PERMISSIONS.PRODUCTS_VIEW, path: "/admin/products" },
   { permission: PERMISSIONS.STOCK_VIEW, path: "/admin/stock" },
   { permission: PERMISSIONS.USERS_VIEW, path: "/admin/users" },
-  { permission: PERMISSIONS.MODULES_VIEW, path: "/admin/modules" },
+  { permission: PERMISSIONS.MODULES_VIEW, path: "/admin/plugins" },
 ];
 
 export default async function AdminDashboardPage() {

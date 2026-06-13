@@ -99,7 +99,7 @@ export async function GET(request: Request) {
 
   const entitlements = await getTenantModuleEntitlements(session.user.tenantSlug);
   if (!canUsePlatformModule(entitlements, "fiscal-focus")) {
-    return new Response("Modulo fiscal disponivel apenas no Plano Platina ativo.", { status: 403 });
+    return new Response("Plugin fiscal disponivel apenas no Plano Platina ativo.", { status: 403 });
   }
 
   const url = new URL(request.url);

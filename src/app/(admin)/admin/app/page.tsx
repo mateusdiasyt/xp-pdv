@@ -47,7 +47,7 @@ export default async function TvAppPage({ searchParams }: TvAppPageProps) {
   if (!canUsePlatformModule(entitlements, "tv-app")) {
     return (
       <div className="space-y-5 text-white">
-        <PageHeader eyebrow="Modulo Platina" title="App da TV" description="APK e atualizacao obrigatoria ficam disponiveis no Plano Platina." />
+        <PageHeader eyebrow="Plugin Platina" title="App da TV" description="APK e atualizacao obrigatoria ficam disponiveis no Plano Platina." />
         <ModuleLockCard
           title="App TV bloqueado"
           description="Ative o Plano Platina no painel super admin para liberar o APK, controle de atualizacoes e uso do app nas Smart TVs."

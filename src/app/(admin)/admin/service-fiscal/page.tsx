@@ -62,7 +62,7 @@ export default async function ServiceFiscalPage({ searchParams }: ServiceFiscalP
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Modulo Platina"
+          eyebrow="Plugin Platina"
           title="Apuracao de servicos"
           description="A apuracao fiscal de servicos fica disponivel quando o Plano Platina estiver ativo."
         />

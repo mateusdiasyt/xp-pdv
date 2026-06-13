@@ -92,7 +92,7 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
     return (
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Modulo Platina"
+          eyebrow="Plugin Platina"
           title="Fiscal XML"
           description="XML, DANFE e consulta fiscal ficam disponiveis quando o Plano Platina estiver ativo."
         />
@@ -110,7 +110,7 @@ export default async function FiscalPage({ searchParams }: FiscalPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Fiscal XML"
         description="Painel para contador baixar XML das vendas NFC-e, conferir chaves e acompanhar status fiscal."
       />

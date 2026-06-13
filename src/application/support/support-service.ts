@@ -21,10 +21,10 @@ function createTicketNumber() {
 
 function ensureSupportStorageAvailable(error: unknown): never {
   if (isMissingSupportTicketTableError(error)) {
-    throw new Error("Modulo de suporte aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
+    throw new Error("Area de suporte aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
   }
 
-  throw error instanceof Error ? error : new Error("Nao foi possivel carregar o modulo de suporte.");
+  throw error instanceof Error ? error : new Error("Nao foi possivel carregar a area de suporte.");
 }
 
 export async function getSupportTickets(filters?: {

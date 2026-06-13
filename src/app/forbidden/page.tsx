@@ -9,7 +9,7 @@ export default function ForbiddenPage() {
         <CardHeader>
           <CardTitle>Acesso nao autorizado</CardTitle>
           <CardDescription>
-            Seu usuario nao possui permissao para acessar este modulo administrativo.
+            Seu usuario nao possui permissao para acessar esta area administrativa.
           </CardDescription>
         </CardHeader>
         <CardContent>

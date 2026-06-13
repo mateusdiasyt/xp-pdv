@@ -480,7 +480,7 @@ export function UpdateUserAccessForm({
           id="searchPermission"
           value={searchPermission}
           onChange={(event) => setSearchPermission(event.target.value)}
-          placeholder="Digite modulo ou acao. Ex: estoque, caixa, visualizar"
+          placeholder="Digite area ou acao. Ex: estoque, caixa, visualizar"
         />
       </div>
 

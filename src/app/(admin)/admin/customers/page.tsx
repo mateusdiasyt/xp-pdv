@@ -46,7 +46,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Clientes"
         description="Cadastro de clientes para uso em comandas e historico de atendimento no PDV."
       />

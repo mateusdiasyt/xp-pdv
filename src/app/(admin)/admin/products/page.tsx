@@ -199,7 +199,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     <div className="space-y-6">
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Modulo ERP</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">ERP</p>
           <h1 className="text-3xl font-semibold tracking-[-0.01em] text-foreground">Catalogo de produtos</h1>
           <p className="text-sm text-muted-foreground">
             Produtos organizados por categoria, com imagem, estoque e edicao direta.

@@ -16,7 +16,7 @@ export default async function UpdatesPage() {
   return (
     <div className="space-y-6 text-white [&_.text-muted-foreground]:text-white/80">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Atualizacoes do sistema"
         description="Registro interno das melhorias e mudancas publicadas no sistema via codigo."
       />

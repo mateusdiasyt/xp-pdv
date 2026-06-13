@@ -155,12 +155,12 @@ const faq = [
   {
     question: "Dá para cobrar videogame por tempo?",
     answer:
-      "Sim. O módulo de Smart TV controla tempo de PS5, simulador, sinuca ou qualquer serviço por minuto, com cobrança, pausa e cancelamento.",
+      "Sim. O plugin de Smart TV controla tempo de PS5, simulador, sinuca ou qualquer serviço por minuto, com cobrança, pausa e cancelamento.",
   },
   {
     question: "Consigo importar XML de compra?",
     answer:
-      "Sim. O módulo de XML permite salvar o arquivo, revisar os itens e dar entrada no estoque com conferência.",
+      "Sim. O plugin de XML permite salvar o arquivo, revisar os itens e dar entrada no estoque com conferência.",
   },
   {
     question: "O sistema imprime em térmica?",
@@ -414,7 +414,7 @@ export default async function LoginPage() {
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-white/62 md:flex">
             <a href="#produto" className="transition-colors hover:text-white">Produto</a>
-            <a href="#modulos" className="transition-colors hover:text-white">Módulos</a>
+            <a href="#plugins" className="transition-colors hover:text-white">Plugins</a>
             <a href="#planos" className="transition-colors hover:text-white">Planos</a>
             <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
             <LandingLoginModal className="transition-colors hover:text-white">Login</LandingLoginModal>
@@ -523,13 +523,13 @@ export default async function LoginPage() {
               Escolha o plano ideal para sua operação.
             </h2>
             <div className="mt-6 space-y-2 text-base leading-7 text-white/64 md:text-lg">
-              <p>O plano Ouro reúne os módulos essenciais do PDV.</p>
+              <p>O plano Ouro reúne os plugins essenciais do PDV.</p>
               <p>O plano Platina adiciona fiscal Focus NFe, App TV e link personalizado.</p>
             </div>
             <div className="mt-8 inline-flex max-w-3xl items-center gap-3 rounded-xl border border-white/10 bg-white/[0.055] px-5 py-4 text-sm leading-6 text-white/72 shadow-[0_24px_90px_-70px_rgba(0,0,0,0.95)] backdrop-blur">
               <Sparkles className="h-4 w-4 shrink-0 text-primary" />
               <span>
-                <strong className="text-white">Platina:</strong> indicado para operações que precisam de módulos avançados e mais controle.
+                <strong className="text-white">Platina:</strong> indicado para operações que precisam de plugins avançados e mais controle.
               </span>
             </div>
           </div>
@@ -668,7 +668,7 @@ export default async function LoginPage() {
               Crie sua conta agora e veja o Mendoza PDV rodando na sua operação.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-white/64">
-              O cadastro abre um pedido de acesso. Depois da aprovação, você configura produtos, fiscal, caixa, usuários e módulos sem misturar seus dados com outros clientes.
+              O cadastro abre um pedido de acesso. Depois da aprovação, você configura produtos, fiscal, caixa, usuários e plugins sem misturar seus dados com outros clientes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <LandingButton label="Criar conta agora" />

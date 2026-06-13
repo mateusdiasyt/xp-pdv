@@ -587,7 +587,7 @@ async function assertInvoiceRecipientMatchesCompany(parsedInvoice: ParsedStockIn
 
 function ensureXmlStorageAvailable(error: unknown): never {
   if (isMissingStockInvoiceXmlTableError(error)) {
-    throw new Error("Modulo de XML de estoque aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
+    throw new Error("Plugin de XML de estoque aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
   }
 
   throw error instanceof Error ? error : new Error("Nao foi possivel salvar o XML de estoque.");

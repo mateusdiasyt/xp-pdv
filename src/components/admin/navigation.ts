@@ -158,8 +158,8 @@ export const adminNavigation: AdminNavigationItem[] = [
     group: "Sistema",
   },
   {
-    label: "Módulos",
-    href: "/admin/modules",
+    label: "Plugins",
+    href: "/admin/plugins",
     icon: Puzzle,
     permission: PERMISSIONS.MODULES_VIEW,
     group: "Sistema",

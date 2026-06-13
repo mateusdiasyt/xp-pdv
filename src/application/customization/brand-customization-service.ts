@@ -78,7 +78,7 @@ function contrastTextColor(backgroundColor: string) {
 
 function ensureBrandCustomizationStorageAvailable(error: unknown): never {
   if (isMissingBrandCustomizationTableError(error)) {
-    throw new Error("Modulo de personalizacao aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
+    throw new Error("Area de personalizacao aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
   }
 
   throw error instanceof Error ? error : new Error("Nao foi possivel carregar as configuracoes de personalizacao.");

@@ -288,7 +288,7 @@ export async function issueSaleNfce(data: { saleId: string; actorId: string }) {
   const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
 
   if (!(await canUseFiscalFocusModule())) {
-    const message = "NFC-e nao emitida: modulo Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
+    const message = "NFC-e nao emitida: plugin Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
     await updateSaleFiscalData(snapshot.id, {
       fiscalReference,
       fiscalDocumentType: "NFCE",
@@ -535,7 +535,7 @@ export async function queueSaleNfceIssue(data: { saleId: string; actorId: string
   const fiscalReference = normalizeReference(snapshot.fiscalReference ?? snapshot.saleNumber);
 
   if (!(await canUseFiscalFocusModule())) {
-    const message = "NFC-e nao enfileirada: modulo Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
+    const message = "NFC-e nao enfileirada: plugin Fiscal / Focus NFe disponivel apenas no Plano Platina ativo.";
     await updateSaleFiscalData(snapshot.id, {
       fiscalReference,
       fiscalDocumentType: "NFCE",

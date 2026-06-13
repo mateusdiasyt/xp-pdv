@@ -21,7 +21,7 @@ async function ensurePlatformModuleAccess(tenantSlug: string, moduleKey: Platfor
   const entitlements = await getTenantModuleEntitlements(tenantSlug);
 
   if (!canUsePlatformModule(entitlements, moduleKey)) {
-    throw new Error("Modulo disponivel apenas no Plano Platina ativo.");
+    throw new Error("Plugin disponivel apenas no Plano Platina ativo.");
   }
 }
 

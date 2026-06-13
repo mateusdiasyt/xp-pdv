@@ -274,7 +274,7 @@ export async function updateFiscalConfigurationRecord(
     });
   } catch (error) {
     if (isMissingFiscalConfigurationTableError(error)) {
-      throw new Error("Modulo fiscal aguardando sincronizacao do banco. Rode o db:push e tente novamente.");
+      throw new Error("Plugin fiscal aguardando sincronizacao do banco. Rode o db:push e tente novamente.");
     }
 
     throw error;

@@ -13,6 +13,7 @@ import {
   Landmark,
   Link2,
   MessageCircle,
+  MoreVertical,
   Palette,
   ReceiptText,
 } from "lucide-react";
@@ -386,53 +387,64 @@ const modules: ModuleItem[] = [
   },
 ];
 
-function planBadgeClassName(plan: ModulePlan) {
-  return plan === "Ouro"
-    ? "border-amber-300/28 bg-amber-300/10 text-amber-100"
-    : "border-sky-200/28 bg-sky-200/10 text-sky-100";
+function pluginAccentClassName(index: number) {
+  const accents = [
+    "border-primary/55 from-primary/14 via-[#0b1418] to-[#111114] text-primary",
+    "border-violet-300/28 from-violet-400/16 via-[#0b1418] to-[#111114] text-violet-200",
+    "border-cyan-300/28 from-cyan-300/16 via-[#0b1418] to-[#111114] text-cyan-200",
+    "border-orange-300/28 from-orange-300/16 via-[#0b1418] to-[#111114] text-orange-200",
+    "border-emerald-300/28 from-emerald-300/16 via-[#0b1418] to-[#111114] text-emerald-200",
+    "border-sky-300/28 from-sky-300/16 via-[#0b1418] to-[#111114] text-sky-200",
+  ];
+
+  return accents[index % accents.length];
 }
 
-function ModuleCard({ item }: { item: ModuleItem }) {
+function ModuleCard({ item, index }: { item: ModuleItem; index: number }) {
   const Icon = item.icon;
 
   return (
-    <article
-      tabIndex={0}
-      className="group/card h-[25rem] outline-none [perspective:1400px]"
-      aria-label={`${item.title} - Plano ${item.plan}`}
-    >
-      <div className="relative h-full rounded-2xl transition-transform duration-500 [transform-style:preserve-3d] group-hover/card:[transform:rotateY(180deg)] group-focus-visible/card:[transform:rotateY(180deg)] motion-reduce:transition-none motion-reduce:group-hover/card:[transform:none] motion-reduce:group-focus-visible/card:[transform:none]">
-        <div className="absolute inset-0 grid gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-[0_22px_80px_-72px_rgba(0,0,0,0.95)] [backface-visibility:hidden]">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-              <Icon className="h-5 w-5" />
-            </div>
-            <span className={cn("rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em]", planBadgeClassName(item.plan))}>
-              {item.plan}
-            </span>
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-xl font-black text-white">{item.title}</h3>
-            {item.preview}
-          </div>
+    <article className={cn("group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-[0_28px_86px_-70px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_34px_100px_-76px_rgba(255,0,89,0.55)]", pluginAccentClassName(index))}>
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid h-11 w-11 place-items-center rounded-xl border border-current/20 bg-current/12 shadow-[0_18px_42px_-30px_currentColor]">
+          <Icon className="h-5 w-5" />
         </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.12em] text-emerald-200">
+            Ativo
+          </span>
+          <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/24 text-white/44">
+            <MoreVertical className="h-4 w-4" />
+          </span>
+        </div>
+      </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-primary/28 bg-[#13090e]/96 p-5 shadow-[0_28px_90px_-56px_rgba(0,0,0,0.95)] [backface-visibility:hidden] [transform:rotateY(180deg)] motion-reduce:hidden">
-          <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <span className={cn("rounded-full border px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em]", planBadgeClassName(item.plan))}>
-                Plano {item.plan}
-              </span>
-              <Icon className="h-5 w-5 text-primary" />
-            </div>
-            <h3 className="text-2xl font-black leading-tight text-white">{item.title}</h3>
-            <p className="mt-4 text-sm font-black leading-6 text-primary">{item.summary}</p>
-            <p className="mt-4 text-sm leading-7 text-white/70">{item.details}</p>
+      <div className="mt-7 min-h-[8rem]">
+        <h3 className="max-w-[13rem] text-xl font-black leading-tight text-white">{item.title}</h3>
+        <p className="mt-3 text-sm leading-5 text-white/60">{item.summary}</p>
+      </div>
+
+      <div className="mt-3 border-t border-white/10 pt-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-white/42">Plano</p>
+            <p className="mt-1 text-sm font-black text-white">{item.plan}</p>
           </div>
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-white/48">
-            Mendoza PDV
+          <div className="border-l border-white/10 pl-4">
+            <p className="text-xs text-white/42">Status</p>
+            <p className="mt-1 text-sm font-black text-emerald-300">Liberado</p>
           </div>
         </div>
+        <div className="mt-4 flex justify-center">
+          <span className="relative h-5 w-10 rounded-full bg-current">
+            <span className="absolute top-1/2 h-4 w-4 translate-x-[1.35rem] -translate-y-1/2 rounded-full bg-white shadow-sm" />
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/18">
+        {item.preview}
       </div>
     </article>
   );
@@ -443,16 +455,16 @@ export function LandingModulesSection() {
   const visibleModules = modules.filter((moduleItem) => moduleItem.plan === selectedPlan);
 
   return (
-    <section id="modulos" className="px-4 py-20">
+    <section id="plugins" className="px-4 py-20">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Módulos do PDV</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Plugins do PDV</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-              Confira os módulos disponíveis no Mendoza PDV
+              Confira os plugins disponíveis no Mendoza PDV
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/58">
-              O plano Ouro cobre a operação essencial. O Platina adiciona módulos avançados para bares, serviços por tempo,
+              O plano Ouro cobre a operação essencial. O Platina adiciona plugins avançados para bares, serviços por tempo,
               fiscal e crescimento do negócio.
             </p>
           </div>
@@ -478,8 +490,8 @@ export function LandingModulesSection() {
         </div>
 
         <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleModules.map((item) => (
-            <ModuleCard key={item.title} item={item} />
+          {visibleModules.map((item, index) => (
+            <ModuleCard key={item.title} item={item} index={index} />
           ))}
         </div>
       </div>

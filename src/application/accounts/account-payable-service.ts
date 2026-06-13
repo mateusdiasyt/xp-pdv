@@ -65,7 +65,7 @@ function nextMonthlyDueDate(currentDueDate: Date, day: number) {
 
 function ensureAccountStorageAvailable(error: unknown): never {
   if (isMissingAccountPayableTableError(error)) {
-    throw new Error("Modulo de contas aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
+    throw new Error("Area de contas aguardando sincronizacao do banco. Rode o db:push no ambiente atual.");
   }
 
   throw error instanceof Error ? error : new Error("Nao foi possivel carregar contas.");

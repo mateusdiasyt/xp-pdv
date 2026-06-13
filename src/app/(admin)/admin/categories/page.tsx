@@ -30,7 +30,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Categorias de Produto"
         description="Estrutura de classificacao para relatorios, organizacao de estoque e catalogo."
       />

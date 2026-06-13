@@ -746,7 +746,7 @@ export function PendingTenantPaymentPanel({
                   },
                   {
                     title: "Plano preservado",
-                    text: "Módulos e dados seguem ativos.",
+                    text: "Plugins e dados seguem ativos.",
                     icon: ShieldCheck,
                   },
                 ].map((benefit) => {

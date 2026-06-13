@@ -29,7 +29,7 @@ export default async function SuppliersPage({ searchParams }: SuppliersPageProps
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Fornecedores"
         description="Base de parceiros para reposicao de estoque e controle de origem dos produtos."
       />

@@ -28,7 +28,7 @@ export default async function CustomizationPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Modulo ERP"
+        eyebrow="ERP"
         title="Configuracoes"
         description="Ajuste identidade visual, horario operacional e credenciais fiscais do sistema."
       />
@@ -37,7 +37,7 @@ export default async function CustomizationPage() {
         brandPanel={
           setupPending ? (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-100">
-              O modulo de personalizacao precisa da tabela `BrandCustomization` no banco atual. Rode `db:push` e tente novamente.
+              A area de personalizacao precisa da tabela `BrandCustomization` no banco atual. Rode `db:push` e tente novamente.
             </div>
           ) : (
             <UpdateBrandCustomizationForm
@@ -59,7 +59,7 @@ export default async function CustomizationPage() {
         fiscalPanel={
           fiscal?.setupPending ? (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-100">
-              O modulo fiscal precisa da tabela `FiscalConfiguration` no banco atual. Rode `db:push` e tente novamente.
+              O plugin fiscal precisa da tabela `FiscalConfiguration` no banco atual. Rode `db:push` e tente novamente.
             </div>
           ) : fiscal && canManageFiscalEnvironment ? (
             <UpdateFiscalEnvironmentForm

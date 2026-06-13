@@ -98,7 +98,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     <div className="space-y-6">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
         <PageHeader
-          eyebrow="Modulo ERP"
+          eyebrow="ERP"
           title="Relatorios"
           description="Vendas, pagamentos, caixa e itens vendidos considerando o turno operacional configurado."
         />
