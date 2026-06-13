@@ -165,6 +165,10 @@ function parseMoneyToCents(value: string) {
   return Math.round(parsed * 100);
 }
 
+function formatMoneyInput(valueInCents: number) {
+  return (valueInCents / 100).toFixed(2);
+}
+
 function normalizeDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -384,6 +388,7 @@ export function QuickSaleForm({
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
+  const [finalPriceByProduct, setFinalPriceByProduct] = useState<Record<string, string>>({});
   const [quantityByProduct, setQuantityByProduct] = useState<Record<string, string>>({});
   const discountAmount = "0.00";
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
@@ -454,17 +459,50 @@ export function QuickSaleForm({
         return null;
       }
 
+      const originalUnitPriceInCents = Math.round(getEffectiveSalePrice(product, happyHourActive) * 100);
+      const finalPriceRaw = finalPriceByProduct[line.productId]?.trim() ?? "";
+      const parsedFinalPriceInCents = finalPriceRaw ? parseMoneyToCents(finalPriceRaw) : 0;
+      const finalPriceInvalid =
+        finalPriceRaw.length > 0 &&
+        (parsedFinalPriceInCents <= 0 || parsedFinalPriceInCents > originalUnitPriceInCents);
+      const finalUnitPriceInCents =
+        finalPriceRaw.length > 0 && !finalPriceInvalid ? parsedFinalPriceInCents : originalUnitPriceInCents;
+      const originalLineTotalInCents = originalUnitPriceInCents * line.quantity;
+      const finalLineTotalInCents = finalUnitPriceInCents * line.quantity;
+      const priceOverrideDiscountInCents = Math.max(0, originalLineTotalInCents - finalLineTotalInCents);
+
       return {
         ...line,
         product,
-        lineTotal: getEffectiveSalePrice(product, happyHourActive) * line.quantity,
+        originalUnitPriceInCents,
+        finalPriceRaw,
+        finalPriceInvalid,
+        finalUnitPriceInCents,
+        originalLineTotalInCents,
+        finalLineTotalInCents,
+        priceOverrideDiscountInCents,
+        lineTotal: originalLineTotalInCents / 100,
       };
     })
-    .filter(Boolean) as Array<{ productId: string; quantity: number; product: ProductOption; lineTotal: number }>;
+    .filter(Boolean) as Array<{
+      productId: string;
+      quantity: number;
+      product: ProductOption;
+      originalUnitPriceInCents: number;
+      finalPriceRaw: string;
+      finalPriceInvalid: boolean;
+      finalUnitPriceInCents: number;
+      originalLineTotalInCents: number;
+      finalLineTotalInCents: number;
+      priceOverrideDiscountInCents: number;
+      lineTotal: number;
+    }>;
   const gameplayCartItems = cartItems.filter((item) => item.product.kind === ProductKind.GAMEPLAY);
 
-  const subtotalInCents = cartItems.reduce((sum, item) => sum + Math.round(item.lineTotal * 100), 0);
-  const manualDiscountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const subtotalInCents = cartItems.reduce((sum, item) => sum + item.originalLineTotalInCents, 0);
+  const priceOverrideDiscountInCents = cartItems.reduce((sum, item) => sum + item.priceOverrideDiscountInCents, 0);
+  const hasInvalidFinalPrice = cartItems.some((item) => item.finalPriceInvalid);
+  const manualDiscountInCents = priceOverrideDiscountInCents + Math.max(0, parseMoneyToCents(discountAmount));
   const appliedCoupon = appliedCouponCode
     ? coupons.find((coupon) => coupon.code === appliedCouponCode)
     : null;
@@ -475,7 +513,7 @@ export function QuickSaleForm({
         lines: cartItems.map((item) => ({
           productId: item.productId,
           categoryId: item.product.category.id,
-          lineTotalInCents: Math.round(item.lineTotal * 100),
+          lineTotalInCents: item.originalLineTotalInCents,
         })),
       })
     : null;
@@ -483,7 +521,7 @@ export function QuickSaleForm({
   const discountInCents = manualDiscountInCents + couponDiscountInCents;
   const discountExceedsSubtotal = discountInCents > subtotalInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
-  const normalizedDiscountAmount = discountAmount.trim() || "0.00";
+  const normalizedDiscountAmount = formatMoneyInput(manualDiscountInCents);
   const paymentsTotalInCents = paymentLines.reduce(
     (acc, paymentLine) => acc + Math.max(0, parseMoneyToCents(paymentLine.amount)),
     0,
@@ -521,6 +559,7 @@ export function QuickSaleForm({
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
   const canSubmitQuickSale =
     cartItems.length > 0 &&
+    !hasInvalidFinalPrice &&
     !discountExceedsSubtotal &&
     nonCashExcessInCents === 0 &&
     paymentShortfallInCents === 0;
@@ -605,11 +644,23 @@ export function QuickSaleForm({
 
   function removeFromCart(productId: string) {
     setCartLines((currentLines) => currentLines.filter((line) => line.productId !== productId));
+    setFinalPriceByProduct((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[productId];
+      return nextMap;
+    });
     setStationByProduct((currentMap) => {
       const nextMap = { ...currentMap };
       delete nextMap[productId];
       return nextMap;
     });
+  }
+
+  function updateFinalPrice(productId: string, value: string) {
+    setFinalPriceByProduct((currentMap) => ({
+      ...currentMap,
+      [productId]: value,
+    }));
   }
 
   function updatePaymentLine(id: number, field: PaymentLineField, value: string) {
@@ -1140,6 +1191,12 @@ export function QuickSaleForm({
                         <span>Subtotal</span>
                         <span>{formatCurrency(subtotalInCents / 100)}</span>
                       </div>
+                      {priceOverrideDiscountInCents > 0 ? (
+                        <div className="mt-1 flex items-center justify-between text-sm text-emerald-100">
+                          <span>Preço manual</span>
+                          <span>{formatCurrency(priceOverrideDiscountInCents / 100)}</span>
+                        </div>
+                      ) : null}
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
                         <span>Desconto</span>
                         <span>{formatCurrency(discountInCents / 100)}</span>
@@ -1186,13 +1243,18 @@ export function QuickSaleForm({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-foreground">{item.product.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {item.quantity}x {formatCurrency(getEffectiveSalePrice(item.product, happyHourActive))}
+                            {item.quantity}x {formatCurrency(item.originalUnitPriceInCents / 100)}
                           </p>
                         </div>
                         <p className="shrink-0 text-sm font-semibold text-foreground">
-                          {formatCurrency(item.lineTotal)}
+                          {formatCurrency(item.finalLineTotalInCents / 100)}
                         </p>
                       </div>
+                      {item.priceOverrideDiscountInCents > 0 ? (
+                        <p className="mt-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-100">
+                          Desconto manual {formatCurrency(item.priceOverrideDiscountInCents / 100)}
+                        </p>
+                      ) : null}
 
                       <div className="mt-3 flex flex-wrap items-end gap-2">
                         <div className="space-y-1">
@@ -1207,6 +1269,17 @@ export function QuickSaleForm({
                             inputMode="numeric"
                             className={`w-24 ${quantityInputClassName}`}
                             required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`quick-checkout-final-price-${item.productId}`}>Preço final</Label>
+                          <Input
+                            id={`quick-checkout-final-price-${item.productId}`}
+                            value={item.finalPriceRaw}
+                            onChange={(event) => updateFinalPrice(item.productId, event.target.value)}
+                            inputMode="decimal"
+                            placeholder={formatMoneyInput(item.originalUnitPriceInCents)}
+                            className={`w-28 ${item.finalPriceInvalid ? "border-destructive text-destructive" : ""}`}
                           />
                         </div>
                         <Button
@@ -1245,6 +1318,11 @@ export function QuickSaleForm({
                               </select>
                             </div>
                           </div>
+                        ) : null}
+                        {item.finalPriceInvalid ? (
+                          <p className="basis-full text-xs text-destructive">
+                            Informe um valor entre R$ 0,01 e {formatCurrency(item.originalUnitPriceInCents / 100)}.
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -1494,6 +1572,12 @@ export function QuickSaleForm({
                       <span>Subtotal</span>
                       <span>{formatCurrency(subtotalInCents / 100)}</span>
                     </div>
+                    {priceOverrideDiscountInCents > 0 ? (
+                      <div className="flex items-center justify-between text-sm text-emerald-100">
+                        <span>Preço manual</span>
+                        <span>{formatCurrency(priceOverrideDiscountInCents / 100)}</span>
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span>Desconto</span>
                       <span>{formatCurrency(discountInCents / 100)}</span>
@@ -1564,6 +1648,8 @@ export function QuickSaleForm({
                 <Check className="h-4 w-4" />
                 {cartItems.length === 0
                   ? "Selecione itens para fechar"
+                  : hasInvalidFinalPrice
+                    ? "Ajuste o preço final"
                   : discountExceedsSubtotal
                     ? "Ajuste o desconto"
                     : nonCashExcessInCents > 0 || paymentShortfallInCents > 0

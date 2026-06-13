@@ -403,6 +403,7 @@ export function CreateSaleForm({
   const [activePanel, setActivePanel] = useState<ComandaPanel>("items");
   const deferredProductSearch = useDeferredValue(productSearch);
   const [discountAmount, setDiscountAmount] = useState("0.00");
+  const [finalPriceByProduct, setFinalPriceByProduct] = useState<Record<string, string>>({});
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
   const [couponPanelOpen, setCouponPanelOpen] = useState(false);
   const [paymentAutofillEnabled, setPaymentAutofillEnabled] = useState(true);
@@ -425,9 +426,35 @@ export function CreateSaleForm({
     },
   ]);
 
-  const optimisticSubtotalAmount = optimisticItems.reduce((sum, item) => sum + item.lineTotal, 0);
-  const subtotalInCents = Math.round(optimisticSubtotalAmount * 100);
+  const checkoutItems = optimisticItems.map((item) => {
+    const originalLineTotalInCents = Math.round(item.lineTotal * 100);
+    const originalUnitPriceInCents =
+      item.quantity > 0 ? Math.round(originalLineTotalInCents / item.quantity) : originalLineTotalInCents;
+    const finalPriceRaw = finalPriceByProduct[item.productId]?.trim() ?? "";
+    const parsedFinalPriceInCents = finalPriceRaw ? parseMoneyToCents(finalPriceRaw) : 0;
+    const finalPriceInvalid =
+      finalPriceRaw.length > 0 &&
+      (parsedFinalPriceInCents <= 0 || parsedFinalPriceInCents > originalUnitPriceInCents);
+    const finalUnitPriceInCents =
+      finalPriceRaw.length > 0 && !finalPriceInvalid ? parsedFinalPriceInCents : originalUnitPriceInCents;
+    const finalLineTotalInCents = finalUnitPriceInCents * item.quantity;
+    const priceOverrideDiscountInCents = Math.max(0, originalLineTotalInCents - finalLineTotalInCents);
+
+    return {
+      ...item,
+      originalUnitPriceInCents,
+      originalLineTotalInCents,
+      finalPriceRaw,
+      finalPriceInvalid,
+      finalLineTotalInCents,
+      priceOverrideDiscountInCents,
+    };
+  });
+  const subtotalInCents = checkoutItems.reduce((sum, item) => sum + item.originalLineTotalInCents, 0);
+  const priceOverrideDiscountInCents = checkoutItems.reduce((sum, item) => sum + item.priceOverrideDiscountInCents, 0);
+  const hasInvalidFinalPrice = checkoutItems.some((item) => item.finalPriceInvalid);
   const manualDiscountInCents = Math.max(0, parseMoneyToCents(discountAmount));
+  const submittedManualDiscountInCents = manualDiscountInCents + priceOverrideDiscountInCents;
   const appliedCoupon = appliedCouponCode
     ? coupons.find((coupon) => coupon.code === appliedCouponCode)
     : null;
@@ -435,15 +462,15 @@ export function CreateSaleForm({
     ? calculateCouponDiscountInCents({
         coupon: appliedCoupon,
         subtotalInCents,
-        lines: optimisticItems.map((item) => ({
+        lines: checkoutItems.map((item) => ({
           productId: item.productId,
           categoryId: item.product.category.id,
-          lineTotalInCents: Math.round(item.lineTotal * 100),
+          lineTotalInCents: item.originalLineTotalInCents,
         })),
       })
     : null;
   const couponDiscountInCents = couponPreview?.discountInCents ?? 0;
-  const discountInCents = manualDiscountInCents + couponDiscountInCents;
+  const discountInCents = submittedManualDiscountInCents + couponDiscountInCents;
   const discountExceedsSubtotal = discountInCents > subtotalInCents;
   const totalInCents = Math.max(subtotalInCents - discountInCents, 0);
   const paymentsTotalInCents = paymentLines.reduce(
@@ -570,6 +597,7 @@ export function CreateSaleForm({
   const normalizedAppliedCouponCode = appliedCoupon && couponDiscountInCents > 0 ? appliedCoupon.code : "";
   const canSubmitComandaSale =
     optimisticItems.length > 0 &&
+    !hasInvalidFinalPrice &&
     !discountExceedsSubtotal &&
     nonCashExcessInCents === 0 &&
     paymentShortfallInCents === 0;
@@ -700,6 +728,11 @@ export function CreateSaleForm({
 
     setRemoveItemState(initialActionState);
     setOptimisticItems((currentItems) => currentItems.filter((currentItem) => currentItem.productId !== item.productId));
+    setFinalPriceByProduct((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[item.productId];
+      return nextMap;
+    });
 
     startItemMutationTransition(async () => {
       const result = await removeComandaItemRequest(formData);
@@ -728,6 +761,13 @@ export function CreateSaleForm({
 
   function selectCoupon(code: string) {
     setAppliedCouponCode(normalizeCouponCode(code));
+  }
+
+  function updateFinalPrice(productId: string, value: string) {
+    setFinalPriceByProduct((currentMap) => ({
+      ...currentMap,
+      [productId]: value,
+    }));
   }
 
   function syncSinglePaymentWithTotal() {
@@ -1241,6 +1281,7 @@ export function CreateSaleForm({
               <form id={`close-comanda-form-${selectedComanda.id}`} onSubmit={handleCloseComandaSubmit} className="space-y-4">
                 <input type="hidden" name="comandaId" value={selectedComanda.id} />
                 <input type="hidden" name="couponCode" value={normalizedAppliedCouponCode} />
+                <input type="hidden" name="discountAmount" value={formatMoneyInput(submittedManualDiscountInCents)} />
                 <input type="hidden" name="cashReceived" value="" />
 
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
@@ -1265,7 +1306,6 @@ export function CreateSaleForm({
                     <Label htmlFor={`discountAmount-${selectedComanda.id}`}>Desconto</Label>
                     <Input
                       id={`discountAmount-${selectedComanda.id}`}
-                      name="discountAmount"
                       value={discountAmount}
                       onChange={(event) => setDiscountAmount(event.target.value)}
                       placeholder="0.00"
@@ -1273,6 +1313,59 @@ export function CreateSaleForm({
                     />
                   </div>
                 </div>
+
+                <section className="rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">Preço final</p>
+                    {priceOverrideDiscountInCents > 0 ? (
+                      <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-100">
+                        {formatCurrency(priceOverrideDiscountInCents / 100)} desconto
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {checkoutItems.map((item) => (
+                      <div key={`checkout-price-${item.productId}`} className="rounded-[1.1rem] border border-border/70 bg-background/30 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">{item.product.name}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {item.quantity}x {formatCurrency(item.originalUnitPriceInCents / 100)}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-sm font-semibold text-foreground">
+                            {formatCurrency(item.finalLineTotalInCents / 100)}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-end">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`comanda-final-price-${selectedComanda.id}-${item.productId}`}>Preço final unitário</Label>
+                            <Input
+                              id={`comanda-final-price-${selectedComanda.id}-${item.productId}`}
+                              value={item.finalPriceRaw}
+                              onChange={(event) => updateFinalPrice(item.productId, event.target.value)}
+                              inputMode="decimal"
+                              placeholder={formatMoneyInput(item.originalUnitPriceInCents)}
+                              className={item.finalPriceInvalid ? "border-destructive text-destructive" : ""}
+                            />
+                          </div>
+                          {item.priceOverrideDiscountInCents > 0 ? (
+                            <p className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100">
+                              -{formatCurrency(item.priceOverrideDiscountInCents / 100)}
+                            </p>
+                          ) : null}
+                        </div>
+                        {item.finalPriceInvalid ? (
+                          <p className="mt-2 text-xs text-destructive">
+                            Informe um valor entre R$ 0,01 e {formatCurrency(item.originalUnitPriceInCents / 100)}.
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
                 <section className="rounded-[1.35rem] border border-border/75 bg-background/32 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -1522,6 +1615,12 @@ export function CreateSaleForm({
                     <span>Subtotal</span>
                     <p className="font-semibold text-foreground">{formatCurrency(subtotalInCents / 100)}</p>
                   </div>
+                  {priceOverrideDiscountInCents > 0 ? (
+                    <div className="flex items-center justify-between gap-2 text-emerald-100 md:block">
+                      <span>Preço manual</span>
+                      <p className="font-semibold">{formatCurrency(priceOverrideDiscountInCents / 100)}</p>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between gap-2 text-muted-foreground md:block">
                     <span>Desconto</span>
                     <p className={discountExceedsSubtotal ? "font-semibold text-destructive" : "font-semibold text-foreground"}>
@@ -1566,7 +1665,11 @@ export function CreateSaleForm({
                     onClick={() => setIsFinalizeDialogOpen(true)}
                   >
                     <Check className="h-4 w-4" />
-                    {nonCashExcessInCents > 0 || paymentShortfallInCents > 0 ? "Ajuste o pagamento" : "Fechar venda"}
+                    {hasInvalidFinalPrice
+                      ? "Ajuste o preço final"
+                      : nonCashExcessInCents > 0 || paymentShortfallInCents > 0
+                        ? "Ajuste o pagamento"
+                        : "Fechar venda"}
                   </Button>
 
                   <ComandaConfirmModal
@@ -1588,6 +1691,12 @@ export function CreateSaleForm({
                           <span>Itens</span>
                           <span className="font-semibold text-foreground">{optimisticItems.length}</span>
                         </div>
+                        {priceOverrideDiscountInCents > 0 ? (
+                          <div className="flex items-center justify-between gap-3 text-emerald-100">
+                            <span>Preço manual</span>
+                            <span className="font-semibold">{formatCurrency(priceOverrideDiscountInCents / 100)}</span>
+                          </div>
+                        ) : null}
                         <div className="flex items-center justify-between gap-3 text-muted-foreground">
                           <span>Desconto</span>
                           <span className="font-semibold text-foreground">{formatCurrency(discountInCents / 100)}</span>
